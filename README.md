@@ -5,10 +5,12 @@ The Parsec Studio website. Vite + React + TypeScript; no runtime dependencies be
 ```sh
 npm install
 npm run dev      # local, http://127.0.0.1:5173
+npm run live     # the same, following the `review` branch (local review before deploy)
 npm run build    # typecheck + static build into dist/
 ```
 
-Deploy: Vercel imports this repo as a Vite project (`vercel.json`). Every push to `main` deploys.
+Deploy: Vercel imports this repo as a Vite project (`vercel.json`). Every push to `main` deploys to production;
+work is reviewed on the `review` branch first (see CLAUDE.md).
 
 ```
 src/site/         the site: Site.tsx, hero/ (the live light), svc/ (service scenes), cases.tsx (cases, player)

@@ -6,6 +6,7 @@
   "description": "parsec.studio — the Parsec Studio website (director-led video production).",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "live": "node scripts/live.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit"
