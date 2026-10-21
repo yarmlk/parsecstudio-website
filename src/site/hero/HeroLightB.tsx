@@ -47,6 +47,7 @@ uniform float uFlare;    // the rim flares before it moves
 uniform float uClr;      // the glass clears: 0 smoked … 1 nothing between us and the film
 uniform float uFit;      // phone: from filling the frame to the whole film
 uniform float uBlur;     // defocus of the film behind the glass (frame heights)
+uniform float uTease;    // hover anticipation: 0 rest … 1 the rim warms up, the glass clears a little
 uniform vec2 uTap[8];
 /* the same 3500 K source seen through haze: scattering leaves it a little deeper */
 #define HZ mix(uWarm, uDeep, 0.62)
@@ -174,7 +175,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float tail = exp(-du * du / (2.0 * st * st));
   float reach = mix(-0.15, 2.6, ign);
   float reveal = smoothstep(reach, reach - 0.55, abs(du)) * smoothstep(0.0, 0.12, ign);
-  float L = (0.38 * pk + 0.50 * body + 0.12 * tail) * reveal * I * front * (1.0 + 0.55 * uFlare);
+  float L = (0.38 * pk + 0.50 * body + 0.12 * tail) * reveal * I * front * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   // far layer: a black room, a wall far behind on the right, lit softly from above
   vec2 pw = p + cam * 0.005 + vec2(0.0, uScroll * 0.36);
@@ -203,7 +204,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
     vec3 R = reel();
     float near = exp(-hIn / 0.13);
     float lit = (0.30 * pk + 0.55 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-    float Tg = 0.03 + 0.20 * near * lit;
+    float Tg = 0.03 + 0.06 * uTease + 0.20 * near * lit;
     vec3 behind = smoked(R / (1.0 + 1.6 * R), clamp(near * lit, 0.0, 1.0)) * Tg * uReelA;
     pc = mix(pc + behind, R, uClr);
   }
@@ -279,7 +280,7 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   float tail = exp(-du * du / (2.0 * st * st));
   float reach = mix(-0.1, 1.2, ign);
   float reveal = smoothstep(reach, reach - 0.3, abs(du)) * smoothstep(0.0, 0.12, ign);
-  float L = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * I * (1.0 + 0.12 * s) * (1.0 + 0.55 * uFlare);
+  float L = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * I * (1.0 + 0.12 * s) * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   vec3 col = vec3(0.0010, 0.0010, 0.0011);
   // the film beyond the far rim: faint across the dark, lit where the light rises
@@ -288,7 +289,7 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
     vec3 fm = reel();
     float near = exp(-h / 0.12);
     float lit = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-    float Tg = 0.016 + 0.17 * near * lit;
+    float Tg = 0.016 + 0.05 * uTease + 0.17 * near * lit;
     vec3 behind = smoked(fm / (1.0 + 1.6 * fm), clamp(near * lit, 0.0, 1.0)) * Tg * uReelA;
     col = mix(col + behind, fm, uClr);
   }
@@ -438,6 +439,28 @@ function rimAt(mode: Mode, x: number, W: number, H: number, drop: number, k: num
   return null;
 }
 
+/* Is a hero point (section px) on the glass the film lives behind? The shader's own test, mirrored: desk, inside the
+   disc (its front layer, at full parallax); phone, beyond the far rim of the plane. */
+function glassAt(mode: Mode, X: number, Y: number, W: number, H: number, drop: number, zoom: number, cx: number, cy: number, scroll: number) {
+  const g = GEO[mode];
+  const A = W / H;
+  // screen → scene: the push-in is undone first
+  let x = (X / W - 0.5) * A, y = 0.5 - Y / H;
+  x = (x - g.F[0]) / zoom + g.F[0];
+  y = (y - g.F[1]) / zoom + g.F[1];
+  if (mode === "desk") { x += cx * 0.024; y += -cy * 0.024 + scroll * 0.2; }
+  else y += scroll * 0.2;
+  const dx = x - g.C[0], dy = y - (g.C[1] - drop);
+  const c = Math.cos(-g.th), s = Math.sin(-g.th);
+  const lx = c * dx - s * dy, ly = s * dx + c * dy;
+  if (mode === "desk") {
+    const a = g.a + drop * (0.25 + 1.4 * drop);
+    const b = ly < 0 ? g.b : 0.55 + 2.5 * drop;
+    return Math.hypot(lx / a, ly / b) < 1;
+  }
+  return Math.hypot(lx / g.a, ly / g.b) > 1 && ly > -0.02;
+}
+
 export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase }: {
   mode: Mode;
   /** filled with open() / close(): call open() straight from the click, so the film may start with sound */
@@ -461,8 +484,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     const emit = (p: ReelPhase) => phaseCb.current(p);
     const rest0 = REST[mode];
     const st = {
-      hot: rest0, hotT: rest0, cx: 0, cy: 0, cxT: 0, cyT: 0, sc: 0, scT: 0,
-      t0: performance.now(), last: performance.now(), aspect: 1.8, frame: 0,
+      hot: rest0, hotT: rest0, cx: 0, cy: 0, cxT: 0, cyT: 0, sc: 0, scT: 0, tease: 0, teaseT: 0,
+      t0: performance.now(), last: performance.now(), aspect: 1.8, frame: 0, zoom: 1, drop: 0, drawn: false,
     };
     const R = {
       phase: "idle" as ReelPhase,
@@ -558,7 +581,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (!visible || document.hidden || R.phase === "open") { running = false; return; }
       // when everything has settled the frame only carries the slow haze and the film: draw at half rate
       const settled = Math.abs(st.hotT - st.hot) < 2e-4 && Math.abs(st.cxT - st.cx) < 2e-4 && Math.abs(st.cyT - st.cy) < 2e-4
-        && Math.abs(st.scT - st.sc) < 2e-4 && now - st.t0 > 12500 && R.phase === "idle" && fin(R.aTw, now);
+        && Math.abs(st.scT - st.sc) < 2e-4 && Math.abs(st.teaseT - st.tease) < 2e-3 && now - st.t0 > 12500 && R.phase === "idle" && fin(R.aTw, now);
       st.frame++;
       if (!settled || st.frame % 2 === 0) draw(now);
       else st.last = now - 1000 / 60;
@@ -649,7 +672,31 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     };
     const onEnded = () => { if (R.phase === "open" || R.phase === "opening") close(); };
     v.addEventListener("ended", onEnded);
-    ctl.current = { open, close, phase: () => R.phase };
+    const local = (clientX: number, clientY: number) => {
+      const r = (section ?? box).getBoundingClientRect();
+      const W = (section ?? box).offsetWidth, H = (section ?? box).offsetHeight;
+      // the site may sit scaled inside its stage: client px → section px
+      return { X: ((clientX - r.left) / r.width) * W, Y: ((clientY - r.top) / r.height) * H, W, H };
+    };
+    ctl.current = {
+      open, close, phase: () => R.phase,
+      tease: (x: number) => { st.teaseT = reduce || fade ? 0 : Math.max(0, Math.min(1, x)); kick(); },
+      onGlass: (clientX: number, clientY: number) => {
+        if (R.phase !== "idle") return false;
+        const { X, Y, W, H } = local(clientX, clientY);
+        if (X < 0 || Y < 0 || X > W || Y > H) return false;
+        return glassAt(mode, X, Y, W, H, st.drop, st.zoom, st.cx, st.cy, st.sc);
+      },
+      spot: () => {
+        if (!st.drawn || !section) return null;
+        const W = section.offsetWidth, H = section.offsetHeight, A = W / H, g = GEO[mode];
+        // the column where the light peaks: the shader puts the peak where the front layer's x meets the hot spot
+        const hx = mode === "desk" ? st.hot - st.cx * 0.024 : st.hot + st.sc * 0.08;
+        const X = (((hx - g.F[0]) * st.zoom + g.F[0]) / A + 0.5) * W;
+        const r = rimAt(mode, X, W, H, st.drop, R.k, st.zoom, st.cx, st.cy, st.sc);
+        return r ? { x: X, y: r.y } : null;
+      },
+    };
 
     if (gl && prog) {
       gl.useProgram(prog);
@@ -664,7 +711,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         res: U("uRes"), time: U("uTime"), mob: U("uMob"), hot: U("uHot"), ign: U("uIgn"), push: U("uPush"),
         scroll: U("uScroll"), unit: U("uUnit"), cam: U("uCam"), warm: U("uWarm"), core: U("uCore"), deep: U("uDeep"),
         reel: U("uReel"), reelA: U("uReelA"), reelAsp: U("uReelAsp"), k: U("uK"), drop: U("uDrop"), flare: U("uFlare"),
-        clr: U("uClr"), fit: U("uFit"), blur: U("uBlur"), tap: U("uTap"),
+        clr: U("uClr"), fit: U("uFit"), blur: U("uBlur"), tap: U("uTap"), tease: U("uTease"),
       };
       gl.uniform3f(u.warm, WARM[0], WARM[1], WARM[2]);
       gl.uniform3f(u.core, CORE[0], CORE[1], CORE[2]);
@@ -740,12 +787,13 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         st.last = now;
         const kk = (per: number) => 1 - Math.pow(1 - per, dt * 60);
         if (reduce) {
-          st.hot = st.hotT; st.cx = st.cxT; st.cy = st.cyT; st.sc = st.scT;
+          st.hot = st.hotT; st.cx = st.cxT; st.cy = st.cyT; st.sc = st.scT; st.tease = st.teaseT;
         } else {
           st.hot += (st.hotT - st.hot) * kk(0.035);
           st.cx += (st.cxT - st.cx) * kk(0.04);
           st.cy += (st.cyT - st.cy) * kk(0.04);
           st.sc += (st.scT - st.sc) * kk(0.09);
+          st.tease += (st.teaseT - st.tease) * kk(0.07);
         }
         // the reveal: the flare holds until the film plays, then the rim goes down
         if (R.phase === "opening" && !R.down) {
@@ -770,7 +818,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         const ign = reduce ? 1 : easeEnter(Math.max(0, el - 0.12) / 2.4);
         const push = reduce ? 0 : easeMove(el / 12);
         const drop = DROP[mode] * R.k;
+        st.zoom = 1 + 0.03 * push; st.drop = drop; st.drawn = true;
         gl.uniform2f(u.res, canvas.width, canvas.height);
+        gl.uniform1f(u.tease, st.tease);
         gl.uniform1f(u.time, reduce ? 20 : el + 20);
         gl.uniform1f(u.hot, st.hot);
         gl.uniform1f(u.ign, ign);

@@ -22,6 +22,12 @@ export interface HeroCtl {
   open: () => void;
   close: () => void;
   phase: () => ReelPhase;
+  /** hover anticipation 0..1, eased inside: the rim warms up and the glass clears a little, the film is about to come */
+  tease: (v: number) => void;
+  /** is this client point on the glass the film lives behind (desk: the disc above the lit rim; phone: above the horizon)? */
+  onGlass: (clientX: number, clientY: number) => boolean;
+  /** where the light is hottest on the rim, in hero-section px (for UI that rides the light); null before the first frame */
+  spot: () => { x: number; y: number } | null;
 }
 
 /** time, length, play state and sound of the hero reel, for PlayerBar; listens only while `live` */
