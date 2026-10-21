@@ -815,22 +815,26 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       };
     }
 
-    // behind the glass: the light cut starts once the light has begun to ignite; or the poster sits there
-    let startT = 0;
-    if (glassFilm) {
-      startT = window.setTimeout(() => {
-        if (R.phase !== "idle") return;
-        setSrc(REEL_SRC.glass);
-        if (visible && !document.hidden) v.play().catch(() => {});
-      }, 900);
-    } else if (gl && prog) posterTex();
+    // behind the glass: the light cut starts once the light has begun to ignite, and only once the hero is seen
+    // (a hero that starts off-screen fetches nothing); otherwise the poster sits there
+    let startT = 0, wantGlass = false;
+    const startGlass = () => {
+      if (R.phase !== "idle" || src) return;
+      if (!visible || document.hidden) { wantGlass = true; return; }
+      wantGlass = false;
+      setSrc(REEL_SRC.glass);
+      v.play().catch(() => {});
+    };
+    if (glassFilm) startT = window.setTimeout(startGlass, 900);
+    else if (gl && prog) posterTex();
 
     const io = new IntersectionObserver((es) => {
       // entries can arrive batched: the last one is the current state
       visible = es[es.length - 1].isIntersecting;
       if (visible) {
         kick();
-        if (R.phase === "idle" && glassFilm && src) v.play().catch(() => {});
+        if (wantGlass) startGlass();
+        else if (R.phase === "idle" && glassFilm && src) v.play().catch(() => {});
       } else {
         halt();
         if (R.phase === "idle") v.pause();
@@ -857,7 +861,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     onScroll();
     const onVis = () => {
       if (document.hidden) { halt(); if (R.phase === "idle") v.pause(); }
-      else { kick(); if (R.phase === "idle" && glassFilm && src && visible) v.play().catch(() => {}); }
+      else { kick(); if (wantGlass) startGlass(); else if (R.phase === "idle" && glassFilm && src && visible) v.play().catch(() => {}); }
     };
     document.addEventListener("visibilitychange", onVis);
 
