@@ -337,9 +337,11 @@ export function usePlayer(src: string | undefined, live: boolean, startMuted = t
 }
 
 export type Player = ReturnType<typeof usePlayer>;
+/** what the bar needs from a player (the hero reel has its own, see hero/reel.ts) */
+export type PlayerLike = Pick<Player, "t" | "d" | "playing" | "muted" | "toggle" | "mute" | "seek">;
 
 /** play · time · the cut as timeline · length · sound. `children` go at the end (e.g. a close button). */
-export function PlayerBar({ pl, dur, children, className }: { pl: Player; dur?: string; children?: ReactNode; className?: string }) {
+export function PlayerBar({ pl, dur, children, className }: { pl: PlayerLike; dur?: string; children?: ReactNode; className?: string }) {
   return (
     <div className={`st-pl${className ? ` ${className}` : ""}`}>
       <button type="button" className="st-round st-pl__play" onClick={pl.toggle} aria-label={pl.playing ? "Pause" : "Play"}>

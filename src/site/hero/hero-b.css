@@ -1,7 +1,18 @@
 /* Hero light B: the live cut. The push-in runs inside the shader, so the plate itself does not scale (a scaled canvas
    would soften the line). The photographic plate shows only when WebGL is unavailable. */
 .st-hero__plate.hlb { animation: none; background: var(--void); }
-.hlb__canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.hlb__fallback { display: none; }
+.hlb__canvas { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; display: block; }
+.hlb .hlb__fallback { display: none; }
 .hlb[data-fallback="1"] { animation: st-push 12s var(--ease-move) both; }
 .hlb[data-fallback="1"] .hlb__fallback { display: block; }
+
+/* The showreel. Behind the glass the shader draws it from this element; once the rim has gone, the element itself is
+   shown, the same frame at the same place (cover on desk, the whole film on the phone), so the hand-over is unseen. */
+.hlb__reel { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; background: transparent; }
+.hlb[data-mode="mob"] .hlb__reel { object-fit: contain; }
+.hlb[data-reel="on"] .hlb__reel { opacity: 1; }
+/* no light to ride (no WebGL, reduced motion): a plain fade */
+.hlb[data-fade] .hlb__reel, .hlb[data-fallback="1"] .hlb__reel { transition: opacity 520ms var(--ease-enter); }
+/* the grain is the glass's; while the film plays it goes */
+.hlb::after { transition: opacity 900ms var(--ease-enter); }
+.hlb[data-reel="on"]::after { opacity: 0; transition-delay: 250ms; }

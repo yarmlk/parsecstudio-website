@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
+import { easeMove } from "../lib/ease";
 import { CONTACT, REVIEWS } from "../lib/facts";
 import { AiFlux } from "../ui/AiFlux";
 import { CutProgress } from "../ui/Cut";
 import { Icon } from "../ui/Icons";
-import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, usePlayer, type Case, type Rect } from "./cases";
+import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, type Case, type Rect } from "./cases";
 import { CutLine, useCutTrack, useReduced } from "./ui";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
+import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -44,11 +46,11 @@ const LOGOS = LOGO_ORDER.map((id) => CLIENT_LOGOS.find((c) => c.id === id)).filt
 const HERO_LOGOS = ["google", "microsoft", "fifa", "nasa", "tefal", "henkel"].map((id) => LOGOS.find((l) => l.id === id)!).filter(Boolean);
 
 /* ── Navigation ───────────────────────────────────────────── */
-function Nav({ mode, active, onGo, onMenu, solid }: { mode: SiteMode; active: number; onGo: (id: SecId) => void; onMenu: () => void; solid: boolean }) {
+function Nav({ mode, active, onGo, onMenu, solid, away }: { mode: SiteMode; active: number; onGo: (id: SecId) => void; onMenu: () => void; solid: boolean; away?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const { ref, pos, ready, hidden } = useCutTrack(hover ?? active, [mode]);
   return (
-    <header className={`st-nav${solid ? " is-solid" : ""}`}>
+    <header className={`st-nav${solid ? " is-solid" : ""}${away ? " is-away" : ""}`} inert={away || undefined}>
       <button type="button" className="st-nav__brand" onClick={() => onGo("hero")} aria-label="parsec studio, back to top">
         <img src={LOGO.lockupWhite} alt="parsec studio" />
       </button>
@@ -102,29 +104,6 @@ function MobileMenu({ active, onGo, onClose }: { active: number; onGo: (id: SecI
         <button type="button" className="st-pill st-pill--paper" onClick={() => onGo("contact")}>Let’s talk</button>
         <a className="st-menu__mail" href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
       </div>
-    </div>
-  );
-}
-
-/* ── Showreel: hosted with the site, in the site's own player. Opened by a click, so it starts with sound. ── */
-const REEL_FILM = { src: "video/site/showreel.mp4", poster: "video/site/showreel.jpg", dur: "0:55" };
-function Reel({ onClose }: { onClose: () => void }) {
-  const pl = usePlayer(REEL_FILM.src, true, false);
-  const closeRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => { closeRef.current?.focus({ preventScroll: true }); }, []);
-  const onKey = (e: ReactKeyboardEvent) => {
-    if (e.key === "Escape") { e.stopPropagation(); onClose(); }
-    if (e.key === " " && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); pl.toggle(); }
-    if (e.key === "m") pl.mute();
-  };
-  return (
-    <div className="st-reel" role="dialog" aria-label="Showreel" onKeyDown={onKey} data-own-keys="">
-      <div className="st-reel__frame">
-        <video {...pl.bind} className="st-reel__video" src={REEL_FILM.src} poster={REEL_FILM.poster} playsInline preload="auto" onClick={pl.toggle} />
-      </div>
-      <PlayerBar pl={pl} dur={REEL_FILM.dur} className="st-reel__bar">
-        <button ref={closeRef} type="button" className="st-round st-reel__close" onClick={onClose} aria-label="Close the showreel"><Icon name="close" size={17} /></button>
-      </PlayerBar>
     </div>
   );
 }
@@ -195,7 +174,46 @@ export function Site({
   const [svcHover, setSvcHover] = useState<number | null>(null);
   const [svOpen, setSvOpen] = useState<number | null>(null);
   const [menu, setMenu] = useState(false);
-  const [reel, setReel] = useState(false);
+  /* the showreel behind the disc: HeroLightB runs the light and the film, the site around it reacts to the phase */
+  const heroCtl = useRef<HeroCtl | null>(null);
+  const reelRef = useRef<HTMLVideoElement | null>(null);
+  const reelBtn = useRef<HTMLButtonElement | null>(null);
+  const reelClose = useRef<HTMLButtonElement | null>(null);
+  const refocus = useRef(false);
+  const [reelPh, setReelPh] = useState<ReelPhase>("idle");
+  const [reelIdle, setReelIdle] = useState(false);
+  const idleT = useRef<number | undefined>(undefined);
+  const reelPl = useReelPlayer(reelRef, reelPh === "open" || reelPh === "opening");
+  const onReelPhase = useCallback((p: ReelPhase) => {
+    setReelPh(p);
+    if (p === "open") requestAnimationFrame(() => reelClose.current?.focus({ preventScroll: true }));
+    if (p === "idle" && refocus.current) {
+      refocus.current = false;
+      requestAnimationFrame(() => reelBtn.current?.focus({ preventScroll: true }));
+    }
+  }, []);
+  const closeReel = useCallback(() => { refocus.current = true; heroCtl.current?.close(); }, []);
+  /* the bar and the close step aside while the film plays and nothing moves */
+  const wake = useCallback(() => {
+    setReelIdle(false);
+    window.clearTimeout(idleT.current);
+    idleT.current = window.setTimeout(() => setReelIdle(true), 2600);
+  }, []);
+  useEffect(() => { if (reelPh === "open") wake(); return () => window.clearTimeout(idleT.current); }, [reelPh, wake]);
+  useEffect(() => {
+    if (reelPh === "idle") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); closeReel(); return; }
+      if (reelPh !== "open") return;
+      const t = e.target as HTMLElement | null;
+      if (e.key === " " && !(t instanceof HTMLButtonElement)) { e.preventDefault(); reelPl.toggle(); }
+      else if (e.key === "m" || e.key === "M") reelPl.mute();
+      else if (e.key === "f" || e.key === "F") fullscreen(reelRef.current);
+      wake();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [reelPh, reelPl, closeReel, wake]);
   const [open, setOpen] = useState<{ list: Case[]; i: number; from: Rect | null; src: "row" | "sv" } | null>(
     startCase != null ? { list: CASES, i: startCase, from: null, src: "row" } : null,
   );
@@ -236,6 +254,8 @@ export function Site({
     const on = () => {
       const y = sc.scrollTop;
       setScrolled(y > 24);
+      const ph = heroCtl.current?.phase();
+      if ((ph === "open" || ph === "opening") && y > sc.clientHeight * 0.3) heroCtl.current?.close();
       const secs = Array.from(sc.querySelectorAll<HTMLElement>("[data-sec]"));
       let cur = "hero" as SecId;
       for (const s of secs) if (s.offsetTop - sc.clientHeight * 0.45 <= y) cur = s.dataset.sec as SecId;
@@ -265,19 +285,40 @@ export function Site({
 
   /* cases row */
   const [rowAt, setRowAt] = useState(0);
+  const rowAnim = useRef(0);
+  /** one card's step (the narrowest: the card under the pointer opens wider) */
   const step = () => {
-    const r = row.current;
-    const c = r?.querySelector<HTMLElement>(".st-card");
-    return c ? c.offsetWidth : 300;
+    const cards = row.current?.querySelectorAll<HTMLElement>(".st-card");
+    if (!cards?.length) return 300;
+    return Math.min(cards[0].offsetWidth, cards[1]?.offsetWidth ?? Infinity);
   };
   const onRow = () => { const r = row.current; if (r) setRowAt(Math.round(r.scrollLeft / step())); };
+  /* the arrows turn the whole row: as many cards as are in view (four on desk), with our move */
   const rowGo = (d: number) => {
     const r = row.current;
     if (!r) return;
+    const s = step();
+    const per = desk ? Math.max(1, Math.floor((r.clientWidth - 72) / s)) : 1;
     const max = r.scrollWidth - r.clientWidth;
-    const next = Math.max(0, Math.min(max, (Math.round(r.scrollLeft / step()) + d) * step()));
-    r.scrollTo({ left: next, behavior: reduced ? "auto" : "smooth" });
+    const from = r.scrollLeft;
+    // to the next page boundary (0, 4, 8 … the end), so back from the end returns to the same pages
+    const cur = from / s;
+    const page = d > 0 ? Math.floor(cur / per + 0.01) + 1 : Math.ceil(cur / per - 0.01) - 1;
+    const to = Math.max(0, Math.min(max, page * per * s));
+    cancelAnimationFrame(rowAnim.current);
+    if (reduced || Math.abs(to - from) < 1) { r.style.scrollSnapType = ""; r.scrollLeft = to; return; }
+    // snapping would fight the tween: off while it runs, back on at a snapped stop
+    r.style.scrollSnapType = "none";
+    const t0 = performance.now(), dur = 640 + Math.min(1, Math.abs(to - from) / 1400) * 380;
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / dur);
+      r.scrollLeft = from + (to - from) * easeMove(k);
+      if (k < 1) rowAnim.current = requestAnimationFrame(tick);
+      else { rowAnim.current = 0; r.style.scrollSnapType = ""; }
+    };
+    rowAnim.current = requestAnimationFrame(tick);
   };
+  useEffect(() => () => cancelAnimationFrame(rowAnim.current), []);
   const rowMax = Math.max(1, CASES.length - (desk ? 4 : 1));
   /* the case grows out of the card's frame and shrinks back into it */
   const frameOf = (card: Element) => card.querySelector(".st-card__img") ?? card;
@@ -331,22 +372,37 @@ export function Site({
     <div ref={root} className={`st-site st-site--${mode}`}>
       <div className="st-site__scroll" ref={scroller}>
         {/* 01 hero */}
-        <section data-sec="hero" className="st-hero">
-          <HeroLightB mode={mode} />
+        <section data-sec="hero" className={`st-hero${reelPh !== "idle" ? " is-reeling" : ""}${reelPh === "open" ? " is-watching" : ""}`}>
+          <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} />
           <div className="st-hero__shade" aria-hidden />
-          <div className="st-hero__in">
-            <h1 className="st-hero__h">Director-led<br />video production.</h1>
-            <div className="st-hero__acts">
+          <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
+            <h1 className="st-hero__h" data-rim="">Director-led<br />video production.</h1>
+            <div className="st-hero__acts" data-rim="">
               <button type="button" className="st-pill st-pill--paper st-pill--lg" onClick={() => goTo("cases")}>Selected works</button>
-              <button type="button" className="st-pill st-pill--lg" onClick={() => setReel(true)}><span className="spark" aria-hidden />Showreel</button>
+              <button ref={reelBtn} type="button" className="st-pill st-pill--lg" onClick={() => heroCtl.current?.open()} aria-label="Watch the showreel"><span className="spark" aria-hidden />Showreel</button>
             </div>
           </div>
           {desk && (
-            <div className="st-hero__rail">
+            <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
               <ul className="st-hero__logos" aria-label="Clients">
                 {HERO_LOGOS.map((l) => <li key={l.id}><img src={l.file} alt={l.name} style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>)}
               </ul>
+            </div>
+          )}
+          {reelPh !== "idle" && (
+            <div
+              className={`st-watch${reelPh === "open" ? " is-on" : ""}${reelIdle && reelPl.playing ? " is-idle" : ""}`}
+              role="group"
+              aria-label="Showreel"
+              onPointerMove={wake}
+              onPointerDown={wake}
+            >
+              <button type="button" className="st-watch__hit" tabIndex={-1} aria-hidden onClick={reelPl.toggle} />
+              <button ref={reelClose} type="button" className="st-round st-watch__close" onClick={closeReel} aria-label="Close the showreel"><Icon name="close" size={17} /></button>
+              <PlayerBar pl={reelPl} dur={REEL_SRC.dur} className="st-watch__bar">
+                <button type="button" className="st-round" onClick={() => fullscreen(reelRef.current)} aria-label="Full screen"><Icon name="expand" size={16} /></button>
+              </PlayerBar>
             </div>
           )}
         </section>
@@ -394,12 +450,12 @@ export function Site({
             )}
           </Head>
           <span className="st-rule" aria-hidden />
-          <div className="st-row" ref={row} onScroll={onRow} data-own-keys="">
+          <div className={`st-row${rowHover != null ? " is-pointing" : ""}`} ref={row} onScroll={onRow} data-own-keys="">
             {CASES.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
-                className={`st-card${open?.src === "row" && open.i === i ? " is-lifted" : ""}`}
+                className={`st-card${open?.src === "row" && open.i === i ? " is-lifted" : ""}${rowHover === i ? " is-hover" : ""}`}
                 onClick={(e) => openCase(i, e.currentTarget)}
                 onPointerEnter={() => desk && setRowHover(i)}
                 onPointerLeave={() => setRowHover(null)}
@@ -516,9 +572,8 @@ export function Site({
       {svOpen != null && (
         <ServiceView key={svOpen} index={svOpen} mode={mode} onClose={closeSv} onWork={openWork} openId={open?.src === "sv" ? open.list[open.i].id : undefined} />
       )}
-      <Nav mode={mode} active={navOn} onGo={goTo} onMenu={() => setMenu(true)} solid={scrolled || svOpen != null} />
+      <Nav mode={mode} active={navOn} onGo={goTo} onMenu={() => setMenu(true)} solid={scrolled || svOpen != null} away={reelPh !== "idle"} />
       {menu && !desk && <MobileMenu active={navOn} onGo={goTo} onClose={() => setMenu(false)} />}
-      {reel && <Reel onClose={() => setReel(false)} />}
       {open && (
         <CaseView
           key={open.from ? `${open.from.x}-${open.from.y}` : "start"}
