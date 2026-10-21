@@ -1,0 +1,7 @@
+/* Hero light B: the live cut. The push-in runs inside the shader, so the plate itself does not scale (a scaled canvas
+   would soften the line). The photographic plate shows only when WebGL is unavailable. */
+.st-hero__plate.hlb { animation: none; background: var(--void); }
+.hlb__canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hlb__fallback { display: none; }
+.hlb[data-fallback="1"] { animation: st-push 12s var(--ease-move) both; }
+.hlb[data-fallback="1"] .hlb__fallback { display: block; }

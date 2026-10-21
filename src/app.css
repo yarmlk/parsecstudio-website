@@ -1,0 +1,7 @@
+/* The window holds one scaled stage; the site scrolls inside it. */
+.app { position: fixed; inset: 0; overflow: hidden; background: var(--void); }
+.app__stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.app__stage > .st-site { position: absolute; inset: 0; }
+/* the first screen fills the window (within limits) */
+.app__stage--desk .st-hero { height: clamp(680px, var(--stage-h), 1040px); }
+.app__stage--mob .st-hero { height: clamp(620px, var(--stage-h), 960px); }

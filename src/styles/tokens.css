@@ -1,0 +1,117 @@
+/* Parsec Studio — brand tokens (v4, single dark theme, FINAL look).
+   Names match the Parsec Studio design system. Use these, never raw values. */
+:root {
+  color-scheme: dark;
+
+  /* blacks */
+  --void: #0b0b0d;
+  --ground: #111114;
+  --graphite: #131316;
+  --plane: #1e1e23;
+
+  /* ink */
+  --paper: #f2f0eb;
+  --paper-2: #e4e2dd;
+  --fog: #b4b2ad;
+  --ash: #8e8c88;
+  --mute: #6e6c69;
+
+  /* the accent pair: Ember (warm light of the cut, 3500K) and its opposite, Frost (cool steel, 7000K) */
+  --ember: #f6c88c;
+  --ember-text: #f3d3a0;     /* ember on dark text, chips */
+  --light-core: #fff1d6;     /* the hot core of the line, the spark */
+  --frost: #9db0c2;
+  --frost-text: #b9c7d4;     /* frost on dark text, chips */
+  /* the AI spectrum: Ember split into five, warm to cool. Only for AI (src/ui/AiFlux.tsx, page 4.3) */
+  --ai-1: #f6c88c;           /* Ember: the split starts from our light */
+  --ai-2: #f0a98e;           /* Rose */
+  --ai-3: #c9a0dc;           /* Violet */
+  --ai-4: #93b1d6;           /* Blue */
+  --ai-5: #9fd6cc;           /* Mint */
+  --ai-ink: #0b0b0d;         /* text set on the spectrum: Void */
+  --ai-line: linear-gradient(90deg, transparent, var(--ai-1) 12%, var(--ai-2) 30%, var(--ai-3) 50%, var(--ai-4) 70%, var(--ai-5) 88%, transparent);
+  --ai-field:
+    radial-gradient(34% 120% at 8% 55%, var(--ai-1) 0%, transparent 70%),
+    radial-gradient(30% 130% at 30% 35%, var(--ai-2) 0%, transparent 70%),
+    radial-gradient(30% 130% at 52% 65%, var(--ai-3) 0%, transparent 70%),
+    radial-gradient(30% 130% at 74% 40%, var(--ai-4) 0%, transparent 70%),
+    radial-gradient(28% 120% at 95% 60%, var(--ai-5) 0%, transparent 70%),
+    linear-gradient(90deg, rgba(246, 200, 140, .55), rgba(240, 169, 142, .55) 25%, rgba(201, 160, 220, .55) 50%, rgba(147, 177, 214, .55) 75%, rgba(159, 214, 204, .55)),
+    #1b1b20;
+  /* legacy aliases (kept so older chapter code still resolves) */
+  --light: var(--ember);
+  --steel: var(--frost);
+
+  /* lines and fills */
+  --hairline: rgba(242, 240, 235, 0.07);
+  --hairline-2: rgba(242, 240, 235, 0.12);
+  --hairline-3: rgba(242, 240, 235, 0.2);
+  --fill-1: rgba(242, 240, 235, 0.035);
+  --fill-2: rgba(242, 240, 235, 0.06);
+  --fill-3: rgba(242, 240, 235, 0.1);
+
+  /* glass — the FINAL look (boards F3 Frost UI, F4 Small signals). Every card in the book is glass. */
+  --glass-fill: rgba(242, 240, 235, 0.06);
+  --glass-fill-hi: rgba(242, 240, 235, 0.08);
+  --glass-blur: blur(28px) saturate(1.3);
+  --glass-edge: inset 0 1px 0 rgba(157, 176, 194, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.7);
+  --glass: var(--glass-edge), var(--glass-shadow);
+  --glass-active-fill: linear-gradient(180deg, rgba(242, 240, 235, 0.1), rgba(242, 240, 235, 0.05));
+  --glass-active: inset 0 1px 0 rgba(255, 236, 204, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 -60px 80px -40px rgba(243, 190, 120, 0.28), var(--glass-shadow);
+  --glass-pill: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  /* older names */
+  --frost-fill-1: rgba(242, 240, 235, 0.05);
+  --frost-fill-2: var(--glass-fill-hi);
+  --frost-edge: rgba(157, 176, 194, 0.55);
+  --warm-edge: rgba(255, 236, 204, 0.45);
+  --underglow: rgba(243, 190, 120, 0.3);
+  --shadow-frost-1: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-frost-2: var(--glass);
+  --shadow-frost-active: var(--glass-active);
+  --shadow-spark: 0 0 8px 2px rgba(246, 200, 140, 0.8), 0 0 26px 8px rgba(240, 160, 80, 0.22);
+
+  /* states */
+  --state-attention: rgba(246, 200, 140, 0.14);
+  --state-agent: rgba(157, 176, 194, 0.14);
+  --state-done: rgba(242, 240, 235, 0.07);
+
+  /* type */
+  --font-display: "Kharkiv Tone", "Geist", system-ui, sans-serif;
+  --font-text: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-quote: "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+
+  --fs-display: clamp(56px, 7.2vw, 128px);   /* openers, cover */
+  --fs-hero: clamp(44px, 5.4vw, 92px);
+  --fs-title: clamp(32px, 3.2vw, 52px);      /* page H2: 46px at 1440 */
+  --fs-h3: clamp(20px, 1.8vw, 30px);         /* card title: 26px at 1440 */
+  --fs-stat: clamp(44px, 4.8vw, 84px);       /* big numbers, Kharkiv Tone */
+  --fs-lead: clamp(14.5px, 1.05vw, 16px);
+  --fs-body: 15px;
+  --fs-small: 13px;
+  --fs-label: 10.5px;
+  --fs-quote: clamp(24px, 2.3vw, 38px);
+
+  /* space (8-step) */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px;
+  --s-8: 32px; --s-10: 40px; --s-12: 48px; --s-16: 64px; --s-18: 72px; --s-24: 96px;
+
+  /* radius */
+  --r-s: 10px; --r-m: 16px; --r-l: 22px; --r-xl: 28px; --r-pill: 999px;
+
+  /* layout */
+  --gutter: clamp(18px, 5vw, 72px);
+  --chrome-top: 64px;
+  --chrome-bot: 72px;
+  --col-gap: clamp(16px, 1.7vw, 24px);
+
+  /* motion */
+  --ease-enter: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --ease-move: cubic-bezier(0.45, 0, 0.2, 1);
+  --t-chip: 160ms;
+  --t-button: 240ms;
+  --t-panel: 320ms;
+  --t-light: 600ms;
+  --t-scene: 900ms;
+}

@@ -1,0 +1,89 @@
+/* Base: reset, type roles, shared utilities. Chapter CSS lives next to each chapter. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+html { background: var(--void); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--paper);
+  font-family: var(--font-text);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+#root { height: 100%; }
+img, video, canvas, svg { display: block; max-width: 100%; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+a { color: inherit; }
+::selection { background: rgba(246, 200, 140, 0.32); color: var(--paper); }
+:focus-visible { outline: 1.5px solid var(--steel); outline-offset: 3px; border-radius: 4px; }
+
+/* scrollbars: quiet */
+* { scrollbar-width: thin; scrollbar-color: rgba(242, 240, 235, 0.14) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(242, 240, 235, 0.12); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Type roles ─────────────────────────────────────────── */
+.t-display { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-display); line-height: .98; letter-spacing: -0.004em; margin: 0; text-wrap: balance; }
+.t-hero { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-hero); line-height: 1.02; letter-spacing: 0.002em; margin: 0; text-wrap: balance; }
+.t-title { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-title); line-height: 1.06; letter-spacing: 0.004em; margin: 0; text-wrap: balance; }
+.t-h3 { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-h3); line-height: 1.15; margin: 0; text-wrap: balance; }
+.t-lead { font-size: var(--fs-lead); line-height: 1.62; font-weight: 300; color: var(--fog); margin: 0; text-wrap: pretty; }
+.t-body { font-size: var(--fs-body); line-height: 1.62; font-weight: 300; color: var(--fog); margin: 0; text-wrap: pretty; }
+.t-small { font-size: var(--fs-small); line-height: 1.5; font-weight: 400; color: var(--ash); margin: 0; }
+.t-label { font-family: var(--font-mono); font-size: var(--fs-label); line-height: 1.4; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ash); }
+.t-data { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; letter-spacing: 0.08em; color: var(--ash); font-variant-numeric: tabular-nums; }
+.t-quote { font-family: var(--font-quote); font-style: italic; font-weight: 400; font-size: var(--fs-quote); line-height: 1.22; color: #e8e4dc; margin: 0; text-wrap: balance; }
+.t-figure { font-family: var(--font-text); font-weight: 300; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+/* Big numbers (500+, 10 years): Kharkiv Tone, the suffix small in frost. Board U3 Bento. */
+.t-stat { font-family: var(--font-display); font-weight: 400; font-size: var(--fs-stat); line-height: .95; letter-spacing: 0; color: var(--paper); margin: 0; font-variant-numeric: tabular-nums; }
+.t-stat sup, .t-stat small { font-family: var(--font-text); font-weight: 300; font-size: .34em; vertical-align: baseline; color: var(--ember-text); margin-left: .06em; }
+/* Arcsecond index: 01″ 02″ — section and step numbers (board F4). */
+.t-arc { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .14em; text-transform: uppercase; color: var(--ash); font-variant-numeric: tabular-nums; }
+.t-arc b { font-weight: 400; color: var(--frost); }
+.t-paper { color: var(--paper); }
+.t-fog { color: var(--fog); }
+.t-ash { color: var(--ash); }
+.t-mute { color: var(--mute); }
+.t-steel, .t-frost { color: var(--frost); }
+.t-ember { color: var(--ember-text); }
+
+/* Ukrainian: Cyrillic headlines are set in Geist 400, whole, so a mixed line ("3D-анімація і CGI") never switches face mid-word. */
+html[lang="uk"] .t-display, html[lang="uk"] .t-hero, html[lang="uk"] .t-title, html[lang="uk"] .t-h3 { font-family: var(--font-text); font-weight: 400; letter-spacing: -0.02em; }
+html[lang="uk"] .t-display { font-size: calc(var(--fs-display) * 0.86); font-weight: 300; }
+html[lang="uk"] .t-hero { font-size: calc(var(--fs-hero) * 0.9); }
+
+/* ── Shared bits ─────────────────────────────────────────── */
+.grain { position: relative; isolation: isolate; }
+.grain::after {
+  content: ""; position: absolute; inset: -40px; z-index: 30; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 240px 240px; opacity: 0.07; mix-blend-mode: soft-light;
+}
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); } 10% { transform: translate(-13px, 9px); } 20% { transform: translate(17px, -21px); }
+  30% { transform: translate(-9px, 25px); } 40% { transform: translate(22px, 5px); } 50% { transform: translate(-25px, -11px); }
+  60% { transform: translate(8px, 19px); } 70% { transform: translate(-19px, -4px); } 80% { transform: translate(12px, -24px); }
+  90% { transform: translate(-4px, 14px); } 100% { transform: translate(0, 0); }
+}
+
+.spark { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--light-core); box-shadow: var(--shadow-spark); flex: none; }
+.spark--steel { background: var(--frost); box-shadow: 0 0 8px 2px rgba(157, 176, 194, 0.55); }
+@keyframes spark-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.spark--pulse { animation: spark-pulse 2.4s ease-in-out infinite; }
+
+.hair { height: 1px; background: var(--hairline); border: 0; margin: 0; }
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .grain::after { animation: none; }
+  .spark--pulse { animation: none; }
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
