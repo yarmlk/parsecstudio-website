@@ -192,9 +192,8 @@ declare global {
 }
 
 /** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
-const BEAM_OUT = 0.22, BEAM_IN = 0.5;
-/** the cut between services: how long the stage takes to go dark before the scene swaps (ms) */
-const CUT_IN = 120;
+const BEAM_OUT = 0.4;
+
 
 /* How hard the scene works, kept for the whole visit (it survives remounts): the canvas's pixel budget and whether the
    light is marched through the haze. The scene starts one step below the top and moves by measured frame times: down
@@ -328,10 +327,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /** the pointer's height (site px); NaN until it moves */
     let yT = NaN;
     // eased state: the service's weights and the prism's turn
-    const st = { spec: 0, proj: 1, k: 0, rot: NaN, svc: Math.max(0, activeRef.current), show: [0, 0, 0] };
+    const st = { spec: 0, proj: 1, k: 0, rot: NaN, az: NaN, svc: Math.max(0, activeRef.current), show: [0, 0, 0] };
     st.spec = st.svc === 1 ? 1 : 0; st.k = st.svc === 2 ? 1 : 0; st.show[st.svc] = 1;
-    /** the cut between services: the service asked for, and when the stage started to go dark for it */
-    const cut = { want: st.svc, at: 0 };
+
     /** where each service's things stand: its light's origin and direction at the middle of its turn (per layout) */
     let place: { o: V3; az: number }[] = [];
     /** how far along its light each service's things stand, and their scale (fitted to the frame per layout) */
@@ -405,22 +403,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (typeof window.__stPrismPy === "number") yT = list.top + ((window.__stPrismPy + 1) / 2) * (list.bottom - list.top);
       px += (pxT - px) * kk(0.035);
 
-      // the service on show (the last one while none is). A switch is a cut: the stage blurs and darkens for a moment
-      // (CSS on the canvas), the scene swaps while it is dark and comes back sharp; nothing fades or regrows
+      // the service on show (the last one while none is). The prism never goes: a switch adds the new name's beam at
+      // once while the old one fades where it is, the light leaving the glass glides to its new colour and aim, and
+      // the things in it change over quickly
       const asked = activeRef.current;
-      if (asked >= 0 && asked !== cut.want) {
-        cut.want = asked;
-        if (drawn && !frozen && !reduce) { cut.at = now; box.classList.add("is-cut"); }
-      }
-      if (cut.want !== st.svc && (frozen || reduce || !drawn || now - cut.at >= CUT_IN)) {
-        st.svc = cut.want;
-        st.spec = st.svc === 1 ? 1 : 0;
-        st.k = st.svc === 2 ? 1 : 0;
-        for (let i = 0; i < 3; i++) st.show[i] = st.svc === i ? 1 : 0;
-        // the prism takes its new turn inside the cut too, so the light never swings across on the way
-        st.rot = NaN;
-        if (box.classList.contains("is-cut")) setTimeout(() => box.classList.remove("is-cut"), 40);
-      }
+      if (asked >= 0) st.svc = asked;
+      const fk = kk(0.16);
+      st.spec += ((st.svc === 1 ? 1 : 0) - st.spec) * fk;
+      st.k += ((st.svc === 2 ? 1 : 0) - st.k) * fk;
+      for (let i = 0; i < 3; i++) st.show[i] += ((st.svc === i ? 1 : 0) - st.show[i]) * kk(0.2);
       const svc = st.svc;
       st.proj = 1 - st.spec;
 
@@ -464,9 +455,14 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // and grows the new one out of the new name into the glass
       const tNow = frozen ? 1e6 : now / 1000;
       if (beam.svc !== svc) {
-        // a switch happens under the cut: the new beam is simply there
-        beam.old = null;
-        beam.tSw = -1e9;
+        // the new beam is simply there; the old one fades where it was
+        if (beam.svc >= 0 && !frozen) {
+          const oa = anchorOf(beam.svc), oo = startAt(oa.x, oa.y, S.slope);
+          const oP = makePrism([0, 0, 0], S.R, S.H, (Number.isNaN(st.rot) ? 0 : st.rot) * DEG);
+          const ot = traceBeam(oP, oo, norm(sub([0, S.hb, 0], oo)), nAt(1, 0));
+          beam.old = { o: oo, pin: ot ? ot.pin : [0, S.hb, 0] };
+          beam.tSw = tNow;
+        } else beam.tSw = -1e9;
         beam.svc = svc;
       }
       const sw = tNow - beam.tSw;
@@ -585,7 +581,13 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the aim: the bundle leaving the glass is turned the last few degrees toward the middle of the stage
       const ta = aim[svc]?.d ?? 0, ca = Math.cos(ta), sa = Math.sin(ta);
       const turn = (v: V3): V3 => [v[0] * ca - v[2] * sa, v[1], v[0] * sa + v[2] * ca];
-      const dE = turn(E.dir ?? d0), dM = turn(M.dir ?? E.dir ?? d0);
+      const pE = turn(E.dir ?? d0), pM = turn(M.dir ?? E.dir ?? d0);
+      // the bundle's heading glides (the prism turning between services never flings the light across)
+      const mAz = Math.atan2(pE[2] + pM[2], pE[0] + pM[0]);
+      st.az = Number.isNaN(st.az) ? mAz : st.az + Math.atan2(Math.sin(mAz - st.az), Math.cos(mAz - st.az)) * kk(0.14);
+      const g = st.az - mAz, cg = Math.cos(g), sg = Math.sin(g);
+      const glide = (v: V3): V3 => [v[0] * cg - v[2] * sg, v[1], v[0] * sg + v[2] * cg];
+      const dE = glide(pE), dM = glide(pM);
       const O: V3 = mul(add(E.out, M.out), 0.5);
       let N = norm(cross(dE, dM));
       if (N[1] < 0) N = mul(N, -1);
@@ -604,9 +606,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the ignite: the light comes out of the letter and travels to the glass, the glass catches it, then the light
       // leaves it. A switch replays only the beam's part: the old one goes, the new one grows, the glass dips a little
       const iB = easeEnter(clamp01(since / 0.6));
-      const grow = Math.min(easeEnter(clamp01(since / 0.55)), easeEnter(clamp01((sw - BEAM_OUT * 0.5) / BEAM_IN)));
+      const grow = easeEnter(clamp01(since / 0.55));
       const beamF = (L + 0.3) - (L + 0.6) * grow;
-      const dip = sw < 3 ? 1 - 0.45 * clamp01(sw / BEAM_OUT) * (1 - easeEnter(clamp01((sw - BEAM_OUT) / (BEAM_IN * 1.2)))) : 1;
+      const dip = 1;
       const iG = easeEnter(clamp01((since - 0.3) / 0.5)) * dip;
       const iForm = easeEnter(clamp01((since - 0.1) / 0.8));
       const iF = easeEnter(clamp01((since - 0.6) / 0.9)) * (0.4 + 0.6 * dip);

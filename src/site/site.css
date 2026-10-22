@@ -187,8 +187,6 @@
 /* the scene's canvas shows with its first frame (the shader may still be compiling when the section arrives) */
 .st-stage__fill > canvas { opacity: 0; transition: opacity 600ms var(--ease-enter), filter 420ms var(--ease-enter); }
 .st-stage__fill[data-ready] > canvas { opacity: 1; }
-/* the cut between services: a moment of blur and dark, the scene swaps inside it */
-.st-stage__fill.is-cut > canvas { filter: blur(12px) brightness(.32); transition: opacity 600ms var(--ease-enter), filter 110ms var(--ease-move); }
 /* the list's side stays calm, but the light leaves the names at full strength */
 .st-stage__shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11, 11, 13, .6) 0%, rgba(11, 11, 13, .22) 22%, rgba(11, 11, 13, 0) 32%),
   linear-gradient(180deg, rgba(11, 11, 13, .9) 0%, rgba(11, 11, 13, 0) 26%); }
