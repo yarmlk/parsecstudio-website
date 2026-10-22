@@ -240,7 +240,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
     float base = mix(mix(0.24, 0.10, uLook), mix(0.085, 0.035, uLook), smoothstep(0.02, 0.5, hIn));
     float Tr = mix(base, mix(0.68, 0.52, uLook), nl) * top * (1.0 + 0.4 * uTease);
     // the pointer's lens: our light shows our work
-    Tr = mix(Tr, mix(0.82, 0.72, uLook) * mix(1.0, top, 0.8), gLens);
+    Tr = mix(Tr, mix(0.6, 0.5, uLook) * mix(1.0, top, 0.8), gLens);
     film = mix(glass(R, Tr) * uReelA, R, uClr);
   }
   col = mix(col, pc * (1.0 - uClr), plane);
@@ -384,7 +384,9 @@ void main(){
   gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0); gHaloN = vec3(0.0); gHaloW = vec3(0.0); gAdapt = vec3(0.0);
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
   // the lens sits on the screen, where the pointer is: a soft round window
-  gLens = uLens.z * (1.0 - smoothstep(0.05, 0.21, length(p - uLens.xy)));
+  // a soft clearing, not a spotlight: wide falloff, never all the way
+  float lr = length(p - uLens.xy);
+  gLens = 0.62 * uLens.z * (1.0 - smoothstep(0.0, 0.26, lr)) * (1.0 - smoothstep(0.0, 0.26, lr));
   // the slow push-in of the camera
   float zoom = 1.0 + 0.03 * uPush;
   vec2 F = uMob > 0.5 ? vec2(0.0, -0.005) : vec2(-0.05, -0.02);
