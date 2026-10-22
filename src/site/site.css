@@ -770,3 +770,8 @@
   .st-tr .act { width: 34px; padding: 0; justify-content: center; }
   .st-tr__tc { min-width: 0; }
 }
+
+/* dev only: Motion object switch on localhost */
+.st-dev-switch { position: absolute; right: 16px; bottom: 16px; z-index: 5; pointer-events: auto; display: flex; gap: 4px; align-items: center; font: 500 11px/1 system-ui, sans-serif; color: rgba(255,255,255,.55); padding: 4px 4px 4px 10px; border-radius: 999px; background: rgba(20,20,20,.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.08); }
+.st-dev-switch button { all: unset; cursor: pointer; padding: 5px 9px; border-radius: 999px; color: rgba(255,255,255,.6); }
+.st-dev-switch button.is-on { background: rgba(255,255,255,.12); color: #fff; }

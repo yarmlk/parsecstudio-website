@@ -15,6 +15,7 @@ export interface Mesh { pos: Float32Array; nrm: Float32Array; idx: Uint16Array }
 /** needs, from its host: `vec3 spectrum(float s)` (all colours fold into our warm light when the spectrum is off) */
 export const CONE_GLSL = `
 uniform vec3 uLO;            // where the light leaves the glass
+uniform float uLSpec;        // how much the light is the AI spectrum
 uniform float uLAE, uLAM;    // the bundle's first and last colour, as directions on the floor (rad)
 uniform float uLWedge;       // how much wider than the bundle the light spreads (rad, each side)
 uniform float uLGain;
@@ -34,10 +35,14 @@ vec3 coneLight(vec3 p){
   float A = smoothstep(hw, hw * 0.35, abs(wrapPi(a - am)));
   float el = atan(v.y, max(r, 1e-3));
   float E = smoothstep(-0.66, -0.34, el) * smoothstep(0.85, 0.5, el);
-  float near = smoothstep(0.1, 0.5, r);
+  // the spectrum (AI) leaves the glass dark and gathers light as it opens; our light is there at once
+  float near = mix(smoothstep(0.1, 0.5, r), smoothstep(0.12, 1.15, r), uLSpec);
   float fall = 1.0 / (1.0 + r * r * 0.26);
   float s = wrapPi(a - uLAE) / (abs(da) < 1e-3 ? 1e-3 : da);
-  return spectrum(s) * A * E * near * fall * uLGain;
+  // and the further its colours travel apart, the purer each gets
+  vec3 c = spectrum(s);
+  c = max(mix(vec3(dot(c, vec3(0.3, 0.5, 0.2))), c, 1.0 + 1.3 * uLSpec * smoothstep(0.5, 2.0, r)), 0.0);
+  return c * A * E * near * fall * uLGain;
 }
 /* one comparison against the shadow map, interpolated between its four nearest texels (no stair-steps) */
 float shadowTap(vec2 uv, float d){
@@ -228,10 +233,10 @@ const MESH_VERT = `
 attribute vec3 aP; attribute vec3 aN;
 uniform mat4 uM, uVP; uniform mat3 uMN;
 uniform float uMirror;
-varying vec3 vW, vN;
+varying vec3 vW, vN, vO;
 void main(){
   vec4 w = uM * vec4(aP, 1.0);
-  vW = w.xyz; vN = uMN * aN;
+  vW = w.xyz; vN = uMN * aN; vO = aP;
   gl_Position = uVP * vec4(w.x, uMirror > 0.5 ? -w.y : w.y, w.z, 1.0);
 }`;
 const DEPTH_FRAG = `
@@ -256,11 +261,31 @@ vec3 spectrum(float s){
 ${cone}
 uniform vec3 uCamPos;
 uniform vec3 uAlb;            // albedo
-uniform float uRough, uF0, uWrap, uGlow, uRim, uMirror, uFade;
+uniform float uRough, uF0, uWrap, uGlow, uRim, uMirror, uFade, uEmit, uPlanet;
 uniform vec2 uRes;
 uniform float uTopY, uTopSoft, uGain, uGrain, uTime;
-varying vec3 vW, vN;
+varying vec3 vW, vN, vO;
 float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float n3(vec3 x){
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+float f3(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * n3(p); p = p * 2.07 + 3.1; a *= 0.5; } return v; }
+/* a planet's own surface, in its own frame (it turns with it): banded and mottled stone, dark seas, fine relief */
+vec3 planetAlb(vec3 o, out float rough){
+  vec3 d = normalize(o);
+  float warp = f3(d * 2.2 + 7.0);
+  float bands = 0.5 + 0.5 * sin(d.y * 11.0 + warp * 4.5);
+  float land = smoothstep(0.42, 0.62, f3(d * 3.4 + warp * 1.6));
+  float fine = f3(d * 22.0);
+  vec3 sea = vec3(0.03, 0.033, 0.04), stone = vec3(0.36, 0.33, 0.29), pale = vec3(0.62, 0.58, 0.52);
+  vec3 c = mix(sea, mix(stone, pale, bands * 0.7), land);
+  c *= 0.78 + 0.44 * fine;
+  rough = mix(0.18, 0.62, land);
+  return c;
+}
 void main(){
   vec3 eye = uCamPos;
   if (uMirror > 0.5) eye.y = -eye.y;
@@ -268,22 +293,27 @@ void main(){
   vec3 N = normalize(vN);
   if (dot(N, V) < 0.0) N = -N;
   vec3 L = normalize(uLO - vW);
+  vec3 alb = uAlb;
+  float rough = uRough;
+  if (uPlanet > 0.5) alb = planetAlb(vO, rough);
   vec3 Li = coneLight(vW) * shadowVis(vW + N * 0.02) * 1.7;   // the things catch more of the light than the satin floor
   float ndl = dot(N, L);
   // marble lets a little light through: the shadow side warms a touch (wrap)
   float diff = max((ndl + uWrap) / (1.0 + uWrap), 0.0);
   vec3 H = normalize(L + V);
-  float sh = exp2(10.0 * (1.0 - uRough) + 1.0);
+  float sh = exp2(10.0 * (1.0 - rough) + 1.0);
   float spec = pow(max(dot(N, H), 0.0), sh) * (sh + 2.0) / 8.0;
   float fr = uF0 + (1.0 - uF0) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
-  vec3 col = Li * (uAlb * diff * (1.0 - fr) + spec * fr * step(0.0, ndl));
+  vec3 col = Li * (alb * diff * (1.0 - fr) + spec * fr * step(0.0, ndl));
   // where the surface turns away from us on the lit side, the light runs along the edge: a line of light on the form
   col += Li * pow(1.0 - max(dot(N, V), 0.0), 3.0) * smoothstep(-0.15, 0.45, ndl) * uRim;
   // the dark room: barely anything, only so the forms are there when the light leaves
-  col += uAlb * 0.006 * (0.4 + 0.6 * max(N.y, 0.0)) + fr * 0.004;
-  col += uAlb * uGlow * length(Li);
+  col += alb * 0.006 * (0.4 + 0.6 * max(N.y, 0.0)) + fr * 0.004;
+  col += alb * uGlow * length(Li);
+  // a hair of light of its own (the orbits' thin lines): there even in the dark, brighter in the light
+  col += uEmit * (vec3(0.9, 0.86, 0.8) * 0.03 + Li * 0.25);
   // the lit floor throws a little of the light back up: surfaces that face down pick it up, warm
-  col += uAlb * coneLight(vec3(vW.x, 0.0, vW.z)) * 0.16 * max(0.0, 0.35 - 0.65 * N.y);
+  col += alb * coneLight(vec3(vW.x, 0.0, vW.z)) * 0.16 * max(0.0, 0.35 - 0.65 * N.y);
   col *= uFade;
   vec2 frag = gl_FragCoord.xy;
   if (uMirror > 0.5) {
@@ -302,15 +332,21 @@ void main(){
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
-export interface Material { alb: V3; rough: number; f0: number; wrap: number; glow: number; rim: number }
+export interface Material { alb: V3; rough: number; f0: number; wrap: number; glow: number; rim: number; emit?: number; planet?: boolean }
 export const MARBLE: Material = { alb: [0.86, 0.84, 0.8], rough: 0.42, f0: 0.04, wrap: 0.28, glow: 0.035, rim: 0.12 };
 /** glossy black ceramic: almost no colour of its own, the light lives in its highlight and along its edges */
+/** a planet: its own banded, mottled surface (in its own frame), soft atmosphere-like rim */
+export const PLANET: Material = { alb: [0.4, 0.37, 0.33], rough: 0.4, f0: 0.04, wrap: 0.12, glow: 0.01, rim: 0.55, planet: true };
+/** an orbit's hairline: nearly no body, a faint light of its own */
+export const ORBIT: Material = { alb: [0.05, 0.05, 0.05], rough: 0.5, f0: 0.04, wrap: 0, glow: 0, rim: 0, emit: 1 };
+/** a moon: pale, fine, matte */
+export const MOON: Material = { alb: [0.58, 0.56, 0.53], rough: 0.6, f0: 0.04, wrap: 0.1, glow: 0.02, rim: 0.4 };
 export const CERAMIC: Material = { alb: [0.014, 0.014, 0.016], rough: 0.1, f0: 0.07, wrap: 0, glow: 0, rim: 0.9 };
 /** thick frosted glass: the light goes into it and glows through */
 export const FROST: Material = { alb: [0.4, 0.4, 0.41], rough: 0.5, f0: 0.04, wrap: 0.9, glow: 0.3, rim: 0.7 };
 
 /** one thing on the stage this frame */
-export interface Item { mesh: number; m: M4; mat: Material; fade: number }
+export interface Item { mesh: number; m: M4; mat: Material; fade: number; cast?: boolean }
 
 interface GPUMesh { vb: WebGLBuffer; nb: WebGLBuffer; ib: WebGLBuffer; n: number }
 
@@ -368,10 +404,18 @@ export class Objects {
 
   /** upload a mesh into slot i */
   set(i: number, m: Mesh) {
-    const gl = this.gl;
+    const gl = this.gl, old = this.meshes[i];
+    if (old) { gl.deleteBuffer(old.vb); gl.deleteBuffer(old.nb); gl.deleteBuffer(old.ib); }
     const b = (target: number, data: ArrayBufferView) => { const x = gl.createBuffer()!; gl.bindBuffer(target, x); gl.bufferData(target, data, gl.STATIC_DRAW); return x; };
     this.meshes[i] = { vb: b(gl.ARRAY_BUFFER, m.pos), nb: b(gl.ARRAY_BUFFER, m.nrm), ib: b(gl.ELEMENT_ARRAY_BUFFER, m.idx), n: m.idx.length };
     this.cpu[i] = m;
+  }
+  /** new positions for mesh i (same count; normals kept) */
+  update(i: number, pos: Float32Array) {
+    const g = this.meshes[i], gl = this.gl;
+    if (!g) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, g.vb);
+    gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
   }
   /** the lowest point of mesh i once tilted by pitch (so a tilted thing can still rest on the floor) */
   lowest(i: number, pitch: number) {
@@ -413,7 +457,7 @@ export class Objects {
     gl.uniform1f(this.u(p, "uMirror"), 0);
     for (const it of items) {
       const g = this.meshes[it.mesh];
-      if (!g || it.fade < 0.3) continue;
+      if (!g || it.fade < 0.3 || it.cast === false) continue;
       this.bindMesh(g);
       gl.uniformMatrix4fv(this.u(p, "uM"), false, it.m);
       gl.uniformMatrix3fv(this.u(p, "uMN"), false, normalMat(it.m));
@@ -443,6 +487,7 @@ export class Objects {
         gl.uniform3f(this.u(p, "uAlb"), it.mat.alb[0], it.mat.alb[1], it.mat.alb[2]);
         gl.uniform1f(this.u(p, "uRough"), it.mat.rough); gl.uniform1f(this.u(p, "uF0"), it.mat.f0);
         gl.uniform1f(this.u(p, "uWrap"), it.mat.wrap); gl.uniform1f(this.u(p, "uGlow"), it.mat.glow); gl.uniform1f(this.u(p, "uRim"), it.mat.rim);
+        gl.uniform1f(this.u(p, "uEmit"), it.mat.emit ?? 0); gl.uniform1f(this.u(p, "uPlanet"), it.mat.planet ? 1 : 0);
         gl.uniform1f(this.u(p, "uFade"), it.fade);
         gl.drawElements(gl.TRIANGLES, g.n, gl.UNSIGNED_SHORT, 0);
       }

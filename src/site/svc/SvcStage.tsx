@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ScenePrism } from "./ScenePrism";
+import { MOTION_VARS, ScenePrism, type MotionVar } from "./ScenePrism";
 
 /* The services stage: one live scene behind the list, the prism at the centre of the section. The active service
    decides what the light does (ScenePrism). The scene is mounted ahead of time, when the section comes within about
@@ -22,6 +22,24 @@ export function SvcStage({ active, mode }: { active: number; mode: "desk" | "mob
         {seen && <ScenePrism active={active} mode={mode} />}
       </div>
       <i className="st-stage__shade" />
+      {import.meta.env.DEV && <MotionSwitch />}
+    </div>
+  );
+}
+
+/** dev only: which object Motion shows, to compare on localhost (remembered in this browser) */
+function MotionSwitch() {
+  const [v, setV] = useState<MotionVar>(() => {
+    let x: MotionVar = "shards";
+    try { x = (localStorage.getItem("st-motion") as MotionVar) || x; } catch { /* no storage */ }
+    window.__stMotion = x;
+    return x;
+  });
+  const pick = (x: MotionVar) => { setV(x); window.__stMotion = x; try { localStorage.setItem("st-motion", x); } catch { /* no storage */ } };
+  return (
+    <div className="st-dev-switch" aria-hidden>
+      Motion:
+      {MOTION_VARS.map((x) => <button key={x} type="button" className={x === v ? "is-on" : undefined} onClick={() => pick(x)}>{x}</button>)}
     </div>
   );
 }
