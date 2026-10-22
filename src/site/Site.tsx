@@ -10,6 +10,7 @@ import { CutLine, useCutTrack, useReduced } from "./ui";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
+import { CtaDevPanel, GlassPlay, ReelButton, useCtaVariant, useTease } from "./hero/ReelCta";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -175,6 +176,7 @@ export function Site({
   const [svOpen, setSvOpen] = useState<number | null>(null);
   const [menu, setMenu] = useState(false);
   /* the showreel behind the disc: HeroLightB runs the light and the film, the site around it reacts to the phase */
+  const heroRef = useRef<HTMLElement | null>(null);
   const heroCtl = useRef<HeroCtl | null>(null);
   const reelRef = useRef<HTMLVideoElement | null>(null);
   const reelBtn = useRef<HTMLButtonElement | null>(null);
@@ -184,14 +186,28 @@ export function Site({
   const [reelIdle, setReelIdle] = useState(false);
   const idleT = useRef<number | undefined>(undefined);
   const reelPl = useReelPlayer(reelRef, reelPh === "open" || reelPh === "opening");
+  /* the showreel's controls (hero/ReelCta): the glass itself plays the film; DEV compares the button's variants */
+  const cta = useCtaVariant();
+  const tease = useTease(heroCtl);
+  const openReel = useCallback(() => heroCtl.current?.open(), []);
+  /** focus goes back to the Showreel control once it is interactive again (it leaves `inert` with the idle render) */
+  const focusReelBtn = useCallback(() => {
+    let n = 0;
+    const go = () => {
+      const b = reelBtn.current;
+      b?.focus({ preventScroll: true });
+      if ((!b || document.activeElement !== b) && ++n < 10) requestAnimationFrame(go);
+    };
+    requestAnimationFrame(go);
+  }, []);
   const onReelPhase = useCallback((p: ReelPhase) => {
     setReelPh(p);
     if (p === "open") requestAnimationFrame(() => reelClose.current?.focus({ preventScroll: true }));
     if (p === "idle" && refocus.current) {
       refocus.current = false;
-      requestAnimationFrame(() => reelBtn.current?.focus({ preventScroll: true }));
+      focusReelBtn();
     }
-  }, []);
+  }, [focusReelBtn]);
   const closeReel = useCallback(() => { refocus.current = true; heroCtl.current?.close(); }, []);
   /* the bar and the close step aside while the film plays and nothing moves */
   const wake = useCallback(() => {
@@ -372,16 +388,17 @@ export function Site({
     <div ref={root} className={`st-site st-site--${mode}`}>
       <div className="st-site__scroll" ref={scroller}>
         {/* 01 hero */}
-        <section data-sec="hero" className={`st-hero${reelPh !== "idle" ? " is-reeling" : ""}${reelPh === "open" ? " is-watching" : ""}`}>
+        <section ref={heroRef} data-sec="hero" className={`st-hero${reelPh !== "idle" ? " is-reeling" : ""}${reelPh === "open" ? " is-watching" : ""}`}>
           <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} />
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production.</h1>
             <div className="st-hero__acts" data-rim="">
               <button type="button" className="st-pill st-pill--paper st-pill--lg" onClick={() => goTo("cases")}>Selected works</button>
-              <button ref={reelBtn} type="button" className="st-pill st-pill--lg" onClick={() => heroCtl.current?.open()} aria-label="Watch the showreel"><span className="spark" aria-hidden />Showreel</button>
+              <ReelButton variant={cta} btnRef={reelBtn} reel={reelRef} idle={reelPh === "idle"} onOpen={openReel} tease={tease} />
             </div>
           </div>
+          <GlassPlay hero={heroRef} ctl={heroCtl} mode={mode} variant={cta} phase={reelPh} tease={tease} />
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
@@ -574,6 +591,7 @@ export function Site({
       )}
       <Nav mode={mode} active={navOn} onGo={goTo} onMenu={() => setMenu(true)} solid={scrolled || svOpen != null} away={reelPh !== "idle"} />
       {menu && !desk && <MobileMenu active={navOn} onGo={goTo} onClose={() => setMenu(false)} />}
+      <CtaDevPanel />
       {open && (
         <CaseView
           key={open.from ? `${open.from.x}-${open.from.y}` : "start"}
