@@ -10,7 +10,7 @@ import { CutLine, useCutTrack, useReduced } from "./ui";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
-import { CtaDevPanel, GlassPlay, ReelButton, useCtaVariant, useTease } from "./hero/ReelCta";
+import { CtaDevPanel, GlassPlay, ReelButton, RideLabel, useCtaVariant, useTease } from "./hero/ReelCta";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -186,9 +186,10 @@ export function Site({
   const [reelIdle, setReelIdle] = useState(false);
   const idleT = useRef<number | undefined>(undefined);
   const reelPl = useReelPlayer(reelRef, reelPh === "open" || reelPh === "opening");
-  /* the showreel's controls (hero/ReelCta): the glass itself plays the film; DEV compares the button's variants */
+  /* the showreel's controls (hero/ReelCta): the glass itself plays the film; the button is A, B or C (DEV compares) */
   const cta = useCtaVariant();
   const tease = useTease(heroCtl);
+  const [rideDock, setRideDock] = useState(false);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
   /** focus goes back to the Showreel control once it is interactive again (it leaves `inert` with the idle render) */
   const focusReelBtn = useCallback(() => {
@@ -395,9 +396,14 @@ export function Site({
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production.</h1>
             <div className="st-hero__acts" data-rim="">
               <button type="button" className="st-pill st-pill--paper st-pill--lg" onClick={() => goTo("cases")}>Selected works</button>
-              <ReelButton variant={cta} btnRef={reelBtn} reel={reelRef} idle={reelPh === "idle"} onOpen={openReel} tease={tease} />
+              {(cta !== "b" || rideDock) && (
+                <ReelButton variant={cta === "b" ? "c" : cta} btnRef={reelBtn} reel={reelRef} idle={reelPh === "idle"} onOpen={openReel} tease={tease} />
+              )}
             </div>
           </div>
+          {cta === "b" && !rideDock && (
+            <RideLabel ctl={heroCtl} mode={mode} idle={reelPh === "idle"} btnRef={reelBtn} onOpen={openReel} tease={tease} onNoLight={() => setRideDock(true)} />
+          )}
           <GlassPlay hero={heroRef} ctl={heroCtl} mode={mode} variant={cta} phase={reelPh} tease={tease} />
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
