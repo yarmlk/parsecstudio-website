@@ -22,6 +22,7 @@ uniform float uPx, uCore;
 uniform vec4 uPl[5];
 uniform float uBev;
 uniform vec3 uTint, uEta;
+uniform float uFrost;
 
 uniform vec3 uBA, uPin, uPoE, uPoM;
 uniform vec3 uIrA, uIrB;
@@ -190,7 +191,12 @@ vec3 fanCol(vec2 xz, float soft, out float r){
   float s = (a - uFanAE) / da;
   float ws = wid / max(r * abs(da), 1e-3);
   // our light (Motion, Vertical) carries one colour; AI parts it into the spectrum
-  return mix(uS0, spectrumW(s, ws), uSpecW) * body * 0.06 / (0.06 + r * abs(da) + wid);
+  // AI: the further the colours travel apart, the purer each one gets
+  vec3 sc = spectrumW(s, ws);
+  sc = max(mix(vec3(dot(sc, vec3(0.3, 0.5, 0.2))), sc, 1.0 + 1.3 * smoothstep(0.45, 1.8, r)), 0.0);
+  // and comes out of the glass dark, gathering light as it opens
+  float entry = mix(1.0, smoothstep(0.06, 0.85, r), uSpecW);
+  return mix(uS0, sc, uSpecW) * body * entry * 0.06 / (0.06 + r * abs(da) + wid);
 }
 /* the fan in the haze: a sheet of light leaving the glass, opening warm → cool, descending onto the floor */
 vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
@@ -353,7 +359,8 @@ vec3 prismMirror(vec3 ro, vec3 rd){
   float e;
   prismN(p, e);
   float tx = h.y - h.x;
-  return lightsGlass(p, rd, tx, 3.0) * exp(-uTint * tx) * 0.42 + glassGlow(p) * (0.05 + e * 0.8);
+  // a light frost on the glass: the satin floor mirrors it as a soft glow, not a second sharp prism
+  return lightsGlass(p, rd, tx, 3.0) * exp(-uTint * tx) * 0.16 + glassGlow(p) * (0.05 + e * 0.5);
 }
 
 /* ---------- glass, seen ---------- */
@@ -411,7 +418,9 @@ vec3 glassView(vec3 ro, vec3 rd, float tN, float tc){
     vec3 v = (back + inner) * exp(-uTint * tx);
     if (c == 0) tr.r = v.r; else if (c == 1) tr.g = v.g; else tr.b = v.b;
   }
-  vec3 col = refl * F * uIForm + (tr + ghost) * (1.0 - F);
+  // a very light frost: the surface mirrors a little less sharply, and a milky veil of the light held inside lifts it
+  vec3 col = refl * F * uIForm * (1.0 - 0.45 * uFrost) + (tr + ghost) * (1.0 - F) * (1.0 - 0.18 * uFrost);
+  col += (glassGlow(p) * 0.12 + uWarm * 0.006) * uFrost * uIForm;
   // the rounded edges catch the light trapped in the glass, and the room's faint sheen
   col += glassGlow(p) * 0.025 + edgeLight(p) * e;
   col += (env(rr) * 1.5 + uWarm * 0.02) * e * uIForm;
