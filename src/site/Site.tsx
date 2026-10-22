@@ -6,6 +6,7 @@ import { AiFlux } from "../ui/AiFlux";
 import { CutProgress } from "../ui/Cut";
 import { Icon } from "../ui/Icons";
 import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, type Case, type Rect } from "./cases";
+import { LogoGrid } from "./clients";
 import { CutLine, useCutTrack, useReduced } from "./ui";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
@@ -504,15 +505,12 @@ export function Site({
           </div>
         </section>
 
-        {/* 04 clients: 3 rows of 4, white logos in glass over the light (the deck's client slide) */}
+        {/* 04 clients: 3 rows of 4, white logos in glass over the light (the deck's client slide); the pointer sends a
+            pulse of light through each tile it enters (clients.tsx) */}
         <section data-sec="clients" className="st-sec st-clients">
           <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" loading="lazy" /></div>
           <Head label="100+ happy customers" title="Clients" />
-          <ul className="st-logos">
-            {LOGOS.map((l) => (
-              <li key={l.id} className="st-logo"><img src={l.file} alt={l.name} loading="lazy" style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>
-            ))}
-          </ul>
+          <LogoGrid logos={LOGOS} widths={LOGO_W} />
         </section>
 
         {/* 05 reviews */}

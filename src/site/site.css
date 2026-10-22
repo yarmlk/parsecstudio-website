@@ -308,13 +308,21 @@
 .st-clients__plate::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(11, 11, 13, .22); }
 .st-logos { position: relative; z-index: 1; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 140px; gap: 16px; --k: .64; }
 .st-logo {
-  min-width: 0; border-radius: 22px; display: flex; align-items: center; justify-content: center;
+  position: relative; min-width: 0; border-radius: 22px; display: flex; align-items: center; justify-content: center;
   background: rgba(242, 240, 235, .06); -webkit-backdrop-filter: blur(32px) saturate(1.3) brightness(.16); backdrop-filter: blur(32px) saturate(1.3) brightness(.16);
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .42), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 40px 80px -40px rgba(0, 0, 0, .7);
-  transition: background-color var(--t-panel) var(--ease-enter), box-shadow var(--t-panel) var(--ease-enter);
 }
-.st-logo:hover { background: rgba(242, 240, 235, .085); box-shadow: inset 0 1px 0 rgba(255, 236, 204, .5), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -60px 80px -50px rgba(246, 190, 120, .32), 0 40px 80px -40px rgba(0, 0, 0, .7); }
-.st-logo img { width: calc(var(--w) * var(--k) * 1px); max-width: 84%; height: auto; }
+.st-logo img { position: relative; width: calc(var(--w) * var(--k) * 1px); max-width: 84%; height: auto; }
+/* the pulse (clients.tsx): a warm bloom from where the pointer came in, and the glass's edges catching it */
+.st-logo__light { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.st-logo__bloom {
+  position: absolute; width: 170%; aspect-ratio: 1; border-radius: 50%; opacity: 0; will-change: transform, opacity;
+  background: radial-gradient(closest-side, rgba(255, 241, 214, .26), rgba(246, 200, 140, .15) 30%, rgba(246, 200, 140, .06) 58%, rgba(246, 200, 140, 0));
+}
+.st-logo__rim {
+  position: absolute; inset: 0; border-radius: inherit; opacity: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 236, 204, .5), inset 0 -60px 80px -50px rgba(246, 190, 120, .3);
+}
 
 /* 05 reviews: verbatim, in the quote face */
 .st-revbar { display: flex; gap: 4px; width: 200px; margin-right: 14px; }
