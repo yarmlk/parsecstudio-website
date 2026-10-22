@@ -227,12 +227,13 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   vec3 pc = vec3(0.0006, 0.00058, 0.00055);
   // Fresnel: the far part of the disc is seen at a grazing angle, so it reflects more (and lets less through)
   float far = smoothstep(-0.2, 0.45, r.y);
-  // a soft-box far above, reflected in the top surface: one broad cool-neutral panel across the disc. Its far edge is
-  // defined (a reflection has an edge, haze has none) but soft, it fades towards us, its ends are softer. A reflection slides
-  // against the surface as the camera moves, so it never moves with the film: that is what puts the film behind.
+  // a soft-box far above, reflected in the top surface: one broad cool-neutral sheen across the disc, fading towards us
+  // and at its ends. A reflection slides against the surface as the camera moves, so it never moves with the film: that
+  // is what puts the film behind.
   vec2 sbq = r - vec2(0.26 - cam.x * ${gf(PAR.sheen)}, 0.105 + cam.y * 0.05);
-  float sbx = smoothstep(0.66, 0.18, abs(sbq.x));
-  float sby = smoothstep(0.008, -0.008, sbq.y) * pow(smoothstep(-0.2, 0.0, sbq.y), 1.8);
+  // its far edge is a soft falloff, never a line: the sheen brightens gently toward it and melts into the dark beyond
+  float sbx = smoothstep(0.72, 0.1, abs(sbq.x));
+  float sby = smoothstep(0.11, -0.07, sbq.y) * pow(smoothstep(-0.34, 0.0, sbq.y), 1.3);
   pc += mix(cool, vec3(1.0), 0.5) * ${gf(GLASS.softbox)} * sbx * sby * (0.6 + 0.4 * far) * smoothstep(0.02, 0.12, hIn) * (1.0 - 0.7 * gLens);
   // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim, in the rounded edge
   // above all. A reflection slides against its surface when the camera moves, so it travels further than the light.
@@ -349,7 +350,7 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   float h = max(dN, 0.0);
   gBend = bevel(h) * above;
   vec2 sbq = vec2(pn.x + 0.06, gUV.y - 0.80 + 0.10 * pn.x);
-  float box = smoothstep(0.30, 0.04, abs(sbq.x)) * smoothstep(0.07, 0.012, abs(sbq.y));
+  float box = smoothstep(0.34, 0.02, abs(sbq.x)) * smoothstep(0.17, 0.0, abs(sbq.y));
   col += mix(cool, vec3(1.0), 0.5) * ${gf(GLASS.softbox * 0.55)} * box * above * (1.0 - uClr);
   vec3 film = vec3(0.0);
   if (above > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
