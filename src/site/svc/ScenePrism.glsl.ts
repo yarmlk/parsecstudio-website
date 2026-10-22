@@ -6,6 +6,8 @@
    the cover's line model (a thin core and two bloom falloffs in pixels), the cover's smoke, static grain and tone.
    Cost: the floor's mirror and everything seen through the glass use cheaper smoke; the blurred spectrum is a texture. */
 
+import { CONE_GLSL } from "./ScenePrism.objects";
+
 export const PRISM_VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
 
 export const PRISM_FRAG = `
@@ -33,9 +35,8 @@ uniform float uFadeLen;
 /* the beam before a switch, going where it was (uIB0 → 0) */
 uniform vec3 uBA0, uPin0;
 uniform float uIB0;
-/* Motion and Vertical: our light leaves the glass as one warm bundle and spreads on the floor. uSpecW: the AI
-   spectrum's weight, uProjW: our light's, uProjK: 0 Motion … 1 Vertical */
-uniform float uSpecW, uProjW, uProjK, uWedge;
+/* uSpecW: how much the light is the AI spectrum (1) rather than our one warm light (0) */
+uniform float uSpecW;
 uniform float uTopY, uTopSoft;   // the hairline under the head: the scene fades out before it (canvas px from the bottom)
 uniform vec3 uS0, uS1, uS2, uS3, uS4;
 uniform sampler2D uSpec;
@@ -67,6 +68,33 @@ vec3 spectrum(float s){
 /* the colour of a bundle of the fan that is still w (in s units) wide — a Gaussian-blurred spectrum, precomputed;
    near the glass all colours overlap into warm white */
 vec3 spectrumW(float s, float w){ return texture2D(uSpec, vec2((s + 0.75) / 2.5, clamp(w / 2.4, 0.0, 1.0))).rgb * 1.6; }
+/* the light leaving the glass as it falls on the objects and the floor, and their shadows (shared with the objects) */
+${CONE_GLSL}
+/* our light in the haze: the whole cone glows faintly in the air, and the objects cut shafts of shadow through it
+   (marched in 12 dithered steps inside the light's reach) */
+uniform float uAirCone;
+vec3 coneAir(vec3 ro, vec3 rd, float tmax){
+  if (uAirCone < 1e-4) return vec3(0.0);
+  vec3 oc = ro - uLO;
+  float b = dot(oc, rd), c = dot(oc, oc) - 10.0;
+  float h = b * b - c;
+  if (h < 0.0) return vec3(0.0);
+  h = sqrt(h);
+  float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
+  if (t1 <= t0) return vec3(0.0);
+  float dt = (t1 - t0) / 12.0;
+  float j = hash(gl_FragCoord.xy * 1.37 + 5.1);
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 12; i++) {
+    vec3 p = ro + rd * (t0 + (float(i) + j) * dt);
+    if (p.y < 0.0) break;
+    vec3 cl = coneLight(p);
+    if (cl.r + cl.g + cl.b < 1e-4) continue;
+    acc += cl * shadowVis1(p);
+  }
+  vec3 pm = ro + rd * (0.5 * (t0 + t1));
+  return acc * dt * uAirCone * mix(0.7, 1.3, smokeLite(pm.xz * 1.7 + pm.y));
+}
 
 /* closest approach of the ray ro + rd t (t0..t1) to the segment a → b: (distance, t, u 0..1) */
 vec3 seg(vec3 ro, vec3 rd, float t0, float t1, vec3 a, vec3 b){
@@ -165,7 +193,9 @@ vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
   vec3 c = fanCol(p.xz, soft, r);
   if (c.r + c.g + c.b < 1e-5) return vec3(0.0);
   float sm = lite > 0.5 ? 0.8 : mix(0.35, 1.35, smokeLite(vec2(r * 2.4, (p.x - p.z) * 3.0 + p.y * 4.0)));
-  return c * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
+  // the objects cut the sheet of light in the haze: their shadows run through the air
+  float vis = lite > 0.5 ? 1.0 : shadowVis(p);
+  return c * vis * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
 }
 
 /* ---------- the beam ---------- */
@@ -258,6 +288,8 @@ vec3 floorLight(vec3 p, vec3 rd){
   // the fan lands: each colour's bundle meets the floor along a soft footprint, the satin spreads it a little more
   float r2;
   vec3 c2 = fanCol(p.xz, uPoolSoft * 2.4, r2);
+  vec3 cl = coneLight(p);
+  float vis = (c2.r + c2.g + c2.b > 1e-5 || cl.r + cl.g + cl.b > 1e-5) ? shadowVis(p) : 1.0;
   if (c2.r + c2.g + c2.b > 1e-5) {
     float r;
     vec3 c = fanCol(p.xz, uPoolSoft, r);
@@ -276,22 +308,13 @@ vec3 floorLight(vec3 p, vec3 rd){
     vec3 c3 = fanCol(p.xz, uPoolSoft * 4.5, r3);
     float th3 = th * 5.0 + 0.15;
     float bloom = exp(-(ys * ys) / (th3 * th3));
-    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain;
+    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis;
   }
-  // our light (Motion, Vertical): past where the bundle reaches the floor it spreads into a wedge of light
-  if (uProjW > 0.002) {
-    vec2 v = p.xz - uFanO.xz;
-    float r = length(v);
-    float a = atan(v.y, v.x);
-    float dm = a - 0.5 * (uFanAE + uFanAM);
-    dm = mod(dm + 3.14159265, 6.2831853) - 3.14159265;
-    float hw = 0.5 * abs(uFanAM - uFanAE) + uWedge;
-    float Ld = uFanO.y / max(uFanM, 0.05);
-    float F = smoothstep(hw, hw * 0.45, abs(dm)) * smoothstep(Ld * 0.7, Ld * 1.05, r) * exp(-max(r - Ld, 0.0) / 1.6);
-    if (F > 0.001) {
-      float sm = smokeLite(vec2(r * 2.0, a * 3.0));
-      col += uS0 * F * 0.3 * mix(0.8, 1.15, sm) * uProjW * uIP;
-    }
+  // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
+  // shadows; the satin breaks it up a little
+  if (cl.r + cl.g + cl.b > 1e-5) {
+    float sm = smokeLite(vec2(length(p.xz - uLO.xz) * 2.0, atan(p.z - uLO.z, p.x - uLO.x) * 3.0));
+    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.42, 0.12, uSpecW) * uIP;
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);
@@ -388,7 +411,7 @@ void main(){
   vec3 pf = ro + rd * tFl;
 
   // the room: haze, then the satin floor (it mirrors softly and fades into the dark)
-  vec3 bg = lightsAir(ro, rd, 0.0, min(tFl, 40.0), 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tFl, 1.0, 0.0);
+  vec3 bg = lightsAir(ro, rd, 0.0, min(tFl, 40.0), 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tFl, 1.0, 0.0) + coneAir(ro, rd, min(tFl, 40.0));
   if (tFl < 1e3) {
     vec3 fl = vec3(0.029, 0.029, 0.033) + floorLight(pf, rd);
     vec3 rr = reflect(rd, vec3(0.0, 1.0, 0.0));
