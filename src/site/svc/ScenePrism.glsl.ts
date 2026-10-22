@@ -314,7 +314,7 @@ vec3 floorLight(vec3 p, vec3 rd){
   // shadows; the satin breaks it up a little
   if (cl.r + cl.g + cl.b > 1e-5) {
     float sm = smokeLite(vec2(length(p.xz - uLO.xz) * 2.0, atan(p.z - uLO.z, p.x - uLO.x) * 3.0));
-    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.42, 0.12, uSpecW) * uIP;
+    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.12, uSpecW) * uIP;
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);

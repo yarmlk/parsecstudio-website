@@ -567,14 +567,14 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
         // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
         // half to us and half to the other, leaning back a touch so the faces meet the camera above
-        // across the light, apart enough that neither stands in the other's shadow: the far one nearer the glass
-        const a = at(2, sd.d + 0.28 * sc, -0.46 * sc, 0), b = at(2, sd.d - 0.3 * sc, 0.46 * sc, 0), f = st.show[2];
+        // two figures on a stage: side by side along the light, each cheated out to us and turned to the other, the
+        // further one a step back so the nearer one's shadow passes it by; the light keys one face and rims the other
+        const a = at(2, sd.d - 0.42 * sc, -0.2 * sc, 0), b = at(2, sd.d + 0.42 * sc, 0.22 * sc, 0), f = st.show[2];
         const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
-        const lean = -0.42;
+        const lean = -0.24;
         const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
-        const ya = blend(facing(a, b), toCam(a), 0.5) + 0.06 * Math.sin(0.5 * tSec);
-        // the one further out turns a little toward the light as well, so its face comes up in it
-        const yb = blend(blend(facing(b, a), toCam(b), 0.36), facing(b, place[2]?.o ?? [0, 0, 0]), 0.28) + 0.06 * Math.sin(0.5 * tSec + 2.2);
+        const ya = blend(toCam(a), facing(a, b), 0.5) + 0.06 * Math.sin(0.5 * tSec);
+        const yb = blend(toCam(b), facing(b, a), 0.5) + 0.06 * Math.sin(0.5 * tSec + 2.2);
         items.push({ mesh: M_CAESAR, m: model([a[0], -objs.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: model([b[0], -objs.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
       }
