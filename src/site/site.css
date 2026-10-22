@@ -87,9 +87,11 @@
   position: absolute; z-index: 20; left: 72px; right: 72px; top: 24px; height: 60px; padding: 0 10px 0 26px; border-radius: var(--r-pill);
   display: flex; align-items: center; justify-content: space-between;
   background: rgba(24, 24, 28, 0); box-shadow: inset 0 1px 0 rgba(157, 176, 194, 0), inset 0 0 0 1px rgba(255, 255, 255, 0), 0 20px 50px -24px rgba(0, 0, 0, 0);
-  transition: background-color 420ms var(--ease-enter), box-shadow 420ms var(--ease-enter), -webkit-backdrop-filter 420ms var(--ease-enter), backdrop-filter 420ms var(--ease-enter), opacity 520ms var(--ease-enter);
+  transition: background-color 420ms var(--ease-enter), box-shadow 420ms var(--ease-enter), -webkit-backdrop-filter 420ms var(--ease-enter), backdrop-filter 420ms var(--ease-enter), opacity 700ms var(--ease-enter) 200ms;
 }
-.st-nav.is-away { opacity: 0; pointer-events: none; }
+.st-nav.is-away { pointer-events: none; }
+/* the nav steps away when the light starts down, and comes back with it */
+.st-site:has(.hlb[data-down]) .st-nav { opacity: 0; transition: opacity 600ms var(--ease-move); }
 /* the nav lands with the rail, after the light and the headline */
 .st-nav > * { animation: st-fade 900ms var(--ease-enter) 700ms backwards; }
 .st-nav.is-solid {
@@ -109,7 +111,7 @@
 .st-hero { position: relative; height: 802px; overflow: hidden; background: var(--void); }
 .st-hero__plate { position: absolute; inset: 0; animation: st-push 12s var(--ease-move) both; }
 .st-hero__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; transition: transform 1400ms var(--ease-enter); }
-.st-hero__shade { position: absolute; inset: 0; z-index: 31; pointer-events: none; background: linear-gradient(180deg, rgba(11, 11, 13, 0) 42%, rgba(11, 11, 13, .82) 100%); transition: opacity 900ms var(--ease-enter); }
+.st-hero__shade { position: absolute; inset: 0; z-index: 31; pointer-events: none; background: linear-gradient(180deg, rgba(11, 11, 13, 0) 42%, rgba(11, 11, 13, .82) 100%); transition: opacity 900ms var(--ease-enter) 200ms; }
 .st-hero__in { position: absolute; z-index: 32; left: 72px; bottom: 120px; width: 760px; display: flex; flex-direction: column; gap: 26px; }
 .st-hero__in > * { animation: st-rise 900ms var(--ease-enter) backwards; }
 .st-hero__in > :nth-child(1) { animation-delay: 300ms; }
@@ -427,7 +429,7 @@
    (masks set from the shader's geometry); once it has gone the film plays in the hero with our bar. */
 .st-hero.is-reeling .st-hero__in, .st-hero.is-reeling .st-hero__rail { pointer-events: none; }
 .st-hero.is-watching .st-hero__in, .st-hero.is-watching .st-hero__rail { visibility: hidden; }
-.st-hero.is-reeling .st-hero__shade { opacity: 0; transition: opacity 1500ms var(--ease-move) 350ms; }
+.st-hero:has(.hlb[data-down]) .st-hero__shade { opacity: 0; transition: opacity 900ms var(--ease-move); }
 .st-hero[data-fade] .st-hero__in, .st-hero[data-fade] .st-hero__rail { transition: opacity 480ms var(--ease-enter); }
 .st-hero[data-fade].is-reeling .st-hero__in, .st-hero[data-fade].is-reeling .st-hero__rail { opacity: 0; }
 .st-watch { position: absolute; inset: 0; z-index: 40; opacity: 0; pointer-events: none; transition: opacity 640ms var(--ease-enter); }

@@ -53,6 +53,7 @@ const FRAG = `
 precision highp float;
 uniform vec2 uRes;
 uniform float uTime, uMob, uHot, uIgn, uPush, uScroll, uUnit;
+uniform float uSpan;     // how far the light has to reach to fill the frame (hero units from the hot spot)
 uniform vec2 uCam;
 uniform vec3 uWarm, uCore, uDeep;
 /* the showreel behind the disc */
@@ -196,8 +197,9 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float pk = exp(-du * du / (2.0 * 0.17 * 0.17));
   float body = exp(-du * du / (2.0 * sb * sb));
   float tail = exp(-du * du / (2.0 * st * st));
-  float reach = mix(-0.15, 2.6, ign);
-  float reveal = smoothstep(reach, reach - 0.55, abs(du)) * smoothstep(0.0, 0.12, ign);
+  // the light opens from the hot spot across exactly the frame, over the whole ignition (not off-screen)
+  float reach = mix(-0.15, uSpan, ign);
+  float reveal = (ign > 0.999 ? 1.0 : smoothstep(reach, reach - 0.55, abs(du))) * smoothstep(0.0, 0.12, ign);
   float L = (0.38 * pk + 0.50 * body + 0.12 * tail) * reveal * I * front * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   // far layer: a black room, a wall far behind on the right, lit softly from above
@@ -316,8 +318,8 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   float pk = exp(-du * du / (2.0 * 0.075 * 0.075));
   float body = exp(-du * du / (2.0 * sb * sb));
   float tail = exp(-du * du / (2.0 * st * st));
-  float reach = mix(-0.1, 1.2, ign);
-  float reveal = smoothstep(reach, reach - 0.3, abs(du)) * smoothstep(0.0, 0.12, ign);
+  float reach = mix(-0.1, uSpan, ign);
+  float reveal = (ign > 0.999 ? 1.0 : smoothstep(reach, reach - 0.3, abs(du))) * smoothstep(0.0, 0.12, ign);
   float L = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * I * (1.0 + 0.12 * s) * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   vec3 col = vec3(0.0010, 0.0010, 0.0011) * (1.0 - uClr * above);
@@ -481,7 +483,9 @@ const REST: Record<Mode, number> = { desk: -0.06, mob: -0.02 };
 
 /* ── the reveal ── */
 const FLARE_MS = 520;                                    // the rim flares (and holds while the film buffers)
-const WAIT_MS = 6000;                                    // … at most this long, then it goes anyway
+const WAIT_MS = 1500;                                    // … at most this long, then it goes down on the last good frame
+/** the light and its haze are out of the frame here: the <video> takes over (the rest of the descent is unseen) */
+const K_OUT: Record<Mode, number> = { desk: 0.78, mob: 0.82 };
 const DOWN_MS: Record<Mode, number> = { desk: 1900, mob: 1700 };
 const UP_MS: Record<Mode, number> = { desk: 1500, mob: 1400 };
 const DROP: Record<Mode, number> = { desk: 1.05, mob: 0.95 };   // hero units: the rim and its haze leave the frame
@@ -721,6 +725,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     /* the glass goes back to its resting state: muted, looping, behind the glass (or the poster) */
     const rest = () => {
       R.phase = "idle"; R.k = 0; R.flare = 0; R.down = false;
+      delete box.dataset.down;
       R.kTw = tw(0, 0, 0, easeMove, 0); R.fTw = tw(0, 0, 0, easeEnter, 0);
       unwipe();
       v.muted = true;
@@ -764,19 +769,22 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
       if (fade) {
         box.dataset.fade = "1";
+        box.dataset.down = "1";
         requestAnimationFrame(() => { box.dataset.reel = "on"; });
         window.clearTimeout(timer);
         timer = window.setTimeout(() => { if (R.phase === "opening") { R.phase = "open"; emit("open"); } }, 560);
         return;
       }
       R.fTw = tw(R.flare, 1, FLARE_MS * (1 - R.flare), easeEnter, now);
-      if (back) { R.down = true; R.kTw = tw(R.k, 1, DOWN_MS[mode] * (1 - R.k), easeMove, now); }
+      if (back) { R.down = true; box.dataset.down = "1"; R.kTw = tw(R.k, 1, DOWN_MS[mode] * (1 - R.k), easeMove, now); }
       kick();
     };
 
     const close = () => {
       if (R.phase === "idle" || R.phase === "closing") return;
       const now = performance.now();
+      // the nav and the shade come back with the light, not after it
+      delete box.dataset.down;
       if (fade) {
         R.phase = "closing";
         emit("closing");
@@ -794,7 +802,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       }
       R.phase = "closing";
       emit("closing");
-      R.kTw = tw(R.k, 0, UP_MS[mode] * R.k, easeMove, now);
+      // the light comes back from just outside the frame, on the enter curve: it answers at once
+      const k0 = Math.min(R.k, K_OUT[mode]);
+      R.kTw = tw(k0, 0, UP_MS[mode] * (k0 / K_OUT[mode]), easeEnter, now);
       R.fTw = tw(R.flare, 0, UP_MS[mode] * Math.max(0.35, R.k), easeMove, now);
       kick();
     };
@@ -849,7 +859,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
       const U = (n: string) => gl.getUniformLocation(prog, n);
       const u = {
-        res: U("uRes"), time: U("uTime"), mob: U("uMob"), hot: U("uHot"), ign: U("uIgn"), push: U("uPush"),
+        res: U("uRes"), time: U("uTime"), mob: U("uMob"), hot: U("uHot"), ign: U("uIgn"), span: U("uSpan"), push: U("uPush"),
         scroll: U("uScroll"), unit: U("uUnit"), cam: U("uCam"), warm: U("uWarm"), core: U("uCore"), deep: U("uDeep"),
         reel: U("uReel"), reelA: U("uReelA"), reelAsp: U("uReelAsp"), k: U("uK"), drop: U("uDrop"), flare: U("uFlare"),
         clr: U("uClr"), fit: U("uFit"), tease: U("uTease"), haloN: U("uHaloN"), haloW: U("uHaloW"), haloF: U("uHaloF"),
@@ -1012,6 +1022,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
           const live = src === REEL_SRC.film && !v.paused && v.readyState >= 3 && v.currentTime > 0.04;
           if ((live && fin(R.fTw, now)) || now - R.asked > WAIT_MS) {
             R.down = true;
+            box.dataset.down = "1";
             R.kTw = tw(R.k, 1, DOWN_MS[mode] * (1 - R.k), easeMove, now);
           }
         }
@@ -1029,12 +1040,15 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         }
         // the sound comes in with the light going down, and leaves as it comes back up
         if (volOk && !v.muted && (R.phase === "opening" || R.phase === "closing")) {
-          const vol = R.phase === "opening" ? (R.down ? Math.min(1, R.k * 1.3) : 0) : Math.pow(R.k, 1.6);
+          const q = Math.min(1, R.k / K_OUT[mode]);
+          const vol = R.phase === "opening" ? (R.down ? q : 0) : Math.pow(q, 1.6);
           try { v.volume = vol; } catch { /* fixed */ }
         }
         if (glassFilm || R.phase !== "idle") uploadFilm();
+        // the light's clock starts with the first frame actually drawn (not before the shader is ready)
+        if (!st.drawn) st.t0 = now;
         const el = (now - st.t0) / 1000;
-        const ign = reduce ? 1 : easeEnter(Math.max(0, el - 0.12) / 2.4);
+        const ign = reduce ? 1 : easeEnter(Math.max(0, el - 0.12) / 1.8);
         const push = reduce ? 0 : easeMove(el / 12);
         const drop = DROP[mode] * R.k;
         st.zoom = 1 + 0.03 * push; st.drop = drop; st.drawn = true;
@@ -1056,6 +1070,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         gl.uniform1f(u.time, reduce ? 20 : el + 20);
         gl.uniform1f(u.hot, st.hot);
         gl.uniform1f(u.ign, ign);
+        gl.uniform1f(u.span, st.aspect * 0.5 + Math.abs(st.hot) + (mode === "mob" ? 0.35 : 0.6));
         gl.uniform1f(u.push, push);
         gl.uniform1f(u.scroll, st.sc);
         gl.uniform1f(u.unit, 1 / Math.max(1, box.offsetHeight));
@@ -1064,12 +1079,13 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         gl.uniform1f(u.k, R.k);
         gl.uniform1f(u.drop, drop);
         gl.uniform1f(u.flare, R.flare);
-        gl.uniform1f(u.clr, sstep(0.08, 0.9, R.k));
-        gl.uniform1f(u.fit, mode === "mob" ? sstep(0.1, 1, R.k) : 0);
+        // the glass clears while the light passes; the film is exactly the frame by the hand-over
+        gl.uniform1f(u.clr, sstep(0.05, 0.62, R.k));
+        gl.uniform1f(u.fit, mode === "mob" ? sstep(0.1, K_OUT[mode], R.k) : 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         if (import.meta.env.DEV) { const w = window as unknown as { __hlbN?: number; __hlbE?: number }; w.__hlbN = (w.__hlbN ?? 0) + 1; const e = gl.getError(); if (e) w.__hlbE = e; }
         if (R.phase !== "idle" || dbg) wipe(drop, R.k, 1 + 0.03 * push);
-        if (R.phase === "opening" && R.down && R.k >= 1) handOver();
+        if (R.phase === "opening" && R.down && R.k >= K_OUT[mode]) handOver();
         else if (R.phase === "closing" && R.k <= 0 && fin(R.fTw, now)) rest();
       };
 
