@@ -5,9 +5,10 @@ import { Icon } from "../ui/Icons";
 import { useReduced } from "./ui";
 
 /* Services and cases for the parsec.studio mock (site copy, English).
-   Cases are the live site's own projects (parsec.studio, __NEXT_DATA__): titles, types and tools from its texts,
-   the films and posters from its own media, re-encoded and hosted here (video/site). AI works come from the Vimeo
-   list and have no film file yet, so they open on their still.
+   Cases are the live site's own projects (parsec.studio, __NEXT_DATA__): titles, types and tools from its texts and
+   the films' own credits, the films from its own media, re-encoded and hosted here (video/site), each poster the
+   strongest frame of its film. AI works come from the Vimeo list and have no film file yet, so they open on their
+   still.
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
@@ -38,44 +39,44 @@ export const CASES: Case[] = [
   {
     id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
     tools: "Unreal Engine 5 · 3ds Max · Cinema 4D · After Effects",
-    line: "Centil’s systems, modelled in 3ds Max and staged in Unreal Engine 5.",
-    poster: "46% 50%", film: film("centil", "1:55"), stills: [still("centil", "The Earth through a porthole")],
+    line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
+    poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
   },
   {
-    id: "prison", title: "A Prison Without Walls", type: "3D Animation & CGI", dur: "1:07",
-    tools: "Unreal Engine 5 · Maya · Substance Painter",
-    line: "A short film with its own story: characters and sets built from scratch in Unreal Engine 5.",
-    poster: "60% 50%", film: film("prison", "1:07"), stills: [still("prison", "A woman and a small robot in an apartment")],
+    id: "prison", title: "A Prison Without Walls", type: "3D short film", dur: "1:07",
+    tools: "Unreal Engine 5 · MetaHuman · Maya · Substance Painter · Cascadeur",
+    line: "A short film with its own story, directed by the studio: a woman and a small robot, sets and characters built from scratch in Unreal Engine 5.",
+    poster: "58% 50%", film: film("prison", "1:07", 1920 / 676), stills: [still("prison", "A small robot by a window in warm light", "58% 50%")],
   },
   {
     id: "blkmrkt", title: "BLKMRKT", type: "Game trailer", dur: "0:28",
     tools: "Unreal Engine 5 · Blender · Maya · Marvelous Designer · Cascadeur",
     line: "The trailer for a mobile game: streets in Unreal Engine 5, clothes in Marvelous Designer.",
-    poster: "50% 50%", film: film("blkmrkt", "0:28"), stills: [still("blkmrkt", "A neon street at night")],
+    poster: "41% 50%", film: film("blkmrkt", "0:28", 1920 / 674), stills: [still("blkmrkt", "A neon alley in the rain", "41% 50%")],
   },
   {
-    id: "fifa", title: "FIFA — World Cup", type: "3D Animation & CGI", client: "FIFA", year: "2022", dur: "0:17",
+    id: "fifa", title: "FIFA World Cup 2022", type: "3D Animation & CGI", client: "FIFA", year: "2022", dur: "0:17",
     tools: "Cinema 4D · Octane Render",
     line: "A 3D film for the FIFA collectible coin, made for the 2022 World Cup in Qatar.",
-    poster: "45% 50%", film: film("fifa", "0:17"), stills: [still("fifa", "The FIFA World Cup Qatar 2022 coin")],
+    poster: "55% 50%", film: film("fifa", "0:17"), stills: [still("fifa", "Two gold World Cup coins falling through red space", "55% 50%")],
   },
   {
-    id: "tefal", title: "Tefal Unlimited", type: "3D Animation & CGI", client: "Tefal", dur: "0:15",
+    id: "tefal", title: "Tefal Unlimited", type: "3D product film", client: "Tefal", dur: "0:15",
     tools: "Cinema 4D · DaVinci Resolve",
     line: "A digital double of the cookware in Cinema 4D, graded to the brand’s colours.",
-    poster: "50% 50%", film: film("tefal", "0:15"), stills: [still("tefal", "A frying pan in the dark")],
+    poster: "48% 50%", film: film("tefal", "0:15", 2), stills: [still("tefal", "The heat indicator under a fan of light", "48% 50%")],
   },
   {
     id: "medieval", title: "Medieval Age", type: "Game trailer", dur: "0:25",
     tools: "Cinema 4D",
     line: "One of three concept trailers for a medieval video game, built from the ground up.",
-    poster: "50% 50%", film: film("medieval", "0:25"), stills: [still("medieval", "A medieval town at dusk")],
+    poster: "48% 50%", film: film("medieval", "0:25"), stills: [still("medieval", "A figure climbing the stairs to a glowing portal", "48% 50%")],
   },
   {
     id: "arch", title: "Architecture Visualization", type: "3D Animation & CGI", dur: "0:19",
     tools: "Unreal Engine 5",
-    line: "Interiors rendered in real time in Unreal Engine 5.",
-    poster: "55% 50%", film: film("arch", "0:19"), stills: [still("arch", "A modern house among pines")],
+    line: "A house and its interiors, rendered in real time in Unreal Engine 5.",
+    poster: "38% 50%", film: film("arch", "0:19"), stills: [still("arch", "A modern house among pines", "38% 50%")],
   },
   {
     id: "banxe", title: "BANXE", type: "3D Animation & CGI", client: "Banxe", dur: "0:38",
