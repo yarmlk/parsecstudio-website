@@ -455,10 +455,7 @@ export function Site({
                     {/* the last word keeps the arrow with it if the line ever wraps */}
                     <span className="st-svc__tail">
                       {s.line.slice(s.line.lastIndexOf(" ") + 1)}
-                      <span className="st-svc__go" aria-hidden>
-                        {s.ai ? <AiFlux form="line" className="st-svc__shaft" /> : <span className="st-svc__shaft" />}
-                        <svg className="st-svc__head" width="12" height="14" viewBox="0 0 12 14"><path d="M3 1.5 9 7l-6 5.5" /></svg>
-                      </span>
+                      <span className="st-svc__go" aria-hidden><Icon name="arrow-up-right" size={13} /></span>
                     </span>
                   </span>
                 </button>

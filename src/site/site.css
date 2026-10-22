@@ -154,7 +154,8 @@
 .st-stage__scene { position: absolute; inset: 0; opacity: 0; filter: blur(14px); transition: opacity 700ms var(--ease-enter), filter 700ms var(--ease-enter); }
 .st-stage__scene.is-on { opacity: 1; filter: blur(0); }
 .st-stage__fill, .st-stage__scene > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.st-stage__shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11, 11, 13, .72) 0%, rgba(11, 11, 13, .38) 34%, rgba(11, 11, 13, 0) 58%),
+/* the list's side stays calm, but the light leaves the names at full strength */
+.st-stage__shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11, 11, 13, .6) 0%, rgba(11, 11, 13, .22) 22%, rgba(11, 11, 13, 0) 32%),
   linear-gradient(180deg, rgba(11, 11, 13, .9) 0%, rgba(11, 11, 13, 0) 26%); }
 .st-svc > :not(.st-stage) { position: relative; z-index: 1; }
 /* the name's box hugs its text: the stage reads the end of the active name from it to start the light */
@@ -165,18 +166,11 @@
 .st-svc__line { display: block; font-size: 15px; line-height: 1.5; color: var(--fog); opacity: 0; transform: translateY(6px); transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
 .st-svc__item.is-on .st-svc__line { opacity: 1; transform: none; transition-delay: 120ms; }
 .st-svc__tail { white-space: nowrap; }
-/* the way in, at the end of the line: the back arrow of the opened service, turned forward (on the AI line its
-   shaft is the AI spectrum, drawn with the line). No glow: the stage's beam is the one warm light here. It steps on
-   and brightens on hover, as the back arrow steps back. */
-.st-svc__go { position: relative; display: inline-block; width: 36px; height: 14px; margin-left: 14px; vertical-align: -1px; transition: transform var(--t-panel) var(--ease-move); }
-.st-svc__shaft { position: absolute; left: 0; right: 3px; top: 50%; height: 1px; margin-top: -.5px; border-radius: 1px; background: rgba(242, 240, 235, .5); transition: background var(--t-button) var(--ease-enter); }
-.st-svc__shaft.ai-flux { display: block; width: auto; height: 2px; margin-top: -1px; background: none; animation: none; }
-.st-svc__item.is-on .st-svc__shaft.ai-flux { animation: ai-draw var(--t-light) var(--ease-enter) 240ms both; }
-.st-svc__head { position: absolute; right: 0; top: 0; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke var(--t-button) var(--ease-enter); }
-.st-svc__item:hover .st-svc__go, .st-svc__item:focus-visible .st-svc__go { transform: translateX(6px); }
-.st-svc__item:hover .st-svc__head, .st-svc__item:focus-visible .st-svc__head { stroke: var(--paper); }
-.st-svc__item:hover .st-svc__shaft:not(.ai-flux), .st-svc__item:focus-visible .st-svc__shaft:not(.ai-flux) { background: var(--paper); }
-@media (prefers-reduced-motion: reduce) { .st-svc__item.is-on .st-svc__shaft.ai-flux { animation: none; } }
+/* the way in, at the end of the line: a small frost button (no lines; the stage's beam is the one light here) */
+.st-svc__go { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 12px; border-radius: 50%; vertical-align: middle; color: rgba(242, 240, 235, .7);
+  background: rgba(242, 240, 235, .06); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .35), inset 0 0 0 1px rgba(255, 255, 255, .06);
+  transition: background-color var(--t-button) var(--ease-enter), color var(--t-button) var(--ease-enter), transform var(--t-panel) var(--ease-move); }
+.st-svc__item:hover .st-svc__go, .st-svc__item:focus-visible .st-svc__go { color: var(--paper); background: rgba(242, 240, 235, .14); transform: translate(2px, -2px); }
 
 /* 03 cases: tall columns between thin lines (the live site); a card opens into the case */
 .st-cases { display: flex; flex-direction: column; padding-bottom: 0; }
@@ -484,7 +478,7 @@
 .st-site--mob .st-svc__item { gap: 7px; padding: 10px 0 12px; }
 .st-site--mob .st-svc__name { font-size: 30px; white-space: normal; }
 .st-site--mob .st-svc__line { font-size: 13.5px; }
-.st-site--mob .st-svc__go { width: 26px; margin-left: 8px; }
+.st-site--mob .st-svc__go { width: 24px; height: 24px; margin-left: 8px; }
 .st-site--mob .st-cases { padding-bottom: 0; }
 .st-site--mob .st-row { flex: none; margin: 0 -20px; padding-left: 20px; scroll-padding-left: 20px; }
 .st-site--mob .st-row::after { flex-basis: 20px; }
