@@ -446,7 +446,7 @@ export const CtaDevPanel: () => ReactNode = import.meta.env.DEV
     return createPortal(
       <div className="rc-dev" role="group" aria-label="Hero variants, dev only">
         <style>{`
-.rc-dev { position: fixed; right: 14px; bottom: 14px; z-index: 2147483000; display: flex; align-items: center; gap: 14px; height: 34px; padding: 0 5px 0 14px;
+.rc-dev { position: fixed; right: 14px; bottom: 100px; z-index: 2147483000; display: flex; align-items: center; gap: 14px; height: 34px; padding: 0 5px 0 14px;
   border-radius: 999px; font: 400 11px/1 "Geist Mono", ui-monospace, Menlo, monospace; letter-spacing: .08em; color: #8e8c88;
   background: rgba(242, 240, 235, .08); -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .07), 0 14px 34px -14px rgba(0, 0, 0, .8); }
