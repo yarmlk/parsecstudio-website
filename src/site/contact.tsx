@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type FormEvent, memo } from "react";
 import { CONTACT } from "../lib/facts";
 import { Icon } from "../ui/Icons";
 import { SITE_SERVICES } from "./cases";
@@ -51,7 +51,7 @@ function Field({ name, label, type = "text", auto, required, optional, error, ar
   );
 }
 
-export function ContactForm() {
+function ContactFormBase() {
   const plate = useRef<HTMLDivElement | null>(null);
   const thanks = useRef<HTMLHeadingElement | null>(null);
   const [errors, setErrors] = useState<Errors>({});
@@ -133,3 +133,6 @@ export function ContactForm() {
     </div>
   );
 }
+
+/** re-rendered only when its own props change (the services hover re-renders the page around it) */
+export const ContactForm = memo(ContactFormBase);

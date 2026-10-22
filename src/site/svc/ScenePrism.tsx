@@ -124,6 +124,8 @@ function bezier(x1: number, y1: number, x2: number, y2: number) {
 }
 /** --ease-enter */
 const easeEnter = bezier(0.2, 0.7, 0.1, 1);
+/** --ease-move */
+const easeMove = bezier(0.45, 0, 0.2, 1);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const sstep = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 
@@ -193,6 +195,8 @@ declare global {
 
 /** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
 const BEAM_OUT = 0.4;
+/** how long the beam's start takes to travel from one name to the next (s) */
+const BEAM_MOVE = 0.62;
 
 
 /* How hard the scene works, kept for the whole visit (it survives remounts): the canvas's pixel budget and whether the
@@ -337,7 +341,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /** each service's aim: where its light heads across the stage, and how far that is turned from where the glass sends it */
     let aim: { az: number; d: number }[] = [];
     /* the beam: where it starts (the active name) and since when; the one before it, going where it was */
-    const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 } };
+    const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 }, from: null as null | { x: number; y: number }, at: { x: 0, y: 0 } };
     /* each service's working turn of the prism (deg): from where its name's beam comes, every colour of its light gets
        out and heads right. The pointer's height runs through them in order, row by row (cached per layout) */
     let wins = { key: "", w: [] as { lo: number; hi: number }[] };
@@ -411,7 +415,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const fk = kk(0.16);
       st.spec += ((st.svc === 1 ? 1 : 0) - st.spec) * fk;
       st.k += ((st.svc === 2 ? 1 : 0) - st.k) * fk;
-      for (let i = 0; i < 3; i++) st.show[i] += ((st.svc === i ? 1 : 0) - st.show[i]) * kk(0.2);
+      for (let i = 0; i < 3; i++) st.show[i] += ((st.svc === i ? 1 : 0) - st.show[i]) * kk(0.3);
       const svc = st.svc;
       st.proj = 1 - st.spec;
 
@@ -454,19 +458,18 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the beam is pinned to the active name: no travel between names. A switch lets the old beam go where it is
       // and grows the new one out of the new name into the glass
       const tNow = frozen ? 1e6 : now / 1000;
+      // the beam moves: its start travels from the last name to the new one on --ease-move, always into the glass
       if (beam.svc !== svc) {
-        // the new beam is simply there; the old one fades where it was
-        if (beam.svc >= 0 && !frozen) {
-          const oa = anchorOf(beam.svc), oo = startAt(oa.x, oa.y, S.slope);
-          const oP = makePrism([0, 0, 0], S.R, S.H, (Number.isNaN(st.rot) ? 0 : st.rot) * DEG);
-          const ot = traceBeam(oP, oo, norm(sub([0, S.hb, 0], oo)), nAt(1, 0));
-          beam.old = { o: oo, pin: ot ? ot.pin : [0, S.hb, 0] };
-          beam.tSw = tNow;
-        } else beam.tSw = -1e9;
+        beam.from = beam.svc >= 0 && !frozen ? { ...beam.at } : null;
+        beam.tSw = tNow;
         beam.svc = svc;
       }
+      beam.old = null;
       const sw = tNow - beam.tSw;
-      const an = anchorOf(svc);
+      const target = anchorOf(svc);
+      const mk = beam.from ? easeMove(clamp01(sw / BEAM_MOVE)) : 1;
+      const an = beam.from ? { x: beam.from.x + (target.x - beam.from.x) * mk, y: beam.from.y + (target.y - beam.from.y) * mk } : target;
+      beam.at = an;
 
       // the pointer's x: the bundle opens a little (0.8 … 1.1)
       const slope = S.slope;
@@ -614,8 +617,6 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const iF = easeEnter(clamp01((since - 0.6) / 0.9)) * (0.4 + 0.6 * dip);
       const front = (land + 1.5) * easeEnter(clamp01((since - 0.55) / 1.0));
       const iP = easeEnter(clamp01((since - 0.85) / 1.1)) * (0.5 + 0.5 * dip);
-      const oldF = beam.old && sw < BEAM_OUT ? 1 - easeEnter(clamp01(sw / BEAM_OUT)) : 0;
-      if (oldF <= 0) beam.old = null;
 
       /* the things on the stage this frame: each service's fade in and out with its light */
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
@@ -719,7 +720,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // without dispersion the two paths in the glass are one
       const poM: V3 = [M.out[0] + (E.out[0] - M.out[0]) * st.proj, M.out[1] + (E.out[1] - M.out[1]) * st.proj, M.out[2] + (E.out[2] - M.out[2]) * st.proj];
       v3("uBA", origin); v3("uPin", tr.pin); v3("uPoE", E.out); v3("uPoM", poM);
-      v3("uBA0", beam.old?.o ?? origin); v3("uPin0", beam.old?.pin ?? tr.pin); f1("uIB0", oldF);
+      v3("uBA0", origin); v3("uPin0", tr.pin); f1("uIB0", 0);
       v3("uIrA", tr.inner.a); v3("uIrB", tr.inner.b); f1("uIrI", tr.inner.F * 1.2);
       v3("uFanO", O); v3("uFanN", N);
       f1("uFanAE", Math.atan2(dE[2], dE[0])); f1("uFanAM", Math.atan2(dM[2], dM[0])); f1("uFanM", fslope);

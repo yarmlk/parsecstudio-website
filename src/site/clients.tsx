@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { PointerEvent } from "react";
 import { useReduced } from "./ui";
 
@@ -56,7 +57,7 @@ function pulse(tile: HTMLElement, clientX: number, clientY: number, reduced: boo
   a.onfinish = () => { bloom.remove(); rim.remove(); };
 }
 
-export function LogoGrid({ logos, widths }: { logos: ClientLogo[]; widths: Record<string, number> }) {
+function LogoGridBase({ logos, widths }: { logos: ClientLogo[]; widths: Record<string, number> }) {
   const reduced = useReduced();
   const onEnter = (e: PointerEvent<HTMLLIElement>) => pulse(e.currentTarget, e.clientX, e.clientY, reduced);
   return (
@@ -70,3 +71,6 @@ export function LogoGrid({ logos, widths }: { logos: ClientLogo[]; widths: Recor
     </ul>
   );
 }
+
+/** re-rendered only when its own props change (the services hover re-renders the page around it) */
+export const LogoGrid = memo(LogoGridBase);

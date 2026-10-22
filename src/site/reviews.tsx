@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties, memo } from "react";
 import { REVIEWS } from "../lib/facts";
 import { useReduced } from "./ui";
 
@@ -29,7 +29,7 @@ function Quote({ i, copy }: { i: number; copy: boolean }) {
   );
 }
 
-export function ReviewColumns({ mode }: { mode: "desk" | "mob" }) {
+function ReviewColumnsBase({ mode }: { mode: "desk" | "mob" }) {
   const reduced = useReduced();
   const cols = mode === "desk" ? DESK : MOB;
   const view = useRef<HTMLDivElement | null>(null);
@@ -110,3 +110,6 @@ export function ReviewColumns({ mode }: { mode: "desk" | "mob" }) {
     </div>
   );
 }
+
+/** re-rendered only when its own props change (the services hover re-renders the page around it) */
+export const ReviewColumns = memo(ReviewColumnsBase);
