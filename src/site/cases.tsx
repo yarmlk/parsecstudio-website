@@ -11,7 +11,7 @@ import { useReduced } from "./ui";
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
-export type Film = { src: string; loop: string; poster: string; dur: string };
+export type Film = { src: string; loop: string; poster: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
 
 /* ── Cases ────────────────────────────────────────────────── */
 export type Case = {
@@ -31,7 +31,7 @@ export type Case = {
 };
 
 const V = "video/site/";
-const film = (id: string, dur: string): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, dur });
+const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, dur, ar });
 const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}${id}.jpg`, pos, alt });
 
 export const CASES: Case[] = [
@@ -157,7 +157,7 @@ export const SITE_SERVICES: Service[] = [
 ];
 
 /* ── A muted loop that plays only while `on` (hover, or the row in focus on a phone) ── */
-export function LoopVideo({ src, on, warm, className, poster }: { src: string; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string }) {
+export function LoopVideo({ src, on, warm, className, poster, pos }: { src: string; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [armed, setArmed] = useState(false);
   const reduced = useReduced();
@@ -175,6 +175,7 @@ export function LoopVideo({ src, on, warm, className, poster }: { src: string; o
       ref={ref}
       className={`${className ?? ""}${on ? " is-on" : ""}`}
       poster={poster}
+      style={pos ? { objectPosition: pos } : undefined}
       muted
       loop
       playsInline
@@ -420,7 +421,21 @@ export function CaseView({
   const [ready, setReady] = useState(false);
   const idleT = useRef<number | undefined>(undefined);
   const back = useRef<HTMLButtonElement | null>(null);
+  const root = useRef<HTMLDivElement | null>(null);
+  const [vp, setVp] = useState<{ w: number; h: number } | null>(null);
   const pl = usePlayer(c.film?.src, phase === "open");
+
+  // the window in site px: a film opens to its own frame inside it (no bars of its own), so the card grows into the
+  // picture without a jump; the black around it is the veil
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const on = () => setVp({ w: el.offsetWidth, h: el.offsetHeight });
+    on();
+    const ro = new ResizeObserver(on);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useLayoutEffect(() => {
     if (phase !== "enter") return;
@@ -464,9 +479,14 @@ export function CaseView({
 
   const st = c.stills[Math.min(shot, c.stills.length - 1)];
   const pos = phase !== "open" || (mode === "mob" && shot === 0) ? c.poster : st.pos;
+  const ar = c.film?.ar;
+  const fit = ar && vp ? Math.min(vp.w, vp.h * ar) : 0;
   const style = box
     ? { left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: mode === "desk" ? 14 : 12 }
-    : { left: 0, top: 0, width: "100%", height: "100%", borderRadius: 0 };
+    : fit && vp
+      // phone: the film sits under the back control and the text reads on the black below it
+      ? { left: (vp.w - fit) / 2, top: mode === "mob" ? Math.min((vp.h - fit / ar!) / 2, 112) : (vp.h - fit / ar!) / 2, width: fit, height: fit / ar!, borderRadius: 0 }
+      : { left: 0, top: 0, width: "100%", height: "100%", borderRadius: 0 };
   const meta: [string, string][] = [];
   if (c.client) meta.push(["Client", c.client]);
   if (c.year) meta.push(["Year", c.year]);
@@ -479,8 +499,9 @@ export function CaseView({
     <div
       className={`st-cv st-cv--${phase}${ready ? " is-ready" : ""}${rest ? " is-idle" : ""}${c.film ? " st-cv--film" : ""}`}
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
-      onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys=""
+      onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
     >
+      <div className="st-cv__veil" aria-hidden />
       <div className="st-cv__box" style={style}>
         {c.film ? (
           <div className="st-cv__frame">
@@ -490,6 +511,7 @@ export function CaseView({
               className="st-cv__video"
               src={c.film.src}
               poster={c.film.poster}
+              style={{ objectPosition: phase === "open" ? "50% 50%" : c.poster }}
               playsInline
               preload="metadata"
               onClick={pl.toggle}
@@ -498,8 +520,8 @@ export function CaseView({
         ) : (
           <Frame still={st} pos={pos} />
         )}
-        <div className="st-cv__shade" aria-hidden />
       </div>
+      <div className="st-cv__shade" aria-hidden />
 
       <div className="st-cv__ui">
         <div className="st-cv__top">

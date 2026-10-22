@@ -202,39 +202,38 @@
 .st-card:hover .st-card__k, .st-card:focus-visible .st-card__k { color: var(--ash); }
 .st-card__plus {
   position: absolute; z-index: 32; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--paper);
-  background: rgba(242, 240, 235, .1); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .08);
-  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  background: rgba(14, 14, 17, .62); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .08);
   opacity: 0; transform: translateY(-4px); transition: opacity var(--t-button) var(--ease-enter), transform var(--t-button) var(--ease-enter);
 }
 .st-card:hover .st-card__plus, .st-card:focus-visible .st-card__plus { opacity: 1; transform: none; }
-/* desk: while one card is pointed at, the others sit behind frosted glass (the brand's glass: blur, a light veil, the
-   cool top edge, the grain on top), so the one you point at is unmistakable */
+/* desk: while one card is pointed at, the others step back a little: a light dim, the image stays sharp */
 .st-card__img::before {
   content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(180deg, rgba(242, 240, 235, .08), rgba(242, 240, 235, .015) 60%), rgba(20, 20, 24, .32);
-  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .42), inset 0 0 0 1px rgba(255, 255, 255, .07);
-  -webkit-backdrop-filter: blur(16px) saturate(1.15); backdrop-filter: blur(16px) saturate(1.15);
-  opacity: 0; transition: opacity 480ms var(--ease-enter);
+  background: #0b0b0d; opacity: 0; transition: opacity 480ms var(--ease-enter);
 }
-.st-site--desk .st-row.is-pointing .st-card:not(.is-hover) .st-card__img::before { opacity: 1; }
+.st-site--desk .st-row.is-pointing .st-card:not(.is-hover) .st-card__img::before { opacity: .3; }
 .st-site--desk .st-row.is-pointing .st-card:not(.is-hover) .st-card__t { color: rgba(242, 240, 235, .4); }
 
 /* the opened case */
 .st-cv { position: absolute; inset: 0; z-index: 60; }
+/* the black behind an opened case: it comes up while the card grows into the film, and goes with it */
+.st-cv__veil { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 640ms var(--ease-enter); }
+.st-cv--open .st-cv__veil { opacity: 1; }
+.st-cv--leave .st-cv__veil { transition: opacity 720ms var(--ease-move); }
 .st-cv__box { position: absolute; overflow: hidden; background: #000; will-change: left, top, width, height; transition: left 720ms var(--ease-move), top 720ms var(--ease-move), width 720ms var(--ease-move), height 720ms var(--ease-move), border-radius 720ms var(--ease-move); }
 .st-cv__frame { position: absolute; inset: 0; }
 .st-cv__frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: object-position 720ms var(--ease-move); }
-.st-cv__frame img.is-new { animation: st-slit 760ms var(--ease-enter) both; }
-.st-cv__shade { position: absolute; inset: 0; z-index: 31; pointer-events: none; opacity: 0; transition: opacity 400ms var(--ease-enter); background: linear-gradient(180deg, rgba(11, 11, 13, .42) 0%, rgba(11, 11, 13, 0) 20%, rgba(11, 11, 13, 0) 50%, rgba(11, 11, 13, .74) 100%); }
+.st-cv__frame img.is-new { animation: st-fade 700ms var(--ease-enter) both; }
+.st-cv__shade { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 400ms var(--ease-enter); background: linear-gradient(180deg, rgba(11, 11, 13, .5) 0%, rgba(11, 11, 13, 0) 18%, rgba(11, 11, 13, 0) 42%, rgba(11, 11, 13, .62) 70%, rgba(11, 11, 13, .9) 100%); }
 .st-cv--open .st-cv__shade { opacity: 1; transition-delay: 520ms; }
 .st-cv__ui { position: absolute; inset: 0; z-index: 2; padding: 24px 72px 40px; display: flex; flex-direction: column; justify-content: space-between; opacity: 0; pointer-events: none; transition: opacity 200ms var(--ease-enter); }
 .st-cv--open .st-cv__ui { opacity: 1; pointer-events: auto; transition: opacity 500ms var(--ease-enter) 680ms; }
 .st-cv__top { height: 60px; display: flex; align-items: center; justify-content: flex-start; }
-.st-cv__back { margin: 0; filter: drop-shadow(0 1px 8px rgba(0, 0, 0, .55)); }
+.st-cv__back { margin: 0; }
 .st-cv__back .st-back__arrow { width: 96px; }
 .st-cv__back .st-back__l { color: var(--paper); }
-.st-cv__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
-.st-cv--open .st-cv__video { object-fit: contain; }
+/* the box takes the film's own shape, so cover is the whole picture once open; from the card it frames like the poster */
+.st-cv__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; transition: object-position 720ms var(--ease-move); }
 .st-cv.is-idle { cursor: none; }
 .st-cv--open.is-ready .st-cv__ui { transition: opacity 280ms var(--ease-enter); }
 .st-cv--open.is-idle .st-cv__ui { opacity: 0; transition: opacity 700ms var(--ease-enter); }
@@ -243,7 +242,7 @@
 
 /* the player: the site's own, the timeline is the cut */
 .st-pl { display: flex; align-items: center; gap: 14px; margin-top: 22px; }
-.st-cv .st-pl .st-round { background: rgba(14, 14, 17, .55); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .35), inset 0 0 0 1px rgba(255, 255, 255, .1); color: var(--paper); }
+.st-cv .st-pl .st-round { background: rgba(14, 14, 17, .62); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .35), inset 0 0 0 1px rgba(255, 255, 255, .1); color: var(--paper); }
 .st-pl__time { flex: none; min-width: 34px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; color: var(--paper); font-variant-numeric: tabular-nums; }
 .st-pl__time--d { color: var(--fog); text-align: right; }
 .st-pl__track { position: relative; flex: 1; height: 26px; cursor: pointer; touch-action: none; outline-offset: 2px; }
@@ -267,13 +266,9 @@
 .st-back:hover .st-back__shaft:not(.ai-flux), .st-back:focus-visible .st-back__shaft:not(.ai-flux) { background: linear-gradient(90deg, var(--light-core), rgba(246, 200, 140, .15)); box-shadow: 0 0 10px 1px rgba(246, 200, 140, .45); }
 .st-back:hover .st-back__l, .st-back:focus-visible .st-back__l { color: var(--paper); }
 .st-cv__bottom { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; }
-.st-cv__panel {
-  width: 580px; padding: 26px 28px 26px; border-radius: 22px; display: flex; flex-direction: column; gap: 12px;
-  background: rgba(14, 14, 17, .64); box-shadow: var(--glass-edge), var(--glass-shadow); -webkit-backdrop-filter: blur(30px) saturate(1.3); backdrop-filter: blur(30px) saturate(1.3);
-  animation: st-rise 700ms var(--ease-enter) both;
-}
+.st-cv__panel { width: 600px; display: flex; flex-direction: column; gap: 12px; animation: st-rise 700ms var(--ease-enter) both; }
 .st-cv__title { margin: 4px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 50px; line-height: 1.04; text-wrap: balance; }
-.st-cv__line { margin: 0; max-width: 54ch; font-size: 15px; line-height: 1.55; color: var(--fog); }
+.st-cv__line { margin: 0; max-width: 54ch; font-size: 15px; line-height: 1.55; color: rgba(242, 240, 235, .78); }
 .st-cv__meta { margin: 8px 0 0; display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 14px 40px; }
 .st-cv__meta div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .st-cv__meta .is-wide { grid-column: 1 / -1; }
@@ -288,8 +283,8 @@
 .st-cv__nav { display: flex; gap: 10px; }
 .st-cv__next { gap: 12px; padding: 0 18px 0 22px; }
 .st-cv__nextl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--fog); }
-.st-cv .st-pill, .st-cv .st-round { background: rgba(14, 14, 17, .5); }
-.st-cv .st-pill:hover, .st-cv .st-round:hover { background: rgba(40, 40, 46, .6); }
+.st-cv .st-pill, .st-cv .st-round { background: rgba(14, 14, 17, .62); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.st-cv .st-pill:hover, .st-cv .st-round:hover { background: rgba(40, 40, 46, .72); }
 
 /* 04 clients: 3 rows of 4 white logos in glass tiles over the light of the reflection plate (the studio deck's
    client slide). The arc runs in the seam under the first row; the plate is evened out across the width (its
@@ -491,7 +486,7 @@
 .st-wk__vid { z-index: 1; opacity: 0; transition: opacity 500ms var(--ease-enter); }
 .st-wk__vid.is-on { opacity: 1; }
 .st-wk__play { position: absolute; z-index: 32; right: 12px; bottom: 12px; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--paper);
-  background: rgba(14, 14, 17, .4); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .08); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  background: rgba(14, 14, 17, .62); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .08);
   opacity: 0; transform: translateY(4px); transition: opacity var(--t-button) var(--ease-enter), transform var(--t-button) var(--ease-enter); }
 .st-wk:hover .st-wk__play, .st-wk:focus-visible .st-wk__play { opacity: 1; transform: none; }
 .st-wk__cap { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
@@ -636,7 +631,7 @@
 .st-site--mob .st-pl .st-round { width: 40px; height: 40px; }
 .st-site--mob .st-pl__time { min-width: 28px; font-size: 10px; }
 .st-site--mob .st-cv__bottom { flex-direction: column; align-items: stretch; gap: 12px; }
-.st-site--mob .st-cv__panel { width: auto; padding: 20px 20px 20px; gap: 10px; }
+.st-site--mob .st-cv__panel { width: auto; gap: 10px; }
 .st-site--mob .st-cv__title { font-size: 32px; }
 .st-site--mob .st-cv__line { font-size: 14px; }
 .st-site--mob .st-cv__meta { grid-template-columns: repeat(3, auto); gap: 10px 24px; }

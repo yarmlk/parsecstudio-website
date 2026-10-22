@@ -450,7 +450,7 @@ export function Site({
               >
                 <span className="st-card__img grain">
                   <img src={c.film?.poster ?? c.stills[0].src} alt="" decoding="async" style={{ objectPosition: c.poster }} />
-                  {c.film && <LoopVideo src={c.film.loop} on={rowHover === i} className="st-card__vid" />}
+                  {c.film && <LoopVideo src={c.film.loop} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
                   <span className="st-card__plus" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 15} /></span>
                 </span>
                 <span className="st-card__cap">
