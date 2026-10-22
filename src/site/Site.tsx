@@ -370,7 +370,7 @@ export function Site({
           <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} />
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
-            <h1 className="st-hero__h" data-rim="">Director-led, AI{"\u2011"}enhanced{desk ? <br /> : " "}video production</h1>
+            <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
             <div className="st-hero__acts" data-rim="">
               <WorksPill onGo={() => goTo("cases")} />
               {reelDock && <ReelButton btnRef={reelBtn} onOpen={openReel} tease={tease} />}
