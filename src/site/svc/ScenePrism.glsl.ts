@@ -31,7 +31,7 @@ uniform float uFanAE, uFanAM, uFanM;
 uniform float uIB, uIF, uIForm, uFront, uIG, uIP, uBeamF;
 uniform vec3 uWarm, uCoreCol;
 /* the beam comes out of the active service's name: it fades in over this length from its origin (world units) */
-uniform float uFadeLen;
+uniform float uFadeLen, uTaper;
 /* the beam before a switch, going where it was (uIB0 → 0) */
 uniform vec3 uBA0, uPin0;
 uniform float uIB0;
@@ -123,6 +123,12 @@ float pt(vec3 ro, vec3 rd, float t0, float t1, vec3 p, out float tt){
   return length(ro + rd * tt - p);
 }
 
+/* the incoming beam: the cover's line with its core width scaled by w (thin at its birth) and its blooms by g */
+vec3 beamGlow(float dpx, float w, float g, float b){
+  float d = dpx / b;
+  float c = d / (uCore * w);
+  return (uCoreCol * exp(-c * c) * 1.6 * mix(0.55, 1.0, w) + uWarm * (exp(-d / (5.0 * w)) * 0.5 + exp(-d / 18.0) * 0.06) * g) / b;
+}
 /* the cover's line: a thin core and two bloom falloffs, measured in pixels; b > 1 blurs it (the satin mirror) */
 vec3 lineGlow(float dpx, vec3 warm, vec3 core, float b){
   float d = dpx / b;
@@ -215,9 +221,12 @@ vec3 lightsAir(vec3 ro, vec3 rd, float t0, float t1, float tc, float b, float li
   float dist = (1.0 - q.z) * Lb;
   float along = smoothstep(0.0, uFadeLen, q.z * Lb);
   along *= smoothstep(uBeamF - 0.25, uBeamF + 0.05, dist);
-  float hz = exp(-q.x / 0.025) * 0.14 + exp(-q.x / 0.12) * 0.04;
+  // it is born thin: a hair of light out of the letter, gathering its core and its glow over the first stretch, so
+  // there is no cut where it starts; its wide bloom stays modest all along
+  float tp = smoothstep(0.0, uTaper, q.z * Lb);
+  float hz = (exp(-q.x / 0.022) * 0.12 + exp(-q.x / 0.1) * 0.025) * tp * tp;
   float sm = lite > 0.5 ? 0.85 : mix(0.45, 1.25, smoke(vec2(q.z * 7.0, q.x * 9.0)));
-  col += (lineGlow(dpx, uWarm, uCoreCol, b) + uWarm * hz * sm * uHaze) * along * uIB;
+  col += (beamGlow(dpx, mix(0.28, 1.0, tp), tp * tp, b) + uWarm * hz * sm * uHaze) * along * uIB;
   // the beam before a switch fades where it is
   if (uIB0 > 0.001) {
     q = seg(ro, rd, t0, t1, uBA0, uPin0);
@@ -294,7 +303,10 @@ vec3 floorLight(vec3 p, vec3 rd){
   float r2;
   vec3 c2 = fanCol(p.xz, uPoolSoft * 2.4, r2);
   vec3 cl = coneLight(p);
-  float vis = (c2.r + c2.g + c2.b > 1e-5 || cl.r + cl.g + cl.b > 1e-5) ? shadowVis(p) : 1.0;
+  bool inLight = c2.r + c2.g + c2.b > 1e-5 || cl.r + cl.g + cl.b > 1e-5;
+  float vis1 = inLight ? shadowVis(p) : 1.0;
+  // the spectrum's shadows part into colour at their edges
+  vec3 vis = inLight && uSpecW > 0.01 ? mix(vec3(vis1), shadowVisRGB(p, 5.0), uSpecW) : vec3(vis1);
   if (c2.r + c2.g + c2.b > 1e-5) {
     float r;
     vec3 c = fanCol(p.xz, uPoolSoft, r);
@@ -319,7 +331,7 @@ vec3 floorLight(vec3 p, vec3 rd){
   // shadows; the satin breaks it up a little
   if (cl.r + cl.g + cl.b > 1e-5) {
     float sm = smokeLite(vec2(length(p.xz - uLO.xz) * 2.0, atan(p.z - uLO.z, p.x - uLO.x) * 3.0));
-    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.12, uSpecW) * uIP;
+    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.24, uSpecW) * uIP;
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);

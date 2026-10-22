@@ -69,6 +69,15 @@ float shadowVis(vec3 p){
   v += step(s.z, unpackD(texture2D(uShadow, s.xy + vec2(-o, -o))));
   return v / 8.0;
 }
+/* the spectrum's shadows: each colour leaves the glass a little further along the fan, so the edges of a shadow
+   split into colour; three interpolated taps across the light's width, one per channel */
+vec3 shadowVisRGB(vec3 p, float spread){
+  if (uShadowOn < 0.5) return vec3(1.0);
+  vec3 s = shadowUV(p);
+  if (s.x < 0.0) return vec3(1.0);
+  vec2 o = vec2(uShadowTx * spread, 0.0);
+  return vec3(shadowTap(s.xy - o, s.z), shadowTap(s.xy, s.z), shadowTap(s.xy + o, s.z));
+}
 /* the same, one tap (for the haze, where many are taken along a ray) */
 float shadowVis1(vec3 p){
   if (uShadowOn < 0.5) return 1.0;

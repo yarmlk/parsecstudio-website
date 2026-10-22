@@ -53,12 +53,16 @@ const BUSTS = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/colossus.bin"] as co
 const M_RING = 0, M_DISC = 1, M_ORB = 2, M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_PILL = 6;
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
-const DIMS = [{ h: 1.15, r: 0.85 }, { h: 0.55, r: 0.6 }, { h: 0.95, r: 0.9 }];
+const DIMS = [{ h: 1.05, r: 0.85 }, { h: 0.8, r: 0.62 }, { h: 0.95, r: 0.9 }];
 /** where each service's things sit across the frame (their middle, as a fraction of the section's width) */
 const AIM_X = [0.775, 0.77, 0.775];
+/** the light lands this far below the prism's level (fraction of the section's height); at most this far turned (rad) */
+const AIM_DY = 0.07, AIM_MAX = 0.75;
 const STAND_MAX = 2.6;
+/** the largest each service's things may grow (the colossal head fills the frame quickly) */
+const SCALE_MAX = [3.2, 1.0, 3.2];
 /** the colossal head lies back on the floor, its face turned up to the camera above */
-const COLOSSUS_TILT = -1.05;
+const COLOSSUS_TILT = -0.7;
 /** the shadow map's reach from the light's origin */
 const L_FAR = 7;
 interface Shot {
@@ -187,6 +191,8 @@ declare global {
 
 /** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
 const BEAM_OUT = 0.22, BEAM_IN = 0.5;
+/** the cut between services: how long the stage takes to go dark before the scene swaps (ms) */
+const CUT_IN = 120;
 
 /* How hard the scene works, kept for the whole visit (it survives remounts): the canvas's pixel budget and whether the
    light is marched through the haze. The scene starts one step below the top and moves by measured frame times: down
@@ -321,10 +327,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let yT = NaN;
     // eased state: the service's weights and the prism's turn
     const st = { spec: 0, proj: 1, k: 0, rot: NaN, svc: Math.max(0, activeRef.current), show: [0, 0, 0] };
+    st.spec = st.svc === 1 ? 1 : 0; st.k = st.svc === 2 ? 1 : 0; st.show[st.svc] = 1;
+    /** the cut between services: the service asked for, and when the stage started to go dark for it */
+    const cut = { want: st.svc, at: 0 };
     /** where each service's things stand: its light's origin and direction at the middle of its turn (per layout) */
     let place: { o: V3; az: number }[] = [];
     /** how far along its light each service's things stand, and their scale (fitted to the frame per layout) */
     let stand: { d: number; s: number }[] = [];
+    /** each service's aim: where its light heads across the stage, and how far that is turned from where the glass sends it */
+    let aim: { az: number; d: number }[] = [];
     /* the beam: where it starts (the active name) and since when; the one before it, going where it was */
     const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 } };
     /* each service's working turn of the prism (deg): from where its name's beam comes, every colour of its light gets
@@ -392,12 +403,22 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (typeof window.__stPrismPy === "number") yT = list.top + ((window.__stPrismPy + 1) / 2) * (list.bottom - list.top);
       px += (pxT - px) * kk(0.035);
 
-      // the service on show (the last one while none is)
-      if (activeRef.current >= 0) st.svc = activeRef.current;
+      // the service on show (the last one while none is). A switch is a cut: the stage blurs and darkens for a moment
+      // (CSS on the canvas), the scene swaps while it is dark and comes back sharp; nothing fades or regrows
+      const asked = activeRef.current;
+      if (asked >= 0 && asked !== cut.want) {
+        cut.want = asked;
+        if (drawn && !frozen && !reduce) { cut.at = now; box.classList.add("is-cut"); }
+      }
+      if (cut.want !== st.svc && (frozen || reduce || !drawn || now - cut.at >= CUT_IN)) {
+        st.svc = cut.want;
+        st.spec = st.svc === 1 ? 1 : 0;
+        st.k = st.svc === 2 ? 1 : 0;
+        for (let i = 0; i < 3; i++) st.show[i] = st.svc === i ? 1 : 0;
+        if (box.classList.contains("is-cut")) setTimeout(() => box.classList.remove("is-cut"), 40);
+      }
       const svc = st.svc;
-      st.spec += ((svc === 1 ? 1 : 0) - st.spec) * kk(0.08);
       st.proj = 1 - st.spec;
-      st.k += ((svc === 2 ? 1 : 0) - st.k) * kk(0.08);
 
       if (S.sat !== lutSat) {
         lutSat = S.sat;
@@ -439,13 +460,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // and grows the new one out of the new name into the glass
       const tNow = frozen ? 1e6 : now / 1000;
       if (beam.svc !== svc) {
-        if (beam.svc >= 0 && !frozen) {
-          const oa = anchorOf(beam.svc), oo = startAt(oa.x, oa.y, S.slope);
-          const oP = makePrism([0, 0, 0], S.R, S.H, (Number.isNaN(st.rot) ? 0 : st.rot) * DEG);
-          const ot = traceBeam(oP, oo, norm(sub([0, S.hb, 0], oo)), nAt(1, 0));
-          beam.old = { o: oo, pin: ot ? ot.pin : [0, S.hb, 0] };
-        }
-        beam.tSw = beam.svc >= 0 && !frozen ? tNow : -1e9;
+        // a switch happens under the cut: the new beam is simply there
+        beam.old = null;
+        beam.tSw = -1e9;
         beam.svc = svc;
       }
       const sw = tNow - beam.tSw;
@@ -497,6 +514,17 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // as far out along the light as the frame allows: right of the prism, under the head's hairline, above the
         // section's foot, clear of the right edge
         const prismX = project(cam, [0, S.H * 0.5, 0], A)[0] * W;
+        // the light of every service is aimed the same way: straight across the stage to its middle, a little below the
+        // prism's level, where its things stand (the glass sends it near enough; the last few degrees are ours)
+        aim = place.map((pl0, i) => {
+          const T = rayAt(AIM_X[i] * W, atY * Hs + AIM_DY * Hs);
+          const t = -cam.pos[1] / Math.min(T[1], -1e-4);
+          const az = Math.atan2(cam.pos[2] + T[2] * t - pl0.o[2], cam.pos[0] + T[0] * t - pl0.o[0]);
+          let dl = Math.atan2(Math.sin(az - pl0.az), Math.cos(az - pl0.az));
+          dl = Math.max(-AIM_MAX, Math.min(AIM_MAX, dl));
+          return { az: pl0.az + dl, d: dl };
+        });
+        place = place.map((pl0, i) => ({ o: pl0.o, az: aim[i].az }));
         stand = place.map((pl0, i) => {
           const f = dirXZ(pl0.az), dm = DIMS[i];
           const fits = (d: number, sc: number) => {
@@ -511,7 +539,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
             return true;
           };
           // as large as the frame takes them (monumental), at the distance that puts them nearest their spot across
-          for (const sc of [3.2, 2.9, 2.6, 2.35, 2.1, 1.9, 1.7, 1.5, 1.3, 1.15, 1, 0.85, 0.7, 0.6, 0.5]) {
+          for (const sc of [3.2, 2.9, 2.6, 2.35, 2.1, 1.9, 1.7, 1.5, 1.3, 1.15, 1, 0.85, 0.7, 0.6, 0.5].filter((x) => x <= SCALE_MAX[i])) {
             let bestD = -1, bestE = 1e9;
             for (let d = STAND_MAX; d >= 0.55; d -= 0.05) {
               if (!fits(d, sc)) continue;
@@ -550,7 +578,10 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (!tr) return;
       const valid = tr.rays.filter((r) => r.dir);
       const E = tr.rays[0], M = valid[valid.length - 1] ?? E;
-      const dE = E.dir ?? d0, dM = M.dir ?? dE;
+      // the aim: the bundle leaving the glass is turned the last few degrees toward the middle of the stage
+      const ta = aim[svc]?.d ?? 0, ca = Math.cos(ta), sa = Math.sin(ta);
+      const turn = (v: V3): V3 => [v[0] * ca - v[2] * sa, v[1], v[0] * sa + v[2] * ca];
+      const dE = turn(E.dir ?? d0), dM = turn(M.dir ?? E.dir ?? d0);
       const O: V3 = mul(add(E.out, M.out), 0.5);
       let N = norm(cross(dE, dM));
       if (N[1] < 0) N = mul(N, -1);
@@ -582,7 +613,6 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
 
       /* the things on the stage this frame: each service's fade in and out with its light */
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
-      for (let i = 0; i < 3; i++) st.show[i] += ((svc === i ? 1 : 0) - st.show[i]) * kk(0.05);
       const items: Item[] = [];
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
@@ -595,7 +625,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // slowly precessing, a frosted moon and a small black disc on their orbits; the light lines their edges and the
         // ring throws its ellipse of shadow across the sphere and the floor
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        const c = at(0, sd.d, 0, 0.62 * sc), f = st.show[0];
+        const c = at(0, sd.d, -0.12 * sc, 0.5 * sc), f = st.show[0];
         const pre = 0.13 * tSec;
         const tilt = axisAngle([0, 0, 0], [Math.cos(pre), 0, Math.sin(pre)], 1.05 + 0.08 * Math.sin(0.21 * tSec));
         items.push({ mesh: M_RING, m: axisAngle(c, [0, 1, 0], 0.07 * tSec, sc, tilt), mat: FROST, fade: f });
@@ -612,7 +642,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
         const tilt = COLOSSUS_TILT + 0.03 * Math.sin(0.21 * tSec);
         const p: V3 = [p0[0], -ob.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
-        items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.75 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
+        items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.42 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
       }
       if (st.show[2] > 0.004 && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
         // Vertical Series: two busts in conversation, turned to each other, one answering the other
@@ -633,7 +663,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
       // our light opens wider for the two figures of Vertical than for the one object of Motion
-      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.05 * st.spec;
+      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.12 * st.spec;
       const lGain = 2.6 * iP * kept;
       const hw = 0.5 * Math.abs(Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE))) + wedge;
       const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
@@ -691,6 +721,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // our light lands as a wider, softer field than the spectrum
       f1("uFanBlur", S.fanBlur * (1 + 0.8 * st.proj)); f1("uPoolSoft", S.poolSoft * (1 + 0.7 * st.proj)); f1("uPoolTh", S.poolTh); f1("uGain", S.gain);
       f1("uFadeLen", S.fadeLen);
+      // the beam gathers its full width and glow over this stretch out of the letter (world units)
+      f1("uTaper", Math.min(0.45, L * 0.32));
       // keep the light clear of the hairline under the head (canvas px from the bottom, where the fade ends)
       f1("uTopY", ruleY > 0 ? (Hs - ruleY - 28) * cpx : 1e5);
       f1("uTopSoft", 70 * cpx);
