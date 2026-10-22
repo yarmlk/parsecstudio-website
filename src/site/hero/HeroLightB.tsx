@@ -138,6 +138,8 @@ vec3 reel(){
   float m = e.x * e.y;
   vec3 hn = texture2D(uHaloN, q).rgb, hw = texture2D(uHaloW, q).rgb, hf = texture2D(uHaloF, q).rgb;
   gHaloN = hn * hn * m; gHaloW = hw * hw * m; gAdapt = hf * hf * m;
+  // behind the glass a light, clean blur (half the sharp frame, half its near blur); clear once the glass has gone
+  c = mix(c, hn * hn, 0.45 * (1.0 - uClr));
   return mix(VOIDL, c, m);
 }
 /* The film seen through the dark glass. The glass sinks the film's darks and mids (a toe) and lets its light through
@@ -148,13 +150,8 @@ vec3 reel(){
    Under the pointer's lens the glass all but goes: the toe, the adaptation and the desaturation ease off.
    T: the glass's transmission here. */
 vec3 glass(vec3 R, float T){
-  float k = mix(mix(0.09, 0.2, uLook), 0.03, gLens);
-  float ad = 1.0 / (1.0 + mix(3.2, 4.0, uLook) * dot(gAdapt, LUMA) * (1.0 - 0.55 * gLens));
-  vec3 S = R * R / (R + k) * (1.0 + k) * ad;
-  S = mix(vec3(dot(S, LUMA)), S, mix(mix(0.92, 0.85, uLook), 1.0, gLens));
-  vec3 bl = max(gHaloN * 0.55 + gHaloW * 0.45 - gAdapt * mix(1.25, 1.1, uLook), 0.0);
-  bl = mix(bl, dot(bl, LUMA) * vec3(1.12, 0.97, 0.80), 0.35);
-  return (S + bl * ad * mix(0.9, 1.6, uLook) * (1.0 + 0.6 * uTease)) * T * vec3(1.0, 0.975, 0.945);
+  // clean glass: the film as it is (no toe, no tint, no glow), only a little light lost in it
+  return R * T;
 }
 
 vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
@@ -239,10 +236,8 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
     // and reflects more), least at the top of the frame, so the film's cuts never jump behind the nav
     float nl = clamp(exp(-hIn / 0.09) * lit, 0.0, 1.0);
     float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
-    float base = mix(mix(0.24, 0.10, uLook), mix(0.085, 0.035, uLook), smoothstep(0.02, 0.5, hIn));
-    float Tr = mix(base, mix(0.68, 0.52, uLook), nl) * top * (1.0 + 0.4 * uTease);
-    // the pointer's lens: our light shows our work
-    Tr = mix(Tr, mix(0.6, 0.5, uLook) * mix(1.0, top, 0.8), gLens);
+    // the disc as it was (dark glass), but clean: neutral, no toe, no tint, just its light blur
+    float Tr = mix(0.26, 0.55, nl) * mix(1.0, top, 0.6);
     film = mix(glass(R, Tr) * uReelA, R, uClr);
   }
   col = mix(col, pc * (1.0 - uClr), plane);
@@ -331,8 +326,7 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
     float lit = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
     float nl = clamp(exp(-h / 0.10) * lit, 0.0, 1.0);
     float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
-    float base = mix(mix(0.22, 0.09, uLook), mix(0.08, 0.032, uLook), smoothstep(0.02, 0.5, h));
-    float T = mix(base, mix(0.62, 0.48, uLook), nl) * top * (1.0 + 0.4 * uTease);
+    float T = mix(0.24, 0.5, nl) * mix(1.0, top, 0.6);
     film = mix(glass(fm, T) * uReelA, fm, uClr);
   }
   gFilm = film * above;

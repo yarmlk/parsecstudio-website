@@ -10,7 +10,7 @@ import { CutLine, useCutTrack, useReduced } from "./ui";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
-import { CtaDevPanel, GlassPlay, ReelButton, RideLabel, useCtaVariant, useTease } from "./hero/ReelCta";
+import { GlassPlay, ReelButton, RideLabel, useTease } from "./hero/ReelCta";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -187,7 +187,8 @@ export function Site({
   const idleT = useRef<number | undefined>(undefined);
   const reelPl = useReelPlayer(reelRef, reelPh === "open" || reelPh === "opening");
   /* the showreel's controls (hero/ReelCta): the glass itself plays the film; the button is A, B or C (DEV compares) */
-  const cta = useCtaVariant();
+  /* the showreel's one control: "Play showreel" riding the light on the disc (no button under the headline) */
+  const cta = "b" as const;
   const tease = useTease(heroCtl);
   const [rideDock, setRideDock] = useState(false);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
@@ -600,7 +601,6 @@ export function Site({
       )}
       <Nav mode={mode} active={navOn} onGo={goTo} onMenu={() => setMenu(true)} solid={scrolled || svOpen != null} away={reelPh !== "idle"} />
       {menu && !desk && <MobileMenu active={navOn} onGo={goTo} onClose={() => setMenu(false)} />}
-      <CtaDevPanel />
       {open && (
         <CaseView
           key={open.from ? `${open.from.x}-${open.from.y}` : "start"}
