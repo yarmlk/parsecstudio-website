@@ -22,8 +22,9 @@ import "./hero-b.css";
  *
  * Motion is a camera and the light, nothing else:
  * - the hot spot follows the pointer x along the rim with the cover's inertia (lerp 0.035 / frame at 60 fps);
- * - a real parallax inside the shader: the front of the disc shifts most, its back less, the haze less again,
- *   the satin reflection the other way, the film behind the glass least;
+ * - a real parallax inside the shader (PAR, shared with the JS mirrors of the rim): the front of the disc shifts most
+ *   and the disc rolls a little, its back less, the haze less again, the far wall and the film behind the glass
+ *   least, the reflections on the glass the other way;
  * - phone: the scroll moves the camera instead;
  * - one slow 12 s push-in, the haze drifts at the cover's speed; no pointer = the frame rests.
  * Pauses off-screen and on hidden documents. Reduced motion = a still frame and a plain fade to the film;
@@ -31,6 +32,20 @@ import "./hero-b.css";
  */
 
 type Mode = "desk" | "mob";
+
+/** The camera's parallax on the desk (pointer; cam runs −0.5 … 0.5), in hero units per unit of cam. Shared by the
+    shader and its JS mirrors (rimAt, glassAt, spot), so the words are wiped exactly along the light. */
+const PAR = {
+  disc: 0.065,   // the front of the disc, the nearest layer
+  back: 0.4,     // its back moves this share of its front (perspective)
+  tilt: 0.03,    // and it rolls a little with cam.x (rad per unit)
+  hazeA: 0.022,  // the far haze layer under the rim
+  hazeB: 0.035,  // the near one
+  wall: 0.012,   // the far wall
+  film: 0.02,    // the film behind the glass, a far plane (frame heights)
+  sheen: 0.34,   // reflections slide against the glass, the other way
+} as const;
+const gf = (x: number) => x.toFixed(4);
 
 const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
 
@@ -104,14 +119,14 @@ vec2 reelScale(){
   float A = gAsp, V = uReelAsp;
   vec2 s = A > V ? vec2(1.0, V / A) : vec2(A / V, 1.0);
   if (A < V) s *= pow(V / A, uFit);
-  return s / (1.0 + 0.014 * (1.0 - uClr));
+  return s / (1.0 + 0.024 * (1.0 - uClr));
 }
 /* the film, linear and sharp. Behind the glass it sits further away: a little overscan and its own small parallax.
    As the glass clears it settles to exactly the frame the <video> will take over. Its blurred light comes with it. */
 vec3 reel(){
   vec2 s = reelScale();
   float o = 1.0 - uClr;
-  vec2 par = vec2(uCam.x / gAsp, -uCam.y) * 0.006 * o;
+  vec2 par = vec2(uCam.x / gAsp, -uCam.y) * ${gf(PAR.film)} * o;
   vec2 q = 0.5 + (gUV + par - 0.5) * s;
   vec3 t0 = texture2D(uReel, q).rgb;
   vec3 c = vec3(s2l(t0.r), s2l(t0.g), s2l(t0.b));
@@ -142,14 +157,15 @@ vec3 glass(vec3 R, float T){
 vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   vec2 C = vec2(-0.055, 0.21 - uDrop);
   float BF = 0.249;
-  float th = -0.2546;
+  float th = -0.2546 - ${gf(PAR.tilt)} * uCam.x;
   vec2 cam = vec2(uCam.x, -uCam.y);
   vec3 cool = vec3(0.80, 0.88, 1.0);
 
-  // near layer: the disc. Its front moves more than its back (perspective), the page scroll moves it a little.
+  // near layer: the disc. Its front moves more than its back (perspective), it rolls a little with the camera,
+  // the page scroll moves it a little.
   vec2 r0 = rot(-th) * (p - C);
   float depth = clamp((r0.y + BF) / (2.0 * BF), 0.0, 1.0);
-  vec2 pn = p + cam * 0.024 * mix(1.0, 0.45, depth) + vec2(0.0, uScroll * 0.20);
+  vec2 pn = p + cam * ${gf(PAR.disc)} * mix(1.0, ${gf(PAR.back)}, depth) + vec2(0.0, uScroll * 0.20);
   vec2 r = rot(-th) * (pn - C);
   vec2 Dv = normalize(vec2(0.13, -0.99));
   float T = 14.0 * lp;
@@ -183,7 +199,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float L = (0.38 * pk + 0.50 * body + 0.12 * tail) * reveal * I * front * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   // far layer: a black room, a wall far behind on the right, lit softly from above
-  vec2 pw = p + cam * 0.005 + vec2(0.0, uScroll * 0.36);
+  vec2 pw = p + cam * ${gf(PAR.wall)} + vec2(0.0, uScroll * 0.36);
   vec3 col = vec3(0.0010, 0.0010, 0.0011);
   col += cool * 0.016 * smoothstep(0.35, 0.95, pw.x) * smoothstep(-0.2, 0.55, pw.y);
 
@@ -192,14 +208,14 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   vec3 pc = vec3(0.0006, 0.00058, 0.00055);
   // a soft-box far above, reflected in the top surface: a faint cool panel on the far part of the disc, defined
   // edges, soft ends. A reflection slides against the surface as the camera moves.
-  vec2 sbq = r - vec2(0.30 - cam.x * 0.30, 0.095 + cam.y * 0.04);
+  vec2 sbq = r - vec2(0.30 - cam.x * ${gf(PAR.sheen)}, 0.095 + cam.y * 0.05);
   float sbx = smoothstep(0.40, 0.16, abs(sbq.x)), sby = smoothstep(0.034, 0.022, abs(sbq.y));
   pc += cool * 0.0042 * sbx * sby * smoothstep(0.0, 0.08, hIn) * (0.75 + 0.25 * sbq.y / 0.034);
   // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim. A reflection
   // slides against its surface when the camera moves, so it travels further than the light itself.
-  float us = uHot + 0.06 + cam.x * 0.22;
+  float us = uHot + 0.06 + cam.x * ${gf(PAR.sheen)};
   float sx = u - us;
-  float hs = 0.048 - cam.y * 0.026;
+  float hs = 0.048 - cam.y * 0.04;
   float sh = (hIn - hs) / 0.038;
   float sheen = exp(-sx * sx / (2.0 * 0.21 * 0.21)) * exp(-sh * sh * 0.5) * smoothstep(0.004, 0.03, hIn) * front
     * (1.0 - smoothstep(0.42, 0.82, u));
@@ -249,8 +265,8 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float env0 = hp * low * open * (exp(-hb / 0.045) + 0.1 * exp(-hb / 0.12));
   if (env0 > 0.0008) {
     // only where the light can reach is the smoke worth computing
-    vec2 pa = p + cam * 0.009 + vec2(0.0, uScroll * 0.32);
-    vec2 pb = p + cam * 0.015 + vec2(0.0, uScroll * 0.27);
+    vec2 pa = p + cam * ${gf(PAR.hazeA)} + vec2(0.0, uScroll * 0.32);
+    vec2 pb = p + cam * ${gf(PAR.hazeB)} + vec2(0.0, uScroll * 0.27);
     vec2 ra = rot(-th) * (pa - C);
     vec2 rb = rot(-th) * (pb - C);
     float ha = max(sdDisc(ra - Dv * T), 0.0);
@@ -482,31 +498,53 @@ const GEO = {
   desk: { C: [-0.055, 0.21], a: 0.976, b: 0.249, th: -0.2546, F: [-0.05, -0.02], from: Math.PI, to: 2 * Math.PI, line: -0.4 },
   mob: { C: [0, -0.305], a: 0.46, b: 0.30, th: -0.05, F: [0, -0.005], from: 0, to: Math.PI, line: 0 },
 } as const;
-function rimAt(mode: Mode, x: number, W: number, H: number, drop: number, k: number, zoom: number, cx: number, cy: number, scroll: number) {
+/** the disc's tilt with the camera (rad), as in the shader */
+const thAt = (mode: Mode, cx: number) => GEO[mode].th - (mode === "desk" ? PAR.tilt * cx : 0);
+/* What the shader adds to a scene point p before it tests the rim: desk, the disc's parallax (its front moves most,
+   its back PAR.back of that, by the point's depth in the disc) and the scroll; phone, the scroll. */
+function shift(mode: Mode, px: number, py: number, drop: number, cx: number, cy: number, scroll: number): [number, number] {
+  if (mode !== "desk") return [0, scroll * 0.2];
+  const g = GEO.desk, th = thAt(mode, cx);
+  const dx = px - g.C[0], dy = py - (g.C[1] - drop);
+  const ry = Math.sin(-th) * dx + Math.cos(-th) * dy;
+  const depth = Math.min(1, Math.max(0, (ry + g.b) / (2 * g.b)));
+  const f = PAR.disc * (1 + (PAR.back - 1) * depth);
+  return [cx * f, -cy * f + scroll * 0.2];
+}
+/* the rim, sampled: for each point its x in the disc's own frame (where the shader's light is measured) and where it
+   shows in the hero (px) */
+function rimPts(mode: Mode, W: number, H: number, drop: number, k: number, zoom: number, cx: number, cy: number, scroll: number) {
   const g = GEO[mode];
   const A = W / H;
-  const c = Math.cos(g.th), s = Math.sin(g.th);
-  // what the shader adds to a point before it tests the rim (the front of the disc, at full parallax)
-  const ox = mode === "desk" ? cx * 0.024 : 0;
-  const oy = (mode === "desk" ? -cy * 0.024 : 0) + scroll * 0.2;
+  const th = thAt(mode, cx);
+  const c = Math.cos(th), s = Math.sin(th);
   const T = (14 * (1 + 0.9 * k)) / H;
-  let X0 = 0, Y0 = 0;
+  const a = mode === "desk" ? g.a + drop * (0.25 + 1.4 * drop) : g.a;
   const N = 160;
+  const pts: { u: number; X: number; Y: number }[] = [];
   for (let i = 0; i <= N; i++) {
     const ph = g.from + ((g.to - g.from) * i) / N;
-    const a = mode === "desk" ? g.a + drop * (0.25 + 1.4 * drop) : g.a;
     const ex = a * Math.cos(ph), ey = g.b * Math.sin(ph);
-    const sx = g.C[0] + c * ex - s * ey - ox;
-    const sy = g.C[1] - drop + s * ex + c * ey - oy;
-    // the push-in: a scene point shows at (s - F) * zoom + F
-    const qx = (sx - g.F[0]) * zoom + g.F[0];
-    const qy = (sy - g.F[1]) * zoom + g.F[1] + g.line * T;
-    const X = (qx / A + 0.5) * W, Y = (0.5 - qy) * H;
-    if (i > 0 && (X - x) * (X0 - x) <= 0 && X !== X0) {
-      const f = (x - X0) / (X - X0);
-      return { y: Y0 + (Y - Y0) * f, m: (Y - Y0) / (X - X0) };
+    // the rim in the disc's frame (pn in the shader) …
+    const nx = g.C[0] + c * ex - s * ey, ny = g.C[1] - drop + s * ex + c * ey;
+    // … and the scene point that lands on it: p + shift(p) = pn, solved by a few fixed-point steps
+    let px = nx, py = ny;
+    for (let j = 0; j < 4; j++) { const [ox, oy] = shift(mode, px, py, drop, cx, cy, scroll); px = nx - ox; py = ny - oy; }
+    // the push-in: a scene point shows at (p - F) * zoom + F
+    const qx = (px - g.F[0]) * zoom + g.F[0];
+    const qy = (py - g.F[1]) * zoom + g.F[1] + g.line * T;
+    pts.push({ u: nx, X: (qx / A + 0.5) * W, Y: (0.5 - qy) * H });
+  }
+  return pts;
+}
+function rimAt(mode: Mode, x: number, W: number, H: number, drop: number, k: number, zoom: number, cx: number, cy: number, scroll: number) {
+  const pts = rimPts(mode, W, H, drop, k, zoom, cx, cy, scroll);
+  for (let i = 1; i < pts.length; i++) {
+    const p0 = pts[i - 1], p1 = pts[i];
+    if ((p1.X - x) * (p0.X - x) <= 0 && p1.X !== p0.X) {
+      const f = (x - p0.X) / (p1.X - p0.X);
+      return { y: p0.Y + (p1.Y - p0.Y) * f, m: (p1.Y - p0.Y) / (p1.X - p0.X) };
     }
-    X0 = X; Y0 = Y;
   }
   return null;
 }
@@ -520,10 +558,11 @@ function glassAt(mode: Mode, X: number, Y: number, W: number, H: number, drop: n
   let x = (X / W - 0.5) * A, y = 0.5 - Y / H;
   x = (x - g.F[0]) / zoom + g.F[0];
   y = (y - g.F[1]) / zoom + g.F[1];
-  if (mode === "desk") { x += cx * 0.024; y += -cy * 0.024 + scroll * 0.2; }
-  else y += scroll * 0.2;
+  const [ox, oy] = shift(mode, x, y, drop, cx, cy, scroll);
+  x += ox; y += oy;
   const dx = x - g.C[0], dy = y - (g.C[1] - drop);
-  const c = Math.cos(-g.th), s = Math.sin(-g.th);
+  const th = thAt(mode, cx);
+  const c = Math.cos(-th), s = Math.sin(-th);
   const lx = c * dx - s * dy, ly = s * dx + c * dy;
   if (mode === "desk") {
     const a = g.a + drop * (0.25 + 1.4 * drop);
@@ -767,14 +806,28 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       },
       spot: () => {
         if (!st.drawn || !section) return null;
-        const W = section.offsetWidth, H = section.offsetHeight, A = W / H, g = GEO[mode];
-        // the column where the light peaks: the shader puts the peak where the front layer's x meets the hot spot
-        const hx = mode === "desk" ? st.hot - st.cx * 0.024 : st.hot + st.sc * 0.08;
-        const X = (((hx - g.F[0]) * st.zoom + g.F[0]) / A + 0.5) * W;
-        const r = rimAt(mode, X, W, H, st.drop, R.k, st.zoom, st.cx, st.cy, st.sc);
-        return r ? { x: X, y: r.y } : null;
+        const W = section.offsetWidth, H = section.offsetHeight;
+        // the shader's light peaks where the rim's own x (in the disc's frame, after the parallax) meets the hot spot
+        const hot = mode === "desk" ? st.hot : st.hot + st.sc * 0.08;
+        const pts = rimPts(mode, W, H, st.drop, R.k, st.zoom, st.cx, st.cy, st.sc);
+        for (let i = 1; i < pts.length; i++) {
+          const p0 = pts[i - 1], p1 = pts[i];
+          if ((p1.u - hot) * (p0.u - hot) <= 0 && p1.u !== p0.u) {
+            const f = (hot - p0.u) / (p1.u - p0.u);
+            return { x: p0.X + (p1.X - p0.X) * f, y: p0.Y + (p1.Y - p0.Y) * f };
+          }
+        }
+        return null;
       },
     };
+    // dev only: the JS mirrors of the light, to check them against the frame
+    if (import.meta.env.DEV) {
+      (window as unknown as { __hlbGeo?: unknown }).__hlbGeo = {
+        rim: (x: number) => section && rimAt(mode, x, section.offsetWidth, section.offsetHeight, st.drop, R.k, st.zoom, st.cx, st.cy, st.sc),
+        glass: (X: number, Y: number) => section && glassAt(mode, X, Y, section.offsetWidth, section.offsetHeight, st.drop, st.zoom, st.cx, st.cy, st.sc),
+        spot: () => ctl.current?.spot(),
+      };
+    }
 
     if (gl && prog) {
       gl.useProgram(prog);
@@ -936,7 +989,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
           st.hot = st.hotT; st.cx = st.cxT; st.cy = st.cyT; st.sc = st.scT; st.tease = st.teaseT;
         } else {
           st.hot += (st.hotT - st.hot) * kk(0.035);
-          st.cx += (st.cxT - st.cx) * kk(0.04);
+          st.cx += (st.cxT - st.cx) * kk(0.048);
           st.cy += (st.cyT - st.cy) * kk(0.04);
           st.sc += (st.scT - st.sc) * kk(0.09);
           st.tease += (st.teaseT - st.tease) * kk(0.07);
@@ -951,9 +1004,16 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         }
         R.flare = val(R.fTw, now);
         R.k = val(R.kTw, now);
-        // dev only: freeze the reveal at a given point (window.__hlb = { k, flare })
-        const dbg = import.meta.env.DEV ? (window as unknown as { __hlb?: { k?: number; flare?: number } }).__hlb : undefined;
-        if (dbg) { if (dbg.k != null) R.k = dbg.k; if (dbg.flare != null) R.flare = dbg.flare; }
+        // dev only: freeze the reveal at a given point, and the camera (window.__hlb = { k, flare, cx, cy, hot })
+        type Dbg = { k?: number; flare?: number; cx?: number; cy?: number; hot?: number };
+        const dbg = import.meta.env.DEV ? (window as unknown as { __hlb?: Dbg }).__hlb : undefined;
+        if (dbg) {
+          if (dbg.k != null) R.k = dbg.k;
+          if (dbg.flare != null) R.flare = dbg.flare;
+          if (dbg.cx != null) st.cx = st.cxT = dbg.cx;
+          if (dbg.cy != null) st.cy = st.cyT = dbg.cy;
+          if (dbg.hot != null) st.hot = st.hotT = dbg.hot;
+        }
         // the sound comes in with the light going down, and leaves as it comes back up
         if (volOk && !v.muted && (R.phase === "opening" || R.phase === "closing")) {
           const vol = R.phase === "opening" ? (R.down ? Math.min(1, R.k * 1.3) : 0) : Math.pow(R.k, 1.6);
