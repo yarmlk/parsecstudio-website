@@ -30,12 +30,12 @@ uniform float uIB, uIF, uIForm, uFront, uIG, uIP, uBeamF;
 uniform vec3 uWarm, uCoreCol;
 /* the beam comes out of the active service's name: it fades in over this length from its origin (world units) */
 uniform float uFadeLen;
-/* Motion and Vertical: no dispersion; the warm light leaves the glass at uProjO and throws a frame of light onto the
-   floor (centre uPoolC, half size uPoolH, world xz); the film lies on the floor (uFootC / uFootH) and the light shows
-   it as shadows. uSpecW: the AI spectrum's weight, uProjW: the projection's, uProjK: 0 the craft film … 1 the vertical */
-uniform float uSpecW, uProjW, uProjK, uPoolFeather;
-uniform vec3 uProjO;
-uniform vec2 uPoolC, uPoolH, uFootC, uFootH;
+/* Motion and Vertical: our light leaves the glass as one narrow warm bundle and lands on the floor, where a film lies
+   (centre uFootC, half size uFootH, world xz); the light develops it. uSpecW: the AI spectrum's weight, uProjW: the
+   film's, uProjK: 0 the craft film … 1 the vertical */
+uniform float uSpecW, uProjW, uProjK, uWedge;
+uniform float uTopY, uTopSoft;   // the hairline under the head: the scene fades out before it (device px from the bottom)
+uniform vec2 uFootC, uFootH;
 uniform sampler2D uFilmA, uFilmB;
 uniform vec3 uS0, uS1, uS2, uS3, uS4;
 uniform sampler2D uSpec;
@@ -150,7 +150,8 @@ vec3 fanCol(vec2 xz, float soft, out float r){
   if (body < 1e-4) return vec3(0.0);
   float s = (a - uFanAE) / da;
   float ws = wid / max(r * abs(da), 1e-3);
-  return spectrumW(s, ws) * body * 0.06 / (0.06 + r * abs(da) + wid);
+  // our light (Motion, Vertical) carries one colour; AI parts it into the spectrum
+  return mix(uS0, spectrumW(s, ws), uSpecW) * body * 0.06 / (0.06 + r * abs(da) + wid);
 }
 /* the fan in the haze: a sheet of light leaving the glass, opening warm → cool, descending onto the floor */
 vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
@@ -245,14 +246,7 @@ vec3 env(vec3 rd){
 }
 
 /* ---------- the projection ---------- */
-/* the frame of light on the floor: a soft rounded rectangle (1 inside) */
-float poolMask(vec2 xz){
-  vec2 d = abs(xz - uPoolC) - uPoolH;
-  float r = 0.06;
-  float sd = length(max(d + r, 0.0)) + min(max(d.x + r, d.y + r), 0.0) - r;
-  return smoothstep(uPoolFeather, -uPoolFeather * 0.5, sd);
-}
-/* the film lying on the floor: 1 where its figures shadow the light (black on white, keyed here), soft-edged */
+/* the film lying on the floor: 1 on its figures (black on white, keyed here), soft-edged */
 float shadowAt(vec2 xz){
   vec2 uv = vec2(0.5 + (xz.x - uFootC.x) / (2.0 * uFootH.x), 0.5 - (xz.y - uFootC.y) / (2.0 * uFootH.y));
   if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 0.0;
@@ -263,17 +257,6 @@ float shadowAt(vec2 xz){
   float l = dot(mix(a, b, uProjK), vec3(0.299, 0.587, 0.114));
   return smoothstep(0.85, 0.15, l);
 }
-/* the throw in the haze: from where the light leaves the glass, widening to the frame on the floor */
-vec3 projAir(vec3 ro, vec3 rd, float t0, float t1, float lite){
-  if (uProjW < 0.002) return vec3(0.0);
-  vec3 P = vec3(uPoolC.x, 0.0, uPoolC.y);
-  vec3 q = seg(ro, rd, t0, t1, uProjO, P);
-  float w = mix(0.025, 0.42 * length(uPoolH), q.z * q.z);
-  float sm = lite > 0.5 ? 0.85 : mix(0.4, 1.3, smokeLite(vec2(q.z * 5.0, q.x * 7.0 + q.z * 2.0)));
-  float core = exp(-q.x / (0.012 + 0.05 * q.z)) * (1.0 - smoothstep(0.0, 0.5, q.z));
-  return uWarm * (exp(-q.x / w) * 0.035 / (0.2 + 2.5 * w) * sm + core * 0.25) * uProjW;
-}
-
 /* ---------- floor ---------- */
 vec3 floorLight(vec3 p, vec3 rd){
   vec3 col = vec3(0.0);
@@ -300,15 +283,22 @@ vec3 floorLight(vec3 p, vec3 rd){
     float bloom = exp(-(ys * ys) / (th3 * th3));
     col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain;
   }
-  // the projection: warm light in the frame, the film's figures as its shadows; a soft spill around it
+  // our light (Motion, Vertical): past where the bundle reaches the floor it spreads into a wedge of light, and there
+  // it develops the film lying on the floor: its figures come up in the light, the rest stays low (a double exposure:
+  // the light is cut by the figures' shapes)
   if (uProjW > 0.002) {
-    float m = poolMask(p.xz);
-    vec2 dO = p.xz - uProjO.xz;
-    float fall = 1.6 / (1.0 + 0.35 * dot(dO, dO));
-    if (m > 0.0) col += uWarm * m * (1.0 - 0.94 * shadowAt(p.xz)) * 0.62 * fall * uProjW;
-    vec2 d = abs(p.xz - uPoolC) - uPoolH;
-    float ou = length(max(d, 0.0));
-    col += uWarm * exp(-ou / 0.22) * (1.0 - m) * 0.05 * fall * uProjW;
+    vec2 v = p.xz - uFanO.xz;
+    float r = length(v);
+    float a = atan(v.y, v.x);
+    float dm = a - 0.5 * (uFanAE + uFanAM);
+    dm = mod(dm + 3.14159265, 6.2831853) - 3.14159265;
+    float hw = 0.5 * abs(uFanAM - uFanAE) + uWedge;
+    float Ld = uFanO.y / max(uFanM, 0.05);
+    float F = smoothstep(hw, hw * 0.45, abs(dm)) * smoothstep(Ld * 0.7, Ld * 1.05, r) * exp(-max(r - Ld, 0.0) / 1.6);
+    if (F > 0.001) {
+      float sm = smokeLite(vec2(r * 2.0, a * 3.0));
+      col += uS0 * F * (0.05 + 1.1 * shadowAt(p.xz)) * mix(0.8, 1.15, sm) * 0.95 * uProjW * uIP;
+    }
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);
@@ -405,7 +395,7 @@ void main(){
   vec3 pf = ro + rd * tFl;
 
   // the room: haze, then the satin floor (it mirrors softly and fades into the dark)
-  vec3 bg = lightsAir(ro, rd, 0.0, min(tFl, 40.0), 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tFl, 1.0, 0.0) + projAir(ro, rd, 0.0, min(tFl, 40.0), 0.0);
+  vec3 bg = lightsAir(ro, rd, 0.0, min(tFl, 40.0), 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tFl, 1.0, 0.0);
   if (tFl < 1e3) {
     vec3 fl = vec3(0.029, 0.029, 0.033) + floorLight(pf, rd);
     vec3 rr = reflect(rd, vec3(0.0, 1.0, 0.0));
@@ -413,7 +403,7 @@ void main(){
     vec3 refl = lightsAir(pf, rr, 0.0, 8.0, tFl, 12.0, 1.0) * 0.5 + fanAir(pf, rr, 0.0, 8.0, 2.6, 1.0) * uFanRefl + env(rr) + prismMirror(pf, rr);
     fl += refl * Ff * 0.85;
     fl *= mix(mix(1.0, 0.45, uIForm), 1.0, smoothstep(0.0, 0.16, footD(pf.xz)));
-    fl *= exp(-max(length(pf.xz - mix(uFanO.xz, uPoolC, uProjW)) - 2.2, 0.0) * 0.45);
+    fl *= exp(-max(length(pf.xz - uFanO.xz) - 2.2, 0.0) * 0.45);
     bg += fl;
   } else bg += env(rd);
 
@@ -429,11 +419,13 @@ void main(){
   if (h.x >= tFl) cov = 0.0;
   if (cov > 0.0 && h.y > 0.0) {
     float tN = max(h.x, 0.0);
-    vec3 gc = lightsAir(ro, rd, 0.0, tN, 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tN, 1.0, 0.0) + projAir(ro, rd, 0.0, tN, 1.0) + glassView(ro, rd, tN, 0.0);
+    vec3 gc = lightsAir(ro, rd, 0.0, tN, 0.0, 1.0, 0.0) + fanAir(ro, rd, 0.0, tN, 1.0, 0.0) + glassView(ro, rd, tN, 0.0);
     // light first: the glass itself comes forward just after it (uIForm)
     col = mix(bg, gc, cov * (0.25 + 0.75 * uIForm));
   }
 
+  // nothing crosses the hairline under the section's head
+  col *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, frag.y);
   // the cover's grade: breathing very slowly, filmic shoulder, static grain (a touch more in the light), vignette
   col *= (0.985 + 0.015 * sin(uTime * 0.31)) * uGain;
   col = vec3(1.0) - exp(-col * 1.4);
