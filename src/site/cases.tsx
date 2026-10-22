@@ -37,22 +37,40 @@ const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}
 
 export const CASES: Case[] = [
   {
-    id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
-    tools: "Unreal Engine 5 · 3ds Max · Cinema 4D · After Effects",
-    line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
-    poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
-  },
-  {
     id: "prison", title: "A Prison Without Walls", type: "3D short film", dur: "1:07",
     tools: "Unreal Engine 5 · MetaHuman · Maya · Substance Painter · Cascadeur",
     line: "A short film with its own story, directed by the studio: a woman and a small robot, sets and characters built from scratch in Unreal Engine 5.",
     poster: "58% 50%", film: film("prison", "1:07", 1920 / 676), stills: [still("prison", "A small robot by a window in warm light", "58% 50%")],
   },
   {
+    id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
+    tools: "Unreal Engine 5 · 3ds Max · Cinema 4D · After Effects",
+    line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
+    poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
+  },
+  {
+    id: "leave", title: "Leave It Alone", type: "Animated music video", client: "Tariq", dur: "3:36",
+    tools: "Illustrator",
+    line: "A music video for Tariq: every scene drawn from scratch and animated frame by frame.",
+    poster: "50% 50%", film: film("leave", "3:36"), stills: [still("leave", "Two figures bound by a wire against a burst of light")],
+  },
+  {
     id: "blkmrkt", title: "BLKMRKT", type: "Game trailer", dur: "0:28",
     tools: "Unreal Engine 5 · Blender · Maya · Marvelous Designer · Cascadeur",
     line: "The trailer for a mobile game: streets in Unreal Engine 5, clothes in Marvelous Designer.",
     poster: "41% 50%", film: film("blkmrkt", "0:28", 1920 / 674), stills: [still("blkmrkt", "A neon alley in the rain", "41% 50%")],
+  },
+  {
+    id: "medieval", title: "Medieval Age", type: "Game trailer", dur: "0:25",
+    tools: "Cinema 4D",
+    line: "One of three concept trailers for a medieval video game, built from the ground up.",
+    poster: "48% 50%", film: film("medieval", "0:25"), stills: [still("medieval", "A figure climbing the stairs to a glowing portal", "48% 50%")],
+  },
+  {
+    id: "pytannia", title: "Krechet feat. Alina Pash", type: "Music video", dur: "3:47",
+    tools: "ARRI Alexa · Drone",
+    line: "The music video for “Pytannia” (Question), shot on ARRI Alexa with drone aerials, then edited, graded and finished at the studio.",
+    poster: "49% 50%", film: film("pytannia", "3:47", 1920 / 804), stills: [still("pytannia", "A figure in a hood and a gas mask", "49% 50%")],
   },
   {
     id: "fifa", title: "FIFA World Cup 2022", type: "3D Animation & CGI", client: "FIFA", year: "2022", dur: "0:17",
@@ -67,34 +85,10 @@ export const CASES: Case[] = [
     poster: "48% 50%", film: film("tefal", "0:15", 2), stills: [still("tefal", "The heat indicator under a fan of light", "48% 50%")],
   },
   {
-    id: "medieval", title: "Medieval Age", type: "Game trailer", dur: "0:25",
-    tools: "Cinema 4D",
-    line: "One of three concept trailers for a medieval video game, built from the ground up.",
-    poster: "48% 50%", film: film("medieval", "0:25"), stills: [still("medieval", "A figure climbing the stairs to a glowing portal", "48% 50%")],
-  },
-  {
     id: "arch", title: "Architecture Visualization", type: "3D Animation & CGI", dur: "0:19",
     tools: "Unreal Engine 5",
     line: "A house and its interiors, rendered in real time in Unreal Engine 5.",
     poster: "38% 50%", film: film("arch", "0:19"), stills: [still("arch", "A modern house among pines", "38% 50%")],
-  },
-  {
-    id: "banxe", title: "BANXE", type: "3D Animation & CGI", client: "Banxe", dur: "0:38",
-    tools: "Cinema 4D · Octane Render · Cascadeur",
-    line: "Digital banking, shown in Cinema 4D with characters animated in Cascadeur.",
-    poster: "50% 50%", film: film("banxe", "0:38"), stills: [still("banxe", "A sketched character beside the words startup, crypto, web3")],
-  },
-  {
-    id: "gmeet", title: "Google Meet", type: "2D Animation", client: "Google", dur: "0:15",
-    tools: "Illustrator · After Effects",
-    line: "A 15-second film in Google’s own style: four characters, one call.",
-    poster: "50% 50%", film: film("gmeet", "0:15"), stills: [still("gmeet", "Four people on a video call")],
-  },
-  {
-    id: "mywish", title: "My Wish App", type: "Video production", client: "MyWishApp", dur: "0:15",
-    tools: "RED",
-    line: "A series of promo films for a wish-list app, shot on RED.",
-    poster: "50% 50%", film: film("mywish", "0:15"), stills: [still("mywish", "A couple at a dinner table")],
   },
 ];
 
@@ -127,7 +121,7 @@ export const SITE_SERVICES: Service[] = [
     id: "craft", name: "Motion, 3D & CGI",
     line: "SaaS and product films, motion design, 3D and CGI.",
     text: "SaaS and product films, motion design, 3D animation and CGI. From script and storyboard to the edit, colour and sound.",
-    works: CASES,
+    works: CASES.filter((c) => c.type !== "Music video"),
     items: [
       "SaaS and product films", "Motion design and explainers", "3D animation and CGI", "Game trailers and cinematics",
       "Brand and event films", "Script and storyboard", "Characters and environments", "Edit, colour and sound",
