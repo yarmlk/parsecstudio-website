@@ -68,13 +68,14 @@ uniform float uTease;    // hover anticipation: 0 rest … 1 the rim warms up, t
 uniform sampler2D uHaloN, uHaloW, uHaloF; // the film's light blurred: near (≈ 1/50 of the frame), wide (≈ 1/12),
                                            // far (≈ 1/3, what the eye adapts to); √-encoded
 uniform float uLook;     // the glass: 0 lit (A, production) … 1 ember (B, dev only)
+uniform vec3 uLens;      // the pointer's window of clearer glass: its centre (screen hero units) and strength
 /* the same 3500 K source seen through haze: scattering leaves it a little deeper */
 #define HZ mix(uWarm, uDeep, 0.62)
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /* shared by the scene functions and main(). The film through the glass is kept apart from the light (gFilm), so the
    light's shoulder never squashes the film's own highlights. */
-vec2 gUV; float gAsp; float gGlass; vec3 gFilm, gHaloN, gHaloW, gAdapt;
+vec2 gUV; float gAsp; float gGlass; vec3 gFilm, gHaloN, gHaloW, gAdapt; float gLens;
 
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
@@ -143,15 +144,16 @@ vec3 reel(){
    field sinks back into it while its detail and its small lights stay, so a white frame never turns the disc into a
    grey slab. Only the film's lights bloom into the glass: what shines brighter than its surroundings spills its
    blurred light around it (warm, like halation on film), so dark detail inside a bright frame stays crisp.
+   Under the pointer's lens the glass all but goes: the toe, the adaptation and the desaturation ease off.
    T: the glass's transmission here. */
 vec3 glass(vec3 R, float T){
-  float k = mix(0.09, 0.2, uLook);
-  float ad = 1.0 / (1.0 + mix(3.2, 4.0, uLook) * dot(gAdapt, LUMA));
+  float k = mix(mix(0.09, 0.2, uLook), 0.03, gLens);
+  float ad = 1.0 / (1.0 + mix(3.2, 4.0, uLook) * dot(gAdapt, LUMA) * (1.0 - 0.55 * gLens));
   vec3 S = R * R / (R + k) * (1.0 + k) * ad;
-  S = mix(vec3(dot(S, LUMA)), S, mix(0.92, 0.85, uLook));
+  S = mix(vec3(dot(S, LUMA)), S, mix(mix(0.92, 0.85, uLook), 1.0, gLens));
   vec3 bl = max(gHaloN * 0.55 + gHaloW * 0.45 - gAdapt * mix(1.25, 1.1, uLook), 0.0);
   bl = mix(bl, dot(bl, LUMA) * vec3(1.12, 0.97, 0.80), 0.35);
-  return (S + bl * ad * mix(0.9, 1.6, uLook)) * T * vec3(1.0, 0.975, 0.945);
+  return (S + bl * ad * mix(0.9, 1.6, uLook) * (1.0 + 0.6 * uTease)) * T * vec3(1.0, 0.975, 0.945);
 }
 
 vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
@@ -210,7 +212,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   // edges, soft ends. A reflection slides against the surface as the camera moves.
   vec2 sbq = r - vec2(0.30 - cam.x * ${gf(PAR.sheen)}, 0.095 + cam.y * 0.05);
   float sbx = smoothstep(0.40, 0.16, abs(sbq.x)), sby = smoothstep(0.034, 0.022, abs(sbq.y));
-  pc += cool * 0.0042 * sbx * sby * smoothstep(0.0, 0.08, hIn) * (0.75 + 0.25 * sbq.y / 0.034);
+  pc += cool * 0.0042 * sbx * sby * smoothstep(0.0, 0.08, hIn) * (0.75 + 0.25 * sbq.y / 0.034) * (1.0 - gLens);
   // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim. A reflection
   // slides against its surface when the camera moves, so it travels further than the light itself.
   float us = uHot + 0.06 + cam.x * ${gf(PAR.sheen)};
@@ -226,7 +228,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   // the rim's light enters the glass at its edge and scatters inside it, like edge-lit acrylic: a warm luminous
   // gradient rising to the lit rim, strongest at the hot spot
   float lit = (0.30 * pk + 0.55 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-  pc += mix(uDeep, uWarm, 0.6) * lit * I * front * (0.040 * exp(-hIn / 0.03) + 0.014 * exp(-hIn / 0.13));
+  pc += mix(uDeep, uWarm, 0.6) * lit * I * front * (0.040 * exp(-hIn / 0.03) + 0.014 * exp(-hIn / 0.13)) * (1.0 + 0.5 * uTease);
   // the film behind the glass: clearly there across the disc, clearer near the lit rim, clearest under the hot spot
   vec3 film = vec3(0.0);
   if (plane > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
@@ -237,6 +239,8 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
     float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
     float base = mix(mix(0.24, 0.10, uLook), mix(0.085, 0.035, uLook), smoothstep(0.02, 0.5, hIn));
     float Tr = mix(base, mix(0.68, 0.52, uLook), nl) * top * (1.0 + 0.4 * uTease);
+    // the pointer's lens: our light shows our work
+    Tr = mix(Tr, mix(0.82, 0.72, uLook) * mix(1.0, top, 0.8), gLens);
     film = mix(glass(R, Tr) * uReelA, R, uClr);
   }
   col = mix(col, pc * (1.0 - uClr), plane);
@@ -277,7 +281,7 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
     float spill = exp(-hb / (5.0 * lp)) * 0.6 + exp(-hb / (16.0 * lp)) * 0.4;
     float vol = 0.85 * exp(-hb / 0.045) + 0.075 * exp(-hb / 0.12);
     float hz = hp * (0.34 * spill * mix(0.8, 1.1, dens) + vol * dens + 0.012 * exp(-hb / 0.08));
-    hz *= low * smoothstep(0.0, 0.9, ign * 1.4 - 0.15) * (1.0 + 0.35 * uFlare);
+    hz *= low * smoothstep(0.0, 0.9, ign * 1.4 - 0.15) * (1.0 + 0.35 * uFlare + 0.2 * uTease);
     col += mix(uWarm, HZ, 0.45 + 0.45 * smoothstep(0.0, 0.2, hb)) * hz * open;
   }
 
@@ -379,6 +383,8 @@ void main(){
   float aspect = uRes.x / uRes.y;
   gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0); gHaloN = vec3(0.0); gHaloW = vec3(0.0); gAdapt = vec3(0.0);
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+  // the lens sits on the screen, where the pointer is: a soft round window
+  gLens = uLens.z * (1.0 - smoothstep(0.05, 0.21, length(p - uLens.xy)));
   // the slow push-in of the camera
   float zoom = 1.0 + 0.03 * uPush;
   vec2 F = uMob > 0.5 ? vec2(0.0, -0.005) : vec2(-0.05, -0.02);
@@ -596,6 +602,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     const rest0 = REST[mode];
     const st = {
       hot: rest0, hotT: rest0, cx: 0, cy: 0, cxT: 0, cyT: 0, sc: 0, scT: 0, tease: 0, teaseT: 0,
+      /* the lens: where the pointer is (screen, hero units), and how much (eased) */
+      lx: 0, ly: 0, ls: 0, lsT: 0,
       t0: performance.now(), last: performance.now(), aspect: 1.8, frame: 0, zoom: 1, drop: 0, drawn: false,
     };
     const R = {
@@ -698,7 +706,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (!visible || document.hidden || R.phase === "open") { running = false; return; }
       // when everything has settled the frame only carries the slow haze and the film: draw at half rate
       const settled = Math.abs(st.hotT - st.hot) < 2e-4 && Math.abs(st.cxT - st.cx) < 2e-4 && Math.abs(st.cyT - st.cy) < 2e-4
-        && Math.abs(st.scT - st.sc) < 2e-4 && Math.abs(st.teaseT - st.tease) < 2e-3 && now - st.t0 > 12500 && R.phase === "idle" && fin(R.aTw, now);
+        && Math.abs(st.scT - st.sc) < 2e-4 && Math.abs(st.teaseT - st.tease) < 2e-3 && Math.abs(st.lsT - st.ls) < 2e-3
+        && now - st.t0 > 12500 && R.phase === "idle" && fin(R.aTw, now);
       st.frame++;
       if (!settled || st.frame % 2 === 0) draw(now);
       else st.last = now - 1000 / 60;
@@ -842,7 +851,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         scroll: U("uScroll"), unit: U("uUnit"), cam: U("uCam"), warm: U("uWarm"), core: U("uCore"), deep: U("uDeep"),
         reel: U("uReel"), reelA: U("uReelA"), reelAsp: U("uReelAsp"), k: U("uK"), drop: U("uDrop"), flare: U("uFlare"),
         clr: U("uClr"), fit: U("uFit"), tease: U("uTease"), haloN: U("uHaloN"), haloW: U("uHaloW"), haloF: U("uHaloF"),
-        look: U("uLook"),
+        look: U("uLook"), lens: U("uLens"),
       };
       gl.uniform3f(u.warm, WARM[0], WARM[1], WARM[2]);
       gl.uniform3f(u.core, CORE[0], CORE[1], CORE[2]);
@@ -986,13 +995,15 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         st.last = now;
         const kk = (per: number) => 1 - Math.pow(1 - per, dt * 60);
         if (reduce) {
-          st.hot = st.hotT; st.cx = st.cxT; st.cy = st.cyT; st.sc = st.scT; st.tease = st.teaseT;
+          st.hot = st.hotT; st.cx = st.cxT; st.cy = st.cyT; st.sc = st.scT; st.tease = st.teaseT; st.ls = st.lsT;
         } else {
           st.hot += (st.hotT - st.hot) * kk(0.035);
           st.cx += (st.cxT - st.cx) * kk(0.048);
           st.cy += (st.cyT - st.cy) * kk(0.04);
           st.sc += (st.scT - st.sc) * kk(0.09);
           st.tease += (st.teaseT - st.tease) * kk(0.07);
+          // the lens opens and closes over ~300 ms
+          st.ls += (st.lsT - st.ls) * kk(0.12);
         }
         // the reveal: the flare holds until the film plays, then the rim goes down
         if (R.phase === "opening" && !R.down) {
@@ -1026,8 +1037,20 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         const drop = DROP[mode] * R.k;
         st.zoom = 1 + 0.03 * push; st.drop = drop; st.drawn = true;
         gl.uniform2f(u.res, canvas.width, canvas.height);
-        gl.uniform1f(u.tease, st.tease);
         gl.uniform1f(u.look, glassLook());
+        // dev only: pin the tease (window.__hlbTease = 0..1) and the lens (window.__hlbLens = { x, y, s }, section px)
+        let tease = st.tease, lx = st.lx, ly = st.ly, ls = st.ls;
+        if (import.meta.env.DEV) {
+          const w = window as unknown as { __hlbTease?: number; __hlbLens?: { x: number; y: number; s?: number } };
+          if (w.__hlbTease != null) tease = w.__hlbTease;
+          if (w.__hlbLens && section) {
+            const Wd = section.offsetWidth, Hd = section.offsetHeight;
+            lx = (w.__hlbLens.x / Wd - 0.5) * (Wd / Hd); ly = 0.5 - w.__hlbLens.y / Hd; ls = w.__hlbLens.s ?? 1;
+          }
+        }
+        gl.uniform1f(u.tease, tease);
+        // the lens lives on the glass while it rests; the reveal takes it with it
+        gl.uniform3f(u.lens, lx, ly, ls * (1 - sstep(0, 0.3, R.k)));
         gl.uniform1f(u.time, reduce ? 20 : el + 20);
         gl.uniform1f(u.hot, st.hot);
         gl.uniform1f(u.ign, ign);
@@ -1106,8 +1129,17 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       st.hotT = (Math.max(0.08, Math.min(0.92, nx)) - 0.5) * st.aspect;
       st.cxT = Math.max(-0.5, Math.min(0.5, nx - 0.5));
       st.cyT = Math.max(-0.5, Math.min(0.5, ny - 0.5));
+      // the lens: a window of clearer glass around the pointer while it is over the glass (and the film is there)
+      st.lx = (nx - 0.5) * st.aspect; st.ly = 0.5 - ny;
+      let on = false;
+      if (R.phase === "idle" && !fade && section) {
+        const { X, Y, W, H } = local(e.clientX, e.clientY);
+        on = glassAt(mode, X, Y, W, H, st.drop, st.zoom, st.cx, st.cy, st.sc);
+      }
+      st.lsT = on ? 1 : 0;
+      kick();
     };
-    const onLeave = () => { st.hotT = rest0; st.cxT = 0; st.cyT = 0; };
+    const onLeave = () => { st.hotT = rest0; st.cxT = 0; st.cyT = 0; st.lsT = 0; };
     section?.addEventListener("pointermove", onMove);
     section?.addEventListener("pointerleave", onLeave);
     const onScroll = () => {
