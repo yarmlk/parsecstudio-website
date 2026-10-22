@@ -3,51 +3,66 @@ import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
-/* Services: one stage, one real glass prism at the centre of the section for all three lines of the studio. The beam
-   comes out of the active service's name (it starts just past its last letter), runs into the prism's centre and leaves
-   it to the right:
-     Motion, 3D & CGI — no dispersion: the same warm 3500 K light throws a 16:9 frame onto the floor, where a film lies and
-                        the light shows it as shadows (motion design → a fight → a ship in a storm);
-     AI Production    — parted into the AI spectrum (Ember → Rose → Violet → Blue → Mint), landing as a field of colour;
-     Vertical Series  — the warm light again, a 9:16 frame and vertical micro-scenes.
-   The pointer: up/down turns the prism a few degrees (the projection sways), left/right lets the light reach a little
-   further. Switching service re-aims the beam from the new name and turns the prism, with the light's timing.
-   The optics are solved on the CPU (ScenePrism.optics.ts); the picture is one fragment shader (ScenePrism.glsl.ts). */
+/* Services: one stage, one real glass prism at the centre of the section, level with the middle of the three names. The
+   beam comes out of the active service's name — one letter's width past its last letter, on the middle line of its type
+   — and runs straight into the prism's centre. It does not move: switching service lets the old beam go where it is
+   and a new one grows out of the new name. The light leaves the glass to the right:
+     Motion, 3D & CGI — no dispersion: our one warm 3500 K light;
+     AI Production    — parted into the AI spectrum (Ember → Rose → Violet → Blue → Mint);
+     Vertical Series  — the warm light again.
+   The pointer: its height over the block of names turns the prism, all the time and only that (the light it sends
+   sweeps the floor); left/right lets the light reach a little further.
+   Everything is laid out in the site's own px (the site is drawn at 1440 and scaled to the window); the canvas only
+   decides the resolution. The optics are solved on the CPU (ScenePrism.optics.ts); the picture is one fragment
+   shader (ScenePrism.glsl.ts). */
 
 const DEG = Math.PI / 180;
 const hex = (h: string): V3 => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
 const SPECTRUM = ["#F6C88C", "#F0A98E", "#C9A0DC", "#93B1D6", "#9FD6CC"].map(hex);
-/** refractive index per colour of the light (dispersion exaggerated ~10× over dense flint so the fan reads at this scale) */
+/** refractive index per colour of the light (dispersion exaggerated ~10× over flint so the fan reads at this scale),
+ *  around a light glass's 1.45: the light gets through the prism over a wide turn, so the pointer can really turn it */
 const N_LIGHT = [1.45, 1.5125, 1.575, 1.6375, 1.7];
+const N_MID = 1.45;
+/** the colours' indices: the AI spectrum (ai 1), or our light (ai 0) as one warm bundle about half as wide;
+ *  sp (0.8 … 1.1) is how far the bundle opens (the pointer's x) */
+const nAt = (sp: number, ai: number) => N_LIGHT.map((n) => N_MID + (n - 1.575) * sp * (0.45 + 0.55 * ai));
+/** a turn of the prism works when every colour gets out of the glass and heads down to the floor on the right: level
+ *  with it, a little above or toward the viewer (25° … -50° from straight right, seen from above), never back into the head */
+const AZ_HI = 30 * (Math.PI / 180), AZ_LO = -50 * (Math.PI / 180);
+/** where the light of a working turn heads (its middle colour, deg from straight right; NaN = the turn fails) */
+function exitAz(P: ReturnType<typeof makePrism>, o: V3, d: V3, ns: number[]) {
+  const t = traceBeam(P, o, d, ns);
+  if (!t) return NaN;
+  for (const r of t.rays) {
+    if (!r.dir || r.dir[1] > -0.02) return NaN;
+    const az = Math.atan2(r.dir[2], r.dir[0]);
+    if (az > AZ_HI || az < AZ_LO) return NaN;
+  }
+  const m = t.rays[2].dir!;
+  return Math.atan2(m[2], m[0]) / (Math.PI / 180);
+}
+/** where each service would rather send its light (deg from straight right, + is up the screen): Motion a little up,
+ *  AI down to the right, Vertical just under level. Of the turns that work, the pointer gets the run nearest to it */
+const AZ_PREF = [8, -20, -8];
 /** index per channel for what is seen through the glass (a modest, real-looking fringe) */
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
-/** the films the light shows on the floor (black figures on white) */
-const FILMS = ["video/site/proj/craft.mp4", "video/site/proj/vertical.mp4"] as const;
-
-interface Frame {
-  /** centre on screen (fractions of the section) and half size on the floor (world units) */
-  at: [number, number]; half: [number, number];
-}
 interface Shot {
   /** camera position, what it looks at, vertical field of view (deg) */
   cam: V3; target: V3; fov: number;
   /** where the prism stands on screen (fractions of the section: x from the left, y from the top) */
   at: [number, number];
-  /** prism circumradius and height; the beam's height at the glass; how far the pointer turns the prism (deg) */
-  R: number; H: number; hb: number; rotAmp: number;
+  /** prism circumradius and height; the beam's height at the glass */
+  R: number; H: number; hb: number;
   /** overall exposure, fan in the air, landing field, haze along the beam, the room's sheen, spectrum chroma */
   gain: number; fanGain: number; landGain: number; haze: number; env: number; sat: number;
   /** absorption of the dark-tinted glass per unit length; edge rounding */
   tint: V3; bevel: number;
   /** how quickly the fan fades in the air; how strongly the floor mirrors it; the fan's softness and footprint */
   airFan: number; fanRefl: number; fanBlur: number; poolSoft: number; poolTh: number;
-  /** the beam fades in over this length out of the last letter (world units); the gap after the letter (px) */
+  /** the beam fades in over this length out of the last letter (world units); the gap after the letter (em of the name) */
   fadeLen: number; gap: number;
-  /** the beam's descent; how much of the prism's working turn the pointer uses (0..1) */
-  slope: number; turn: number;
-  /** the films lying on the floor (centre on screen, half size on the floor): larger than the light, they run off the
-   *  right edge; the light only ever shows part of them */
-  craft: Frame; vert: Frame;
+  /** the beam's descent from the name into the glass */
+  slope: number;
   /** phone: the list is too narrow for the light to leave a name without crossing the others, so it comes in from the
    *  edge here (fractions of the section) */
   edge?: [number, number];
@@ -55,21 +70,17 @@ interface Shot {
 const SHOTS: Record<"desk" | "mob", Shot> = {
   desk: {
     cam: [0, 7.0, -3.3], target: [0, 0.3, 0], fov: 23, at: [0.5, 0.69],
-    R: 0.34, H: 0.62, hb: 0.3, rotAmp: 5,
+    R: 0.34, H: 0.62, hb: 0.3,
     gain: 1, fanGain: 1, landGain: 9, haze: 1, env: 1.6, sat: 1.8, tint: [1.25, 1.32, 1.45], bevel: 0.0065,
-    airFan: 0.6, fanRefl: 0.4, fanBlur: 0.06, poolSoft: 2.0, poolTh: 0.05, fadeLen: 0.035, gap: 14,
-    slope: 0.36, turn: 0.9,
-    craft: { at: [0.8, 0.66], half: [2.3, 1.3] },
-    vert: { at: [0.78, 0.66], half: [0.95, 1.69] },
+    airFan: 0.6, fanRefl: 0.4, fanBlur: 0.06, poolSoft: 2.0, poolTh: 0.05, fadeLen: 0.035, gap: 0.5,
+    slope: 0.36,
   },
   mob: {
     cam: [0, 7.0, -3.3], target: [0, 0.3, 0], fov: 34, at: [0.3, 0.8], edge: [-0.02, 0.77],
-    R: 0.34, H: 0.66, hb: 0.32, rotAmp: 4,
+    R: 0.34, H: 0.66, hb: 0.32,
     gain: 0.9, fanGain: 0.9, landGain: 8, haze: 0.9, env: 1.6, sat: 1.8, tint: [1.25, 1.32, 1.45], bevel: 0.0065,
-    airFan: 0.6, fanRefl: 0.4, fanBlur: 0.07, poolSoft: 2.2, poolTh: 0.04, fadeLen: 0.03, gap: 10,
-    slope: 0.36, turn: 0.9,
-    craft: { at: [0.75, 0.82], half: [1.4, 0.8] },
-    vert: { at: [0.75, 0.82], half: [0.55, 0.98] },
+    airFan: 0.6, fanRefl: 0.4, fanBlur: 0.07, poolSoft: 2.2, poolTh: 0.04, fadeLen: 0.03, gap: 0.5,
+    slope: 0.36,
   },
 };
 
@@ -142,10 +153,17 @@ declare global {
     __stSceneT?: number;
     /** debug: pointer position over the scene, -1 (left) … 1 (right) */
     __stPrismPx?: number;
+    /** debug: pointer height over the block of names, -1 (top) … 1 (bottom) */
+    __stPrismPy?: number;
     /** debug: override any of the shot's settings live */
     __stPrismDbg?: Partial<Shot>;
+    /** debug: what the scene laid out last frame (site px), for checks */
+    __stPrismInfo?: Record<string, unknown>;
   }
 }
+
+/** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
+const BEAM_OUT = 0.22, BEAM_IN = 0.5;
 
 export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "mob" }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -198,93 +216,77 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     v3("uEta", N_VIEW);
     f1("uGrain", 0.03);
 
-    const mkTex = (unit: number, px: Uint8Array) => {
-      const t = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0 + unit);
-      gl.bindTexture(gl.TEXTURE_2D, t);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      return t;
-    };
-    const tex = mkTex(0, new Uint8Array([0, 0, 0, 255]));
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.uniform1i(u("uSpec"), 0);
-    // the films start white: no figures, an even frame of light, until their first frame arrives
-    const white = new Uint8Array([255, 255, 255, 255]);
-    const filmTex = [mkTex(1, white), mkTex(2, white)];
-    gl.uniform1i(u("uFilmA"), 1);
-    gl.uniform1i(u("uFilmB"), 2);
     let lutSat = NaN;
 
-    /* the films: muted loops, fetched the first time their service is shown, playing only while they are seen */
-    type RVFC = HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
-    const hasRVFC = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
-    const films = FILMS.map((src) => {
-      const v = document.createElement("video") as RVFC;
-      v.muted = true; v.loop = true; v.playsInline = true; v.preload = "none";
-      v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
-      return { v, src, armed: false, fresh: false, ok: false };
-    });
-    films.forEach((f) => {
-      const onFrame = () => { f.fresh = true; f.v.requestVideoFrameCallback?.(onFrame); };
-      f.v.addEventListener("loadeddata", () => { f.fresh = true; f.v.requestVideoFrameCallback?.(onFrame); });
-    });
-    const upload = (i: number) => {
-      const f = films[i];
-      if (f.v.readyState < 2 || !f.v.videoWidth) return;
-      if (!f.fresh && hasRVFC && f.ok) return;
-      f.fresh = false;
-      gl.activeTexture(gl.TEXTURE1 + i);
-      gl.bindTexture(gl.TEXTURE_2D, filmTex[i]);
-      try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, f.v); f.ok = true; } catch { /* keep the last */ }
-    };
-
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    let raf = 0, visible = true, running = false, dpr = 1;
+    let raf = 0, visible = true, running = false;
+    /** the canvas's px per site px (the window's scale × the device's pixel ratio, within the pixel budget) */
+    let cpx = 1;
     let tOn = performance.now();
     const t0 = performance.now();
     let last = performance.now();
-    // pointer: -1 … 1 across the section (x) and down it (y)
-    let px = 0, py = 0, pxT = 0, pyT = 0;
-    // eased state: the service's weights, the prism's turn, the beam's descent and where it starts on screen
-    const st = { spec: 0, proj: 1, k: 0, rot: NaN, ax: NaN, ay: NaN, svc: Math.max(0, activeRef.current) };
-    /* the prism's working turn for the current beam: every colour leaves the glass and heads right (cached) */
-    let range = { key: "", c: 0, h: 0 };
+    // pointer: -1 … 1 across the section (x) and down the block of names (y)
+    let px = 0, pxT = 0;
+    /** the pointer's height (site px); NaN until it moves */
+    let yT = NaN;
+    // eased state: the service's weights and the prism's turn
+    const st = { spec: 0, proj: 1, k: 0, rot: NaN, svc: Math.max(0, activeRef.current) };
+    /* the beam: where it starts (the active name) and since when; the one before it, going where it was */
+    const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 } };
+    /* each service's working turn of the prism (deg): from where its name's beam comes, every colour of its light gets
+       out and heads right. The pointer's height runs through them in order, row by row (cached per layout) */
+    let wins = { key: "", w: [] as { lo: number; hi: number }[] };
 
-    /* where each name ends (section px): the beam starts just past its last letter, at the middle of its line */
+    /* where each name ends (site px): the beam starts one letter past its last letter, on the middle line of its type */
     let anchors: { x: number; y: number }[] = [];
-    /** the block of the three names (section px): the prism stands at its middle, the pointer's height turns it */
+    /** the block of the three names (site px): the prism stands level with its middle, the pointer's height turns it */
     let list = { top: 0, bottom: 0, mid: 0 };
-    /** the hairline under the section's head (section px): nothing of the scene crosses it */
+    /** each service's row (site px, top … bottom of its button): the pointer turns the prism through its window there */
+    let rows: { top: number; bottom: number }[] = [];
+    /** the hairline under the section's head (site px): nothing of the scene crosses it */
     let ruleY = 0;
     const measure = () => {
       if (!section) return;
       const sr = section.getBoundingClientRect();
       const k = sr.width / Math.max(1, section.offsetWidth) || 1;
-      const gap = SHOTS[mode].gap;
       anchors = Array.from(section.querySelectorAll<HTMLElement>("[data-svc] .st-svc__name")).map((el) => {
         const rg = document.createRange();
         rg.selectNodeContents(el);
         const rs = rg.getClientRects();
         const r = rs.length ? rs[rs.length - 1] : el.getBoundingClientRect();
-        return { x: (r.right - sr.left) / k + gap, y: ((r.top + r.bottom) / 2 - sr.top) / k };
+        const em = parseFloat(getComputedStyle(el).fontSize) || 46;
+        return { x: (r.right - sr.left) / k + SHOTS[mode].gap * em, y: ((r.top + r.bottom) / 2 - sr.top) / k };
       });
       const rule = section.querySelector<HTMLElement>(".st-rule");
       if (rule) ruleY = (rule.getBoundingClientRect().top - sr.top) / k;
-      if (anchors.length) {
-        const y0 = anchors[0].y, y1 = anchors[anchors.length - 1].y;
-        list = { top: y0 - 40, bottom: y1 + 40, mid: (y0 + y1) / 2 };
+      const items = section.querySelectorAll<HTMLElement>("[data-svc] .st-svc__name");
+      if (items.length) {
+        const a = items[0].getBoundingClientRect(), b = items[items.length - 1].getBoundingClientRect();
+        const top = (a.top - sr.top) / k, bottom = (b.bottom - sr.top) / k;
+        list = { top, bottom, mid: (top + bottom) / 2 };
       }
+      rows = Array.from(section.querySelectorAll<HTMLElement>(".st-svc__item")).map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: (r.top - sr.top) / k, bottom: (r.bottom - sr.top) / k };
+      });
     };
 
     const resize = () => {
       const r = box.getBoundingClientRect();
+      const lh = Math.max(1, box.offsetHeight);
       const base = Math.min(window.devicePixelRatio || 1, 1.5);
-      dpr = Math.min(base, Math.sqrt(2_600_000 / Math.max(1, r.width * r.height)));
-      canvas.width = Math.max(2, Math.round(r.width * dpr));
-      canvas.height = Math.max(2, Math.round(r.height * dpr));
+      const d = Math.min(base, Math.sqrt(2_600_000 / Math.max(1, r.width * r.height)));
+      canvas.width = Math.max(2, Math.round(r.width * d));
+      canvas.height = Math.max(2, Math.round(r.height * d));
+      cpx = canvas.height / lh;
       gl.viewport(0, 0, canvas.width, canvas.height);
       measure();
     };
@@ -298,15 +300,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       last = now;
       const kk = (per: number) => (frozen || reduce ? 1 : 1 - Math.pow(1 - per, dt * 60));
       if (typeof window.__stPrismPx === "number") pxT = window.__stPrismPx;
+      if (typeof window.__stPrismPy === "number") yT = list.top + ((window.__stPrismPy + 1) / 2) * (list.bottom - list.top);
       px += (pxT - px) * kk(0.035);
-      py += (pyT - py) * kk(0.035);
 
       // the service on show (the last one while none is)
       if (activeRef.current >= 0) st.svc = activeRef.current;
       const svc = st.svc;
-      st.spec += ((svc === 1 ? 1 : 0) - st.spec) * kk(0.06);
+      st.spec += ((svc === 1 ? 1 : 0) - st.spec) * kk(0.08);
       st.proj = 1 - st.spec;
-      st.k += ((svc === 2 ? 1 : 0) - st.k) * kk(0.06);
+      st.k += ((svc === 2 ? 1 : 0) - st.k) * kk(0.08);
 
       if (S.sat !== lutSat) {
         lutSat = S.sat;
@@ -318,11 +320,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const stops = lightStops(S.sat);
       stops.forEach((c, i) => v3(`uS${i}`, [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]));
 
-      // the camera: the prism's centre lands exactly where the composition wants it
-      const W = canvas.width / dpr, Hs = canvas.height / dpr, A = W / Hs;
+      // the camera, in site px: the prism's centre lands exactly where the composition wants it
+      const W = Math.max(1, box.offsetWidth), Hs = Math.max(1, box.offsetHeight), A = W / Hs;
       const c0 = lookCam(S.cam, S.target, S.fov * DEG, [0, 0]);
       const p0 = project(c0, [0, S.H * 0.5, 0], A);
-      // desk: the prism stands at the middle of the block of names, centred across the section
+      // desk: the prism stands across from the middle of the block of names, at the middle of the section's width
       const atY = mode === "desk" && list.mid > 0 ? list.mid / Hs : S.at[1];
       const shift: [number, number] = [(S.at[0] - 0.5) * 2 * A - (p0[0] - 0.5) * 2 * A, (0.5 - atY) * 2 - (0.5 - p0[1]) * 2];
       const cam = lookCam(S.cam, S.target, S.fov * DEG, shift);
@@ -330,19 +332,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const sx = (X / W - 0.5) * 2 * A - shift[0], sy = (0.5 - Y / Hs) * 2 - shift[1];
         return norm(add(add(mul(cam.f, cam.focal), mul(cam.r, sx)), mul(cam.u, sy)));
       };
-      const onFloor = (X: number, Y: number): [number, number] => {
-        const rd = rayAt(X, Y);
-        const t = -cam.pos[1] / Math.min(rd[1], -1e-4);
-        return [cam.pos[0] + rd[0] * t, cam.pos[2] + rd[2] * t];
-      };
-
-      // the beam: it starts where the active name ends (eased, so it swings to the next name) and descends into the
-      // prism's centre; the pointer's x lets it reach a little further
-      const an = S.edge ? { x: S.edge[0] * W, y: S.edge[1] * Hs } : anchors[svc] ?? { x: W * 0.36, y: Hs * S.at[1] };
-      if (Number.isNaN(st.ax)) { st.ax = an.x; st.ay = an.y; }
-      st.ax += (an.x - st.ax) * kk(0.06);
-      st.ay += (an.y - st.ay) * kk(0.06);
-      // where the beam starts in the air so that it reads, on screen, as leaving the name
+      // where the beam starts in the air so that it reads, on screen, as leaving the name, and descends at sl into
+      // the prism's centre
       const startAt = (X: number, Y: number, sl: number): V3 => {
         const r0 = rayAt(X, Y);
         let lo = 0.5, hi = 40;
@@ -353,38 +344,78 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         }
         return add(cam.pos, mul(r0, (lo + hi) / 2));
       };
-      // the pointer's x: the light reaches a touch further and the bundle opens a little (0.8 … 1.1)
-      // our light throws further than the spectrum: its landing is where the film shows
-      const slope = S.slope * (0.72 + 0.28 * st.spec) * (1 - 0.06 * px);
-      const spread = 0.8 + 0.15 * (px + 1);
-      // the colours' indices: the AI spectrum, or our light as one narrow bundle
-      const nAt = (sp: number, ai: number) => N_LIGHT.map((n) => 1.565 + (n - 1.575) * sp * (0.75 + 0.25 * ai));
-      const nNow = nAt(spread, st.spec);
-      // the prism's working turn for this beam (where every colour leaves rightwards), found once per name and size
-      const key = `${svc}|${Math.round(W)}x${Math.round(Hs)}|${Math.round(an.x)},${Math.round(an.y)}`;
-      if (range.key !== key) {
-        const o = startAt(an.x, an.y, S.slope);
-        const dd = norm(sub([0, S.hb, 0], o));
-        const nMax = nAt(1.1, 1);
-        const ok: boolean[] = [];
-        for (let d = 0; d < 120; d++) {
-          const t = traceBeam(makePrism([0, 0, 0], S.R, S.H, d * DEG), o, dd, nMax);
-          ok.push(!!t && t.rays.every((r) => !!r.dir && r.dir[1] < -0.02 && r.dir[0] > 0.3));
+      const anchorOf = (i: number) => (S.edge ? { x: S.edge[0] * W, y: S.edge[1] * Hs } : anchors[i] ?? { x: W * 0.36, y: Hs * atY });
+
+      // the beam is pinned to the active name: no travel between names. A switch lets the old beam go where it is
+      // and grows the new one out of the new name into the glass
+      const tNow = frozen ? 1e6 : now / 1000;
+      if (beam.svc !== svc) {
+        if (beam.svc >= 0 && !frozen) {
+          const oa = anchorOf(beam.svc), oo = startAt(oa.x, oa.y, S.slope);
+          const oP = makePrism([0, 0, 0], S.R, S.H, (Number.isNaN(st.rot) ? 0 : st.rot) * DEG);
+          const ot = traceBeam(oP, oo, norm(sub([0, S.hb, 0], oo)), nAt(1, 0));
+          beam.old = { o: oo, pin: ot ? ot.pin : [0, S.hb, 0] };
         }
-        let best = 0, bs = 0;
-        for (let i = 0; i < 120; i++) {
-          if (!ok[i]) continue;
-          let n = 0;
-          while (n < 120 && ok[(i + n) % 120]) n++;
-          if (n > best) { best = n; bs = i; }
-        }
-        range = { key, c: bs + best / 2, h: Math.max(0, best / 2 - 2) };
+        beam.tSw = beam.svc >= 0 && !frozen ? tNow : -1e9;
+        beam.svc = svc;
       }
-      // the pointer's height over the block of names turns the prism through that range, smoothly, all the time
-      let rotT = range.c + range.h * S.turn * py;
+      const sw = tNow - beam.tSw;
+      const an = anchorOf(svc);
+
+      // the pointer's x: the bundle opens a little (0.8 … 1.1)
+      const slope = S.slope;
+      const spread = 0.8 + 0.15 * (px + 1);
+      const nNow = nAt(spread, st.spec);
+      // each service's window, for its own name and its own light, at the widest opening (narrower ones work wider)
+      const ans = S.edge ? [anchorOf(0)] : [0, 1, 2].map(anchorOf);
+      const key = `${Math.round(W)}x${Math.round(Hs)}|${ans.map((a) => `${Math.round(a.x)},${Math.round(a.y)}`).join(";")}`;
+      if (wins.key !== key) {
+        const w: { lo: number; hi: number }[] = [];
+        for (let i = 0; i < 3; i++) {
+          const a = ans[Math.min(i, ans.length - 1)];
+          const o = startAt(a.x, a.y, S.slope), d = norm(sub([0, S.hb, 0], o));
+          const ns = nAt(1.1, i === 1 ? 1 : 0);
+          const az: number[] = [];
+          for (let k = 0; k < 240; k++) az.push(exitAz(makePrism([0, 0, 0], S.R, S.H, k * 0.5 * DEG), o, d, ns));
+          // the runs of working turns (wrapping at 120°); score: long, and heading where the service wants its light
+          let best = 0, bs = 0, score = -1e9;
+          const start = az.findIndex((v) => Number.isNaN(v));
+          for (let q = 0; q < 240 && start >= 0; q++) {
+            const k = (start + q) % 240;
+            if (Number.isNaN(az[k]) || !Number.isNaN(az[(k + 239) % 240])) continue;
+            let n = 0;
+            while (n < 240 && !Number.isNaN(az[(k + n) % 240])) n++;
+            const sc = n * 0.5 - 0.8 * Math.abs(az[(k + (n >> 1)) % 240] - AZ_PREF[i]);
+            if (sc > score) { score = sc; best = n; bs = k; }
+          }
+          if (start < 0) { best = 240; bs = 0; }
+          // a degree and a half kept clear of each end (there the light grazes out)
+          const lo = bs * 0.5 + 1.5, hi = Math.max(lo, (bs + best) * 0.5 - 1.5);
+          // the same window repeats every 120° (three faces): take the one that follows the previous row's in order
+          let sh = 0;
+          if (w.length) { const pc = (w[w.length - 1].lo + w[w.length - 1].hi) / 2; sh = Math.round((pc + 20 - (lo + hi) / 2) / 120) * 120; }
+          w.push(best ? { lo: lo + sh, hi: hi + sh } : w[w.length - 1] ?? { lo: 0, hi: 0 });
+        }
+        wins = { key, w };
+      }
+      // the pointer's height turns the prism, smoothly, all the time: over a service's row through that service's
+      // window, top to bottom; so moving down the list turns it on and on. Off the rows it holds the nearest end. Only
+      // when the light comes from another name than the row under the pointer, the turn stays inside its window
+      const rotTarget = () => {
+        const wa = wins.w[svc] ?? { lo: 0, hi: 0 };
+        if (Number.isNaN(yT) || !rows.length) return (wa.lo + wa.hi) / 2;
+        const rs = S.edge ? [{ top: list.top, bottom: list.bottom }] : rows;
+        let b = 0;
+        for (let i = 0; i < rs.length; i++) if (yT >= rs[i].top) b = i;
+        const r = rs[b];
+        const wb = S.edge ? wa : wins.w[b] ?? wa;
+        const f = wb.lo + (wb.hi - wb.lo) * clamp01((yT - r.top) / Math.max(1, r.bottom - r.top));
+        return S.edge || b === svc ? f : Math.max(wa.lo, Math.min(wa.hi, f));
+      };
+      let rotT = rotTarget();
       if (!Number.isNaN(st.rot)) rotT += Math.round((st.rot - rotT) / 120) * 120;
-      st.rot = Number.isNaN(st.rot) ? rotT : st.rot + (rotT - st.rot) * kk(0.06);
-      const origin = startAt(st.ax, st.ay, slope);
+      st.rot = Number.isNaN(st.rot) ? rotT : st.rot + (rotT - st.rot) * kk(0.07);
+      const origin = startAt(an.x, an.y, slope);
       const d0 = norm(sub([0, S.hb, 0], origin));
       const P = makePrism([0, 0, 0], S.R, S.H, st.rot * DEG);
       const tr = traceBeam(P, origin, d0, nNow);
@@ -399,22 +430,27 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const land = O[1] / Math.max(fslope, 1e-3);
       const kept = valid.length / tr.rays.length;
       const L = Math.hypot(tr.pin[0] - origin[0], tr.pin[1] - origin[1], tr.pin[2] - origin[2]);
+      if (import.meta.env.DEV) {
+        const pin = project(cam, tr.pin, A), pc = project(cam, [0, S.H * 0.5, 0], A), po = project(cam, origin, A);
+        window.__stPrismInfo = {
+          W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
+          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx,
+        };
+      }
 
-      // the film lies still on the floor, larger than the light: where the light lands, it shows
-      const fr = st.k;
-      const fAt: [number, number] = [S.craft.at[0] + (S.vert.at[0] - S.craft.at[0]) * fr, S.craft.at[1] + (S.vert.at[1] - S.craft.at[1]) * fr];
-      const half: [number, number] = [S.craft.half[0] + (S.vert.half[0] - S.craft.half[0]) * fr, S.craft.half[1] + (S.vert.half[1] - S.craft.half[1]) * fr];
-      const base = onFloor(fAt[0] * W, fAt[1] * Hs);
-
-      // the ignite: the light comes out of the letter and travels to the glass (550 ms), the glass catches it, then the
-      // light leaves it: the fan blooms, or the frame lights up on the floor
+      // the ignite: the light comes out of the letter and travels to the glass, the glass catches it, then the light
+      // leaves it. A switch replays only the beam's part: the old one goes, the new one grows, the glass dips a little
       const iB = easeEnter(clamp01(since / 0.6));
-      const beamF = (L + 0.3) - (L + 0.6) * easeEnter(clamp01(since / 0.55));
-      const iG = easeEnter(clamp01((since - 0.3) / 0.5));
+      const grow = Math.min(easeEnter(clamp01(since / 0.55)), easeEnter(clamp01((sw - BEAM_OUT * 0.5) / BEAM_IN)));
+      const beamF = (L + 0.3) - (L + 0.6) * grow;
+      const dip = sw < 3 ? 1 - 0.45 * clamp01(sw / BEAM_OUT) * (1 - easeEnter(clamp01((sw - BEAM_OUT) / (BEAM_IN * 1.2)))) : 1;
+      const iG = easeEnter(clamp01((since - 0.3) / 0.5)) * dip;
       const iForm = easeEnter(clamp01((since - 0.1) / 0.8));
-      const iF = easeEnter(clamp01((since - 0.6) / 0.9));
+      const iF = easeEnter(clamp01((since - 0.6) / 0.9)) * (0.4 + 0.6 * dip);
       const front = (land + 1.5) * easeEnter(clamp01((since - 0.55) / 1.0));
-      const iP = easeEnter(clamp01((since - 0.85) / 1.1));
+      const iP = easeEnter(clamp01((since - 0.85) / 1.1)) * (0.5 + 0.5 * dip);
+      const oldF = beam.old && sw < BEAM_OUT ? 1 - easeEnter(clamp01(sw / BEAM_OUT)) : 0;
+      if (oldF <= 0) beam.old = null;
 
       gl.uniform2f(u("uRes"), canvas.width, canvas.height);
       f1("uTime", frozen ? 20 + (dbgT as number) : (now - t0) / 1000);
@@ -422,7 +458,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uFocal", cam.focal);
       f2("uShift", cam.shift[0], cam.shift[1]);
       f1("uPx", 2 / (canvas.height * cam.focal));
-      f1("uCore", 1.2 * dpr);
+      f1("uCore", 1.2 * Math.min(cpx, 1.5));
       const pl = new Float32Array(20);
       for (let i = 0; i < 5; i++) { pl[i * 4] = P.n[i][0]; pl[i * 4 + 1] = P.n[i][1]; pl[i * 4 + 2] = P.n[i][2]; pl[i * 4 + 3] = P.d[i]; }
       gl.uniform4fv(u("uPl[0]"), pl);
@@ -430,39 +466,30 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // without dispersion the two paths in the glass are one
       const poM: V3 = [M.out[0] + (E.out[0] - M.out[0]) * st.proj, M.out[1] + (E.out[1] - M.out[1]) * st.proj, M.out[2] + (E.out[2] - M.out[2]) * st.proj];
       v3("uBA", origin); v3("uPin", tr.pin); v3("uPoE", E.out); v3("uPoM", poM);
+      v3("uBA0", beam.old?.o ?? origin); v3("uPin0", beam.old?.pin ?? tr.pin); f1("uIB0", oldF);
       v3("uIrA", tr.inner.a); v3("uIrB", tr.inner.b); f1("uIrI", tr.inner.F * 1.2);
       v3("uFanO", O); v3("uFanN", N);
       f1("uFanAE", Math.atan2(dE[2], dE[0])); f1("uFanAM", Math.atan2(dM[2], dM[0])); f1("uFanM", fslope);
       f1("uHaze", S.haze); f1("uFanGain", S.fanGain); f1("uLandGain", S.landGain * (1 + 0.4 * st.proj)); f1("uEnv", S.env);
       f1("uAirFan", S.airFan); f1("uFanRefl", S.fanRefl);
-      // our light lands as a wider, softer field than the spectrum (the film needs room to show)
+      // our light lands as a wider, softer field than the spectrum
       f1("uFanBlur", S.fanBlur * (1 + 0.8 * st.proj)); f1("uPoolSoft", S.poolSoft * (1 + 0.7 * st.proj)); f1("uPoolTh", S.poolTh); f1("uGain", S.gain);
       f1("uFadeLen", S.fadeLen);
-      // keep the light clear of the hairline under the head (device px from the bottom, where the fade ends)
-      f1("uTopY", ruleY > 0 ? (Hs - ruleY - 28) * dpr : 1e5);
-      f1("uTopSoft", 70 * dpr);
+      // keep the light clear of the hairline under the head (canvas px from the bottom, where the fade ends)
+      f1("uTopY", ruleY > 0 ? (Hs - ruleY - 28) * cpx : 1e5);
+      f1("uTopSoft", 70 * cpx);
       f1("uIB", iB); f1("uBeamF", beamF); f1("uIG", iG); f1("uIForm", iForm);
       f1("uIF", iF * kept); f1("uFront", front); f1("uIP", iP * kept);
-      // the projection
       f1("uSpecW", st.spec); f1("uProjW", st.proj); f1("uProjK", st.k);
       // how wide our light spreads on the floor: the pointer's x opens it a little
       f1("uWedge", 0.2 + 0.06 * (px + 1));
-      f2("uFootC", base[0], base[1]); f2("uFootH", half[0], half[1]);
-      // the films: play the one in light, upload its new frames
-      films.forEach((f, i) => {
-        const want = running && st.proj * (i === 0 ? 1 - st.k : st.k) > 0.01;
-        if (want && !f.armed) { f.armed = true; f.v.src = f.src; f.v.load(); }
-        if (want && f.v.paused) f.v.play().catch(() => {});
-        if (!want && !f.v.paused) f.v.pause();
-        if (want) upload(i);
-      });
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
 
     let lastKey = "";
     const loop = (now: number) => {
       // debug clock frozen: draw only when what is shown changes (keeps headless captures responsive)
-      const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
+      const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
       if (!key || key !== lastKey) draw(now);
       lastKey = key;
       raf = running ? requestAnimationFrame(loop) : 0;
@@ -471,12 +498,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const sync = () => {
       const want = activeRef.current >= 0 && visible && !document.hidden && !reduce;
       if (want && !running) { running = true; last = performance.now(); raf = requestAnimationFrame(loop); }
-      else if (!want && running) { running = false; cancelAnimationFrame(raf); raf = 0; films.forEach((f) => f.v.pause()); }
+      else if (!want && running) { running = false; cancelAnimationFrame(raf); raf = 0; }
     };
     let wasOn = false;
     const wake = () => {
       const isOn = activeRef.current >= 0;
-      if (isOn && !wasOn) { tOn = performance.now(); lastKey = ""; if (reduce) draw(performance.now()); }
+      if (isOn && !wasOn) { tOn = performance.now(); beam.svc = -1; beam.old = null; lastKey = ""; if (reduce) draw(performance.now()); }
       if (isOn && reduce) draw(performance.now());
       wasOn = isOn;
       sync();
@@ -495,9 +522,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const r = box.getBoundingClientRect();
       if (r.width < 1) return;
       pxT = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
-      // y: over the block of names (a little beyond it still turns, then it holds)
-      const yl = ((e.clientY - r.top) / r.height) * Math.max(1, box.offsetHeight);
-      pyT = list.bottom > list.top ? Math.max(-1, Math.min(1, ((yl - list.top) / (list.bottom - list.top)) * 2 - 1)) : Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+      // y in site px (the rows decide what it turns)
+      yT = ((e.clientY - r.top) / r.height) * Math.max(1, box.offsetHeight);
       if (reduce && activeRef.current >= 0) draw(performance.now());
     };
     window.addEventListener("pointermove", onMove);
@@ -509,8 +535,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       ro.disconnect(); io.disconnect();
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", sync);
-      films.forEach((f) => { f.v.pause(); f.v.removeAttribute("src"); f.v.load(); });
-      gl.deleteTexture(tex); filmTex.forEach((t) => gl.deleteTexture(t));
+      gl.deleteTexture(tex);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
       canvas.remove();
     };
