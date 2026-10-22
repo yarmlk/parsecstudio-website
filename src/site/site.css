@@ -331,9 +331,13 @@
   --st-rev-fade: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .06) 6%, rgba(0, 0, 0, .26) 12%, rgba(0, 0, 0, .62) 18%, #000 24%, #000 76%, rgba(0, 0, 0, .62) 82%, rgba(0, 0, 0, .26) 88%, rgba(0, 0, 0, .06) 94%, transparent 100%);
   -webkit-mask-image: var(--st-rev-fade); mask-image: var(--st-rev-fade);
 }
-.st-rev:focus-visible { outline-offset: -2px; }
 .st-rev__col { min-width: 0; }
 .st-rev__track { position: relative; will-change: transform; }
+/* the drift: one list's height per loop (each track holds its list twice), run by the compositor, never paused */
+.st-rev__track.is-up { animation: st-rev-up var(--rev-dur, 40s) linear var(--rev-delay, 0s) infinite; }
+.st-rev__track.is-down { animation: st-rev-down var(--rev-dur, 40s) linear var(--rev-delay, 0s) infinite; }
+@keyframes st-rev-up { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -50%, 0); } }
+@keyframes st-rev-down { from { transform: translate3d(0, -50%, 0); } to { transform: translate3d(0, 0, 0); } }
 .st-rev__set { display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px; }
 .st-quote {
   position: relative; margin: 0; padding: 32px 32px 28px; border-radius: 22px; display: flex; flex-direction: column; gap: 36px;
