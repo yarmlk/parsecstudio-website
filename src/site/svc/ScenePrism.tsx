@@ -59,6 +59,8 @@ const AIM_X = [0.775, 0.77, 0.775];
 /** the light lands this far below the prism's level (fraction of the section's height); at most this far turned (rad) */
 const AIM_DY = 0.07, AIM_MAX = 0.75;
 const STAND_MAX = 2.6;
+/** the colossal head in the spectrum (off: AI shows the colour alone) */
+const SHOW_HEAD = false;
 /** the largest each service's things may grow (the colossal head fills the frame quickly) */
 const SCALE_MAX = [3.2, 1.0, 3.2];
 /** the colossal head lies back on the floor, its face turned up to the camera above */
@@ -309,7 +311,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loadMeshes = () => {
       if (meshes) return;
       meshes = true;
-      const go = () => BUSTS.forEach((url, i) => loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      const go = () => BUSTS.forEach((url, i) => (i === 2 && !SHOW_HEAD) || loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
     };
@@ -415,6 +417,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         st.spec = st.svc === 1 ? 1 : 0;
         st.k = st.svc === 2 ? 1 : 0;
         for (let i = 0; i < 3; i++) st.show[i] = st.svc === i ? 1 : 0;
+        // the prism takes its new turn inside the cut too, so the light never swings across on the way
+        st.rot = NaN;
         if (box.classList.contains("is-cut")) setTimeout(() => box.classList.remove("is-cut"), 40);
       }
       const svc = st.svc;
@@ -636,7 +640,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const kn: V3 = [c[0] - Math.cos(ph * 0.8 + 1) * 0.86 * sc, c[1] + Math.sin(ph * 0.8 + 1) * 0.36 * sc, c[2] - Math.sin(ph * 0.8 + 1) * 0.7 * sc];
         items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.4, 0.2], 0.6 * tSec, sc), mat: CERAMIC, fade: f });
       }
-      if (st.show[1] > 0.004 && ob.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
+      // AI Production plays with colour alone: the spectrum over the floor, no object in it
+      if (SHOW_HEAD && st.show[1] > 0.004 && ob.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
         // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
         const sd = stand[1] ?? { d: 1.4, s: 1 }, sc = sd.s;
         const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
@@ -663,7 +668,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
       // our light opens wider for the two figures of Vertical than for the one object of Motion
-      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.12 * st.spec;
+      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.17 * st.spec;
       const lGain = 2.6 * iP * kept;
       const hw = 0.5 * Math.abs(Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE))) + wedge;
       const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
@@ -730,7 +735,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uIF", iF * kept); f1("uFront", front); f1("uIP", iP * kept);
       f1("uSpecW", st.spec);
       // the haze our light lights in the air (fainter for the spectrum, whose fan already draws itself)
-      f1("uAirCone", off.air || !TIERS[quality.tier].air ? 0 : (0.055 - 0.035 * st.spec) * S.haze);
+      f1("uAirCone", off.air || !TIERS[quality.tier].air ? 0 : (0.055 - 0.01 * st.spec) * S.haze);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       mark();
 
