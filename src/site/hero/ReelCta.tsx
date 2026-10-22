@@ -48,14 +48,9 @@ function Play({ size = 10 }: { size?: number }) {
   );
 }
 
-/** the length, seen in mono and heard as words */
+/** the length: not shown on the button (the label says enough), only heard as words */
 function Length({ id }: { id: string }) {
-  return (
-    <>
-      <span className="rc-time" aria-hidden>{REEL_SRC.dur}</span>
-      <span className="visually-hidden" id={id}>{spoken(REEL_SRC.dur)}</span>
-    </>
-  );
+  return <span className="visually-hidden" id={id}>{spoken(REEL_SRC.dur)}</span>;
 }
 
 /** No light to ride (no WebGL): a plain frost pill under the headline. Hover and keyboard focus warm the light. */
