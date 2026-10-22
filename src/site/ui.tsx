@@ -55,9 +55,13 @@ export function useCutTrack(active: number, deps: unknown[] = []) {
 }
 
 export function CutLine({ pos, ready, hidden, steel, gap = 7, bend = 2.4 }: { pos: CutPos | null; ready: boolean; hidden?: boolean; steel?: boolean; gap?: number; bend?: number }) {
+  // coming back from hidden it lands in place and only fades in; it travels only between items while it is shown
+  const shown = useRef(false);
+  const land = !shown.current && !hidden && !!pos;
+  useLayoutEffect(() => { shown.current = !hidden && !!pos; });
   return (
     <span
-      className={`st-cut${ready ? " is-ready" : ""}`}
+      className={`st-cut${ready ? (land ? " is-land" : " is-ready") : ""}`}
       style={{ transform: `translate(${pos?.x ?? 0}px, ${(pos?.y ?? 0) + gap}px)`, width: pos?.w ?? 0, opacity: pos && !hidden ? 1 : 0 }}
       aria-hidden
     >

@@ -26,6 +26,7 @@
 
 .st-cut { position: absolute; left: 0; top: 0; height: 8px; pointer-events: none; will-change: transform; }
 .st-cut.is-ready { transition: transform var(--t-panel) var(--ease-move), width var(--t-panel) var(--ease-move), opacity var(--t-button) linear; }
+.st-cut.is-land { transition: opacity var(--t-button) linear; }
 .st-cut svg { display: block; width: 100%; }
 
 /* ── 10.6 Website: page layout ────────────────────────────── */
@@ -89,6 +90,8 @@
   transition: background-color 420ms var(--ease-enter), box-shadow 420ms var(--ease-enter), -webkit-backdrop-filter 420ms var(--ease-enter), backdrop-filter 420ms var(--ease-enter), opacity 520ms var(--ease-enter);
 }
 .st-nav.is-away { opacity: 0; pointer-events: none; }
+/* the nav lands with the rail, after the light and the headline */
+.st-nav > * { animation: st-fade 900ms var(--ease-enter) 700ms backwards; }
 .st-nav.is-solid {
   background: rgba(24, 24, 28, .42); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .36), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 20px 50px -24px rgba(0, 0, 0, .7);
   -webkit-backdrop-filter: blur(26px) saturate(1.3); backdrop-filter: blur(26px) saturate(1.3);
@@ -97,7 +100,7 @@
 .st-nav__brand img { height: 19px; width: auto; }
 .st-nav__right { display: flex; align-items: center; gap: 30px; }
 .st-nav__menu { position: relative; display: flex; gap: 30px; }
-.st-nav__item { height: 40px; font-size: 13.5px; font-weight: 400; color: var(--fog); transition: color var(--t-button) var(--ease-enter); }
+.st-nav__item { height: 40px; font-size: 13.5px; font-weight: 400; color: var(--fog); transition: color var(--t-panel) var(--ease-move); }
 .st-nav__item span { display: inline-block; line-height: 18px; }
 .st-nav__item:hover, .st-nav__item.is-on { color: var(--paper); }
 .st-nav__talk { height: 40px; padding: 0 20px; font-size: 13.5px; }
