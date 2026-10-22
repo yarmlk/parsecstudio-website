@@ -446,6 +446,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         }
         // as far out along the light as the frame allows: right of the prism, under the head's hairline, above the
         // section's foot, clear of the right edge
+        const prismX = project(cam, [0, S.H * 0.5, 0], A)[0] * W;
         stand = place.map((pl0, i) => {
           const f = dirXZ(pl0.az), dm = DIMS[i];
           const fits = (d: number, sc: number) => {
@@ -455,12 +456,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
               const rz = y > 0 ? dm.r * 0.6 : dm.r;
               const q = project(cam, [b[0] + ox * dm.r * sc, y, b[2] + oz * rz * sc], A);
               const X = q[0] * W, Y = q[1] * Hs;
-              if (X < W * 0.56 || X > W - 56 || Y < ruleY + 40 || Y > Hs - 8) return false;
+              if (X < prismX + W * 0.06 || X > W - (mode === "mob" ? 14 : 56) || Y < ruleY + 40 || Y > Hs - 8) return false;
             }
             return true;
           };
           // as large as the frame takes them (monumental), at the distance that puts them nearest their spot across
-          for (const sc of [3.2, 2.9, 2.6, 2.35, 2.1, 1.9, 1.7, 1.5, 1.3, 1.15, 1, 0.85, 0.7]) {
+          for (const sc of [3.2, 2.9, 2.6, 2.35, 2.1, 1.9, 1.7, 1.5, 1.3, 1.15, 1, 0.85, 0.7, 0.6, 0.5]) {
             let bestD = -1, bestE = 1e9;
             for (let d = STAND_MAX; d >= 0.55; d -= 0.05) {
               if (!fits(d, sc)) continue;
@@ -470,7 +471,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
             }
             if (bestD > 0) return { d: bestD, s: sc };
           }
-          return { d: 1.2, s: 0.6 };
+          // no room for them in this frame (a narrow phone): the light alone
+          return { d: 0, s: 0 };
         });
         wins = { key, w };
       }
@@ -538,7 +540,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         return [pl0.o[0] + f[0] * along + r[0] * side, y, pl0.o[2] + f[2] * along + r[2] * side];
       };
       const facing = (p: V3, q: V3) => Math.atan2(q[0] - p[0], q[2] - p[2]);
-      if (st.show[0] > 0.004) {
+      if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
         // Motion, 3D & CGI: the orbital object — a glossy black ceramic sphere inside a wide frosted ring-disc, the ring
         // slowly precessing, a frosted moon and a small black disc on their orbits; the light lines their edges and the
         // ring throws its ellipse of shadow across the sphere and the floor
@@ -554,7 +556,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const kn: V3 = [c[0] - Math.cos(ph * 0.8 + 1) * 0.86 * sc, c[1] + Math.sin(ph * 0.8 + 1) * 0.36 * sc, c[2] - Math.sin(ph * 0.8 + 1) * 0.7 * sc];
         items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.4, 0.2], 0.6 * tSec, sc), mat: CERAMIC, fade: f });
       }
-      if (st.show[1] > 0.004 && objs.has(M_COLOSSUS)) {
+      if (st.show[1] > 0.004 && objs.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
         // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
         const sd = stand[1] ?? { d: 1.4, s: 1 }, sc = sd.s;
         const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
@@ -562,7 +564,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const p: V3 = [p0[0], -objs.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
         items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.75 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
       }
-      if (st.show[2] > 0.004 && objs.has(M_CAESAR) && objs.has(M_SENATOR)) {
+      if (st.show[2] > 0.004 && objs.has(M_CAESAR) && objs.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
         // Vertical Series: two busts in conversation, turned to each other, one answering the other
         const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
         // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
