@@ -11,10 +11,11 @@ import "./hero-b.css";
  * the right. The edge is a thin 3500 K light strip over a fine steel bevel; light escapes underneath into warm haze.
  * Phone: the same object as a horizon, plane below, light rising behind its far edge.
  *
- * The showreel plays behind the glass all the time, sharp: dark glass, but lit. The glass sinks the film's darks
- * into deep black and lets its light through with its colour, clearly across the disc, clearer near the lit rim,
- * clearest under the hot spot (our light shows our work). The film's own highlights bloom softly into the glass, and
- * the rim's light enters the glass edge and glows inside it like edge-lit acrylic. On the desk the glass shows the
+ * The showreel plays behind the glass all the time, a long way behind a thick sheet of smoked glass (through()): its
+ * rounded front edge bends the film like the edge of a lens, its surface carries slow waves and the reflections (a
+ * soft-box, the rim's light), and all of these stay with the glass while the film moves under them. The film comes
+ * through clearly across the disc, clearer near the lit rim, clearest under the hot spot (our light shows our work),
+ * and the rim's light enters the glass edge and glows inside it like edge-lit acrylic. On the desk the glass shows the
  * film itself (muted), so "Showreel" only restarts it with sound; the phone runs a light cut. "Showreel": the rim
  * flares, then comes down past the lens like a curtain of light; behind it the glass clears, the words dissolve as
  * the light passes them, the sound comes in with it. Then the <video> itself takes over (cheap to play) and the
@@ -45,6 +46,12 @@ const PAR = {
   film: 0.02,    // the film behind the glass, a far plane (frame heights)
   sheen: 0.34,   // reflections slide against the glass, the other way
 } as const;
+/** the glass (hero units, linear light): how far its rounded edge bends the film at most (under half the bevel, so
+    the picture is drawn together but never folds), how deep its surface waves go, and how bright its reflections are */
+const BEV = 0.1;
+const BEV_BEND = 0.038;
+const WAVE = 0.0042;
+const GLASS = { softbox: 0.024, gleam: 0.07 } as const;
 const gf = (x: number) => x.toFixed(4);
 
 const VERT = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }`;
@@ -112,6 +119,7 @@ float sdDisc(vec2 q){ return sdE(q, vec2(0.976 + uDrop * (0.25 + 1.4 * uDrop), q
 
 /* ── the film ── */
 float s2l(float s){ return s <= 0.04045 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4); }
+vec3 tap(vec2 q){ vec3 t = texture2D(uReel, q).rgb; return vec3(s2l(t.r), s2l(t.g), s2l(t.b)); }
 const vec3 VOIDL = vec3(0.0037, 0.0037, 0.0041);
 /* its scale in uv: it fills the frame; the phone pulls back to the whole film as it is revealed */
 vec2 reelScale(){
@@ -120,28 +128,46 @@ vec2 reelScale(){
   if (A < V) s *= pow(V / A, uFit);
   return s / (1.0 + 0.024 * (1.0 - uClr));
 }
-/* the film, linear and sharp. Behind the glass it sits further away: a little overscan and its own small parallax.
-   As the glass clears it settles to exactly the frame the <video> will take over. Its blurred light comes with it. */
-vec3 reel(){
+
+/* The glass: a thick sheet of smoked glass, the film a long way behind it. What makes it read as glass, not as a
+   dimmed picture:
+   - its front edge is rounded (BEV deep): like the edge of a lens it bends the film behind it, so near the edge the
+     film comes from further in, drawn together, and splits a little into its colours (red bends least);
+   - its surface is never quite flat: slow, shallow waves fixed to the glass, so the moving film slides under them;
+   - the film sits far behind: its own small parallax, a little overscan, a breath of diffusion (more in the edge);
+   - Fresnel: the edge and the far part of the disc (seen at a grazing angle) let less through and reflect more;
+   - the reflections lie on top of the film (the scene adds them): the soft-box above, the rim's light in the edge.
+   As the glass clears (uClr) all of it goes and the film settles exactly where the <video> will take over.
+   d: how deep into the glass from its front edge; n: on screen, the way into the glass; w: the glass's own frame. */
+#define BEV ${gf(BEV)}
+float gBend;
+float bevel(float d){ float x = 1.0 - clamp(d / BEV, 0.0, 1.0); return x * x; }
+vec3 through(float d, vec2 n, vec2 w){
   vec2 s = reelScale();
   float o = 1.0 - uClr;
+  float bend = gBend * o;
   vec2 par = vec2(uCam.x / gAsp, -uCam.y) * ${gf(PAR.film)} * o;
   vec2 q = 0.5 + (gUV + par - 0.5) * s;
-  vec3 t0 = texture2D(uReel, q).rgb;
-  vec3 c = vec3(s2l(t0.r), s2l(t0.g), s2l(t0.b));
   // outside the film (the phone's whole frame): the room
   vec2 pq = s / uRes;
   vec2 e = smoothstep(-pq, pq, q) * smoothstep(-pq, pq, 1.0 - q);
   float m = e.x * e.y;
-  vec3 hn = texture2D(uHaloN, q).rgb;
-  // behind the glass a light, clean blur (half the sharp frame, half its near blur); clear once the glass has gone
-  c = mix(c, hn * hn, 0.45 * (1.0 - uClr));
+  // the waves of the sheet (≈ 2 px, a few across the frame) and the edge's bend (into the glass, under half of BEV)
+  vec2 wv = vec2(gnoise(w * 4.2 + vec2(3.1, 7.7)), gnoise(w * 4.2 + vec2(11.7, 5.3)));
+  vec2 off = n * bend * ${gf(BEV_BEND)} + wv * ${gf(WAVE)} * o * (1.0 - 0.6 * gLens);
+  vec2 dq = vec2(off.x / gAsp, off.y) * s;
+  vec3 c;
+  if (bend > 0.002) {
+    float ca = 0.13 * bend;
+    c = vec3(tap(q + dq * (1.0 - ca)).r, tap(q + dq).g, tap(q + dq * (1.0 + ca)).b);
+  } else c = tap(q + dq);
+  // a breath of diffusion across the sheet, more where the edge bends the light; none under the pointer's lens
+  vec3 hn = texture2D(uHaloN, q + dq).rgb;
+  c = mix(c, hn * hn, (0.12 * (1.0 - gLens) + 0.38 * bend) * o);
+  // the thick edge gathers the film's light and carries it (light-piping): its colour glows in the edge
+  vec3 hw = texture2D(uHaloW, q + dq * 1.6).rgb;
+  c += hw * hw * bend * o * 0.35;
   return mix(VOIDL, c, m);
-}
-/* The film seen through the dark glass. T: the glass's transmission here. */
-vec3 glass(vec3 R, float T){
-  // clean glass: the film as it is (no toe, no tint, no glow), only a little light lost in it
-  return R * T;
 }
 
 vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
@@ -196,39 +222,49 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
 
   // the glass itself: near black, no grey lift; what makes it glass is what it reflects and the light inside it
   float hIn = max(-dN, 0.0);
+  // its rounded front edge: 0 on the flat … 1 at the edge (only the front edge is rounded; the back melts away)
+  gBend = bevel(hIn) * front * plane;
   vec3 pc = vec3(0.0006, 0.00058, 0.00055);
-  // a soft-box far above, reflected in the top surface: a faint cool panel on the far part of the disc, defined
-  // edges, soft ends. A reflection slides against the surface as the camera moves.
-  vec2 sbq = r - vec2(0.30 - cam.x * ${gf(PAR.sheen)}, 0.095 + cam.y * 0.05);
-  float sbx = smoothstep(0.40, 0.16, abs(sbq.x)), sby = smoothstep(0.034, 0.022, abs(sbq.y));
-  pc += cool * 0.0042 * sbx * sby * smoothstep(0.0, 0.08, hIn) * (0.75 + 0.25 * sbq.y / 0.034) * (1.0 - gLens);
-  // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim. A reflection
-  // slides against its surface when the camera moves, so it travels further than the light itself.
+  // Fresnel: the far part of the disc is seen at a grazing angle, so it reflects more (and lets less through)
+  float far = smoothstep(-0.2, 0.45, r.y);
+  // a soft-box far above, reflected in the top surface: one broad cool-neutral panel across the disc. Its far edge is
+  // defined (a reflection has an edge, haze has none) but soft, it fades towards us, its ends are softer. A reflection slides
+  // against the surface as the camera moves, so it never moves with the film: that is what puts the film behind.
+  vec2 sbq = r - vec2(0.26 - cam.x * ${gf(PAR.sheen)}, 0.105 + cam.y * 0.05);
+  float sbx = smoothstep(0.66, 0.18, abs(sbq.x));
+  float sby = smoothstep(0.008, -0.008, sbq.y) * pow(smoothstep(-0.2, 0.0, sbq.y), 1.8);
+  pc += mix(cool, vec3(1.0), 0.5) * ${gf(GLASS.softbox)} * sbx * sby * (0.6 + 0.4 * far) * smoothstep(0.02, 0.12, hIn) * (1.0 - 0.7 * gLens);
+  // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim, in the rounded edge
+  // above all. A reflection slides against its surface when the camera moves, so it travels further than the light.
   float us = uHot + 0.06 + cam.x * ${gf(PAR.sheen)};
   float sx = u - us;
-  float hs = 0.048 - cam.y * 0.04;
-  float sh = (hIn - hs) / 0.038;
-  float sheen = exp(-sx * sx / (2.0 * 0.21 * 0.21)) * exp(-sh * sh * 0.5) * smoothstep(0.004, 0.03, hIn) * front
+  float hs = 0.040 - cam.y * 0.03;
+  float sh = (hIn - hs) / 0.034;
+  float sheen = exp(-sx * sx / (2.0 * 0.24 * 0.24)) * exp(-sh * sh * 0.5) * smoothstep(0.004, 0.03, hIn) * front
     * (1.0 - smoothstep(0.42, 0.82, u));
-  pc += mix(mix(uWarm, uDeep, 0.25), cool, 0.3) * sheen * 0.026 * I * reveal;
+  pc += mix(mix(uWarm, uDeep, 0.25), cool, 0.2) * sheen * ${gf(GLASS.gleam)} * I * reveal * (1.0 + 0.4 * uTease);
   // the chamfer just above the strip catches its light: a thin deep line that keeps the cut crisp
   float ch = smoothstep(-aa, aa, 2.2 * lp - hIn);
   pc += uDeep * ch * L * 0.075 + uDeep * exp(-hIn / (5.0 * lp)) * L * 0.012;
   // the rim's light enters the glass at its edge and scatters inside it, like edge-lit acrylic: a warm luminous
-  // gradient rising to the lit rim, strongest at the hot spot
+  // gradient rising to the lit rim, strongest at the hot spot, held in the rounded edge
   float lit = (0.30 * pk + 0.55 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-  pc += mix(uDeep, uWarm, 0.6) * lit * I * front * (0.040 * exp(-hIn / 0.03) + 0.014 * exp(-hIn / 0.13)) * (1.0 + 0.5 * uTease);
+  pc += mix(uDeep, uWarm, 0.6) * lit * I * front * (0.040 * exp(-hIn / 0.03) + 0.014 * exp(-hIn / 0.13) + 0.02 * gBend) * (1.0 + 0.5 * uTease);
   // the film behind the glass: clearly there across the disc, clearer near the lit rim, clearest under the hot spot
   vec3 film = vec3(0.0);
   if (plane > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
-    vec3 R = reel();
+    // on screen, the way into the glass from its front edge (against the gradient of the disc's distance)
+    float e = 0.004;
+    vec2 gr = vec2(sdDisc(r + vec2(e, 0.0)) - sdDisc(r - vec2(e, 0.0)), sdDisc(r + vec2(0.0, e)) - sdDisc(r - vec2(0.0, e)));
+    vec2 nIn = -normalize(rot(th) * gr + vec2(0.0, 1e-6));
+    vec3 R = through(hIn, nIn, r);
     // transmission: clearest under the lit rim, falling away into the disc (its far part is seen at a grazing angle
-    // and reflects more), least at the top of the frame, so the film's cuts never jump behind the nav
+    // and reflects more), least at the top of the frame, so the film's cuts never jump behind the nav; the rounded
+    // edge lets less through again (it reflects the rim's light instead)
     float nl = clamp(exp(-hIn / 0.09) * lit, 0.0, 1.0);
     float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
-    // the disc as it was (dark glass), but clean: neutral, no toe, no tint, just its light blur
-    float Tr = mix(0.26, 0.55, nl) * mix(1.0, top, 0.6);
-    film = mix(glass(R, Tr) * uReelA, R, uClr);
+    float Tr = mix(0.28, 0.55, nl) * mix(1.0, top, 0.6) * (1.0 - 0.35 * far) * (1.0 - 0.3 * gBend);
+    film = mix(R * Tr * uReelA, R, uClr);
   }
   col = mix(col, pc * (1.0 - uClr), plane);
   gFilm = film * plane;
@@ -308,16 +344,25 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   float L = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * I * (1.0 + 0.12 * s) * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
   vec3 col = vec3(0.0010, 0.0010, 0.0011) * (1.0 - uClr * above);
-  // the film beyond the far rim: clearly there across the dark, lit where the light rises
+  // the film beyond the far rim, through the glass: clearly there across the dark, lit where the light rises; the
+  // rounded far rim bends it, the soft-box lies on the glass above
   float h = max(dN, 0.0);
+  gBend = bevel(h) * above;
+  vec2 sbq = vec2(pn.x + 0.06, gUV.y - 0.80 + 0.10 * pn.x);
+  float box = smoothstep(0.30, 0.04, abs(sbq.x)) * smoothstep(0.07, 0.012, abs(sbq.y));
+  col += mix(cool, vec3(1.0), 0.5) * ${gf(GLASS.softbox * 0.55)} * box * above * (1.0 - uClr);
   vec3 film = vec3(0.0);
   if (above > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
-    vec3 fm = reel();
+    // on screen, the way into the glass: up, away from the rim
+    float e = 0.004;
+    vec2 gr = vec2(sdE(r + vec2(e, 0.0), R) - sdE(r - vec2(e, 0.0), R), sdE(r + vec2(0.0, e), R) - sdE(r - vec2(0.0, e), R));
+    vec2 nIn = normalize(rot(th) * gr + vec2(0.0, 1e-6));
+    vec3 fm = through(h, nIn, r);
     float lit = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
     float nl = clamp(exp(-h / 0.10) * lit, 0.0, 1.0);
     float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
-    float T = mix(0.24, 0.5, nl) * mix(1.0, top, 0.6);
-    film = mix(glass(fm, T) * uReelA, fm, uClr);
+    float T = mix(0.24, 0.5, nl) * mix(1.0, top, 0.6) * (1.0 - 0.3 * gBend);
+    film = mix(fm * T * uReelA, fm, uClr);
   }
   gFilm = film * above;
   // satin plane: near black, a faint sheen falling away from the rim, the light's reflection running towards us
@@ -367,7 +412,7 @@ void main(){
   vec2 fc = gl_FragCoord.xy;
   vec2 uv = fc / uRes;
   float aspect = uRes.x / uRes.y;
-  gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0);
+  gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0); gBend = 0.0;
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
   // the lens sits on the screen, where the pointer is: a soft round window
   // a soft clearing, not a spotlight: wide falloff, never all the way
@@ -435,7 +480,7 @@ void main(){
   gl_FragColor = vec4(sqrt(c), 1.0);
 }`;
 /** the film's light at two scales (target px; the gaussian's sigma is 2.2 of their texels): near (≈ 1/50 of the
-    frame), the glass's diffusion, and wide (≈ 1/12) */
+    frame), the glass's diffusion, and wide (≈ 1/12), the light its thick edge gathers */
 const HALO = { near: [192, 108], wide: [48, 27], sigma: 2.2 } as const;
 /** a 17-tap gaussian as a centre tap and four bilinear pairs a side */
 function gauss(sigma: number) {
