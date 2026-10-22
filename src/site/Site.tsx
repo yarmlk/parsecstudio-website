@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
 import { easeMove } from "../lib/ease";
 import { CONTACT } from "../lib/facts";
@@ -349,6 +349,18 @@ export function Site({
   };
 
   const svcOn = svcHover ?? Math.max(0, svc);
+  /* the pointer anywhere over the services section picks the service whose row it is level with; the choice stays
+     when the pointer leaves, so one service is always on */
+  const onSvcMove = useCallback((e: RPointerEvent<HTMLElement>) => {
+    if (e.pointerType === "touch") return;
+    let best = -1, bd = Infinity;
+    e.currentTarget.querySelectorAll<HTMLElement>(".st-svc__item").forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const d = Math.abs(e.clientY - (r.top + r.height / 2));
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best >= 0) setSvcHover((h) => (h === best ? h : best));
+  }, []);
 
   return (
     <div ref={root} className={`st-site st-site--${mode}`}>
@@ -393,19 +405,17 @@ export function Site({
         {/* 02 services: one block on the left (the head, the rule, three names); the stage owns the centre and the
             right. Each name ends well left of the centre so the light can leave it for the prism. The open arrow
             follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
-        <section data-sec="services" className="st-sec st-svc">
+        <section data-sec="services" className="st-sec st-svc" onPointerMove={desk ? onSvcMove : undefined}>
           <SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} />
           <Head label="From treatment to master" title="Services" />
           <span className="st-rule" aria-hidden />
-          <ol className="st-svc__list" onPointerLeave={() => setSvcHover(null)}>
+          <ol className="st-svc__list">
             {SITE_SERVICES.map((s, i) => (
               <li key={s.id} data-svc="" className={`st-svc__li${(desk ? svcHover === i : svc === i) ? " is-play" : ""}`}>
                 <button
                   type="button"
                   className={`st-svc__item${i === svcOn ? " is-on" : i < svcOn ? " is-seen" : ""}`}
-                  onPointerEnter={() => desk && setSvcHover(i)}
                   onFocus={() => setSvcHover(i)}
-                  onBlur={() => setSvcHover(null)}
                   onClick={() => setSvOpen(i)}
                   aria-label={`${s.name}. ${s.line} Open the service`}
                 >
