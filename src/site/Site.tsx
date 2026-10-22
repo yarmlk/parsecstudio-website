@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
 import { easeMove } from "../lib/ease";
 import { CONTACT, REVIEWS } from "../lib/facts";
@@ -7,6 +7,7 @@ import { CutProgress } from "../ui/Cut";
 import { Icon } from "../ui/Icons";
 import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, type Case, type Rect } from "./cases";
 import { CutLine, useCutTrack, useReduced } from "./ui";
+import { ContactForm } from "./contact";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
@@ -121,37 +122,6 @@ function Head({ label, title, children }: { label: string; title: string; childr
       </div>
       {children && <div className="st-head__r">{children}</div>}
     </div>
-  );
-}
-
-/* ── Contact form (a mock: nothing is sent) ────────────────── */
-function ContactForm() {
-  const [sent, setSent] = useState<string | null>(null);
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    setSent(String(f.get("name") || "").trim().split(" ")[0] || "there");
-  };
-  if (sent) {
-    return (
-      <div className="st-form st-form--sent" aria-live="polite">
-        <span className="spark" aria-hidden />
-        <p className="st-form__thanks">Thank you, {sent}.</p>
-        <p className="st-form__note">We reply from {CONTACT.email}.</p>
-        <span className="st-lbl st-form__mock">Preview · nothing was sent</span>
-        <button type="button" className="st-pill st-pill--sm" onClick={() => setSent(null)}>New message</button>
-      </div>
-    );
-  }
-  return (
-    <form className="st-form" onSubmit={onSubmit}>
-      <label className="st-field"><span className="st-field__l">Name</span><input name="name" required autoComplete="off" placeholder="Your name" /></label>
-      <label className="st-field"><span className="st-field__l">Email</span><input name="email" type="email" required autoComplete="off" placeholder="you@company.com" /></label>
-      <label className="st-field st-field--area"><span className="st-field__l">Message</span><textarea name="msg" rows={4} placeholder="The film, the timing, the budget" /></label>
-      <div className="st-form__row">
-        <button type="submit" className="st-pill st-pill--paper">Send<Icon name="arrow-right" size={15} /></button>
-      </div>
-    </form>
   );
 }
 
@@ -559,38 +529,19 @@ export function Site({
           </div>
         </section>
 
-        {/* 06 contact + footer */}
+        {/* 06 contact: the head on the left, the form as one frosted plate over the Horizon light; a quiet footer */}
         <section data-sec="contact" className="st-sec st-contact">
           <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" loading="lazy" /></div>
-          <Head label="Contact" title="Let’s talk" />
           <div className="st-contact__in">
             <div className="st-contact__l">
-              <div className="st-contact__top">
-                <span className="st-lbl">Write to us</span>
-                <a className="st-contact__mail" href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
-                <p className="st-contact__p">Or leave the brief here: the idea, the timing, the budget.</p>
-              </div>
-              <div className="st-next">
-                <span className="st-lbl">What happens next</span>
-                <ol className="st-next__list">
-                  {["Treatment", "Moodboard", "Storyboard", "Video draft"].map((t, i) => (
-                    <li key={t}><span className="st-next__t">{t}</span></li>
-                  ))}
-                </ol>
-              </div>
+              <Head label="Contact" title="Let’s talk" />
+              <p className="st-contact__p">Tell us about the project.<br />A few lines are enough.</p>
             </div>
             <ContactForm />
           </div>
           <footer className="st-foot">
-            <div className="st-foot__brand">
-              <img src={LOGO.lockupWhite} alt="parsec studio" />
-              <span className="st-foot__tag">We direct the light.</span>
-            </div>
-            {desk && (
-              <nav className="st-foot__nav" aria-label="Footer">
-                {SECTIONS.slice(0, 4).map((n) => <button key={n.id} type="button" onClick={() => goTo(n.id)}>{n.label}</button>)}
-              </nav>
-            )}
+            <img className="st-foot__logo" src={LOGO.lockupWhite} alt="parsec studio" />
+            <a className="st-foot__mail" href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
             <span className="st-foot__c">© 2026 Parsec Studio</span>
           </footer>
         </section>
