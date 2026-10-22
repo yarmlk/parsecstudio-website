@@ -53,7 +53,7 @@ const BUSTS = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/colossus.bin"] as co
 const M_RING = 0, M_DISC = 1, M_ORB = 2, M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_PILL = 6;
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
-const DIMS = [{ h: 1.25, r: 0.6 }, { h: 0.55, r: 0.6 }, { h: 0.9, r: 0.62 }];
+const DIMS = [{ h: 1.15, r: 0.85 }, { h: 0.55, r: 0.6 }, { h: 0.95, r: 0.9 }];
 /** where each service's things sit across the frame (their middle, as a fraction of the section's width) */
 const AIM_X = [0.775, 0.77, 0.775];
 const STAND_MAX = 2.6;
@@ -172,6 +172,8 @@ declare global {
     __stPrismPy?: number;
     /** debug: override any of the shot's settings live */
     __stPrismDbg?: Partial<Shot>;
+    /** debug: when an array, each drawn frame's time to completion (ms) is pushed to it */
+    __stPrismTime?: number[];
     /** debug: no multisampling (a software GPU captures multisampled canvases very slowly) */
     __stPrismNoAA?: boolean;
     /** debug: set true to time the next frame's passes (shadow, prism, objects; ms) — it is replaced by the times */
@@ -251,10 +253,10 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
 
     /* the things the light falls on */
     const objs = new Objects(gl);
-    objs.set(M_RING, ring(0.5, 0.1, 0.05, 192, 32));
-    objs.set(M_DISC, puck(0.34, 0.08));
-    objs.set(M_ORB, sphere(0.15));
-    objs.set(M_PILL, ring(0.07, 0.07, 0.07, 48, 24));
+    objs.set(M_RING, ring(0.52, 0.12, 0.022, 224, 32));
+    objs.set(M_DISC, sphere(0.3, 128, 64));
+    objs.set(M_ORB, sphere(0.085));
+    objs.set(M_PILL, puck(0.11, 0.035));
     let alive = true;
     BUSTS.forEach((url, i) => loadMesh(url).then((m) => { if (alive) objs.set(M_CAESAR + i, m); }).catch(() => {}));
 
@@ -537,18 +539,20 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       };
       const facing = (p: V3, q: V3) => Math.atan2(q[0] - p[0], q[2] - p[2]);
       if (st.show[0] > 0.004) {
-        // Motion, 3D & CGI: the orbital object — a thick frosted ring-disc around a glossy black ceramic disc, floating
-        // and always turning, the two against each other
+        // Motion, 3D & CGI: the orbital object — a glossy black ceramic sphere inside a wide frosted ring-disc, the ring
+        // slowly precessing, a frosted moon and a small black disc on their orbits; the light lines their edges and the
+        // ring throws its ellipse of shadow across the sphere and the floor
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
         const c = at(0, sd.d, 0, 0.62 * sc), f = st.show[0];
-        items.push({ mesh: M_RING, m: axisAngle(c, [0, 1, 0], 0.16 * tSec, sc, axisAngle([0, 0, 0], [1, 0, 0.35], 1.0 + 0.12 * Math.sin(0.23 * tSec))), mat: CERAMIC, fade: f });
-        items.push({ mesh: M_DISC, m: axisAngle(c, [0.2, 1, -0.3], -0.29 * tSec, sc, axisAngle([0, 0, 0], [0, 0, 1], 1.25 + 0.15 * Math.sin(0.19 * tSec + 1))), mat: FROST, fade: f });
-        // a frosted moon passes through the ring on a slow tilted orbit; a small black ceramic knot keeps the other side
-        const ph = 0.37 * tSec;
-        const orb: V3 = [c[0] + Math.cos(ph) * 0.62 * sc, c[1] + Math.sin(ph) * 0.26 * sc, c[2] + Math.sin(ph) * 0.5 * sc];
+        const pre = 0.13 * tSec;
+        const tilt = axisAngle([0, 0, 0], [Math.cos(pre), 0, Math.sin(pre)], 1.05 + 0.08 * Math.sin(0.21 * tSec));
+        items.push({ mesh: M_RING, m: axisAngle(c, [0, 1, 0], 0.07 * tSec, sc, tilt), mat: FROST, fade: f });
+        items.push({ mesh: M_DISC, m: axisAngle(c, [0.15, 1, 0.1], 0.1 * tSec, sc), mat: CERAMIC, fade: f });
+        const ph = 0.31 * tSec;
+        const orb: V3 = [c[0] + Math.cos(ph) * 0.92 * sc, c[1] + Math.sin(ph) * 0.3 * sc, c[2] + Math.sin(ph) * 0.78 * sc];
         items.push({ mesh: M_ORB, m: model(orb, 0, 0, 0, sc), mat: FROST, fade: f });
-        const kn: V3 = [c[0] - Math.cos(ph) * 0.7 * sc, c[1] - Math.sin(ph) * 0.2 * sc + 0.1 * sc, c[2] - Math.sin(ph) * 0.55 * sc];
-        items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.3, 0], 0.8 * tSec, sc), mat: CERAMIC, fade: f });
+        const kn: V3 = [c[0] - Math.cos(ph * 0.8 + 1) * 0.86 * sc, c[1] + Math.sin(ph * 0.8 + 1) * 0.36 * sc, c[2] - Math.sin(ph * 0.8 + 1) * 0.7 * sc];
+        items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.4, 0.2], 0.6 * tSec, sc), mat: CERAMIC, fade: f });
       }
       if (st.show[1] > 0.004 && objs.has(M_COLOSSUS)) {
         // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
@@ -563,24 +567,29 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
         // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
         // half to us and half to the other, leaning back a touch so the faces meet the camera above
-        const a = at(2, sd.d - 0.3 * sc, -0.2 * sc, 0), b = at(2, sd.d + 0.3 * sc, 0.12 * sc, 0), f = st.show[2];
+        // across the light, apart enough that neither stands in the other's shadow: the far one nearer the glass
+        const a = at(2, sd.d + 0.28 * sc, -0.46 * sc, 0), b = at(2, sd.d - 0.3 * sc, 0.46 * sc, 0), f = st.show[2];
         const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
         const lean = -0.42;
         const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
         const ya = blend(facing(a, b), toCam(a), 0.5) + 0.06 * Math.sin(0.5 * tSec);
-        const yb = blend(facing(b, a), toCam(b), 0.42) + 0.06 * Math.sin(0.5 * tSec + 2.2);
+        // the one further out turns a little toward the light as well, so its face comes up in it
+        const yb = blend(blend(facing(b, a), toCam(b), 0.36), facing(b, place[2]?.o ?? [0, 0, 0]), 0.28) + 0.06 * Math.sin(0.5 * tSec + 2.2);
         items.push({ mesh: M_CAESAR, m: model([a[0], -objs.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: model([b[0], -objs.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
-      const wedge = (0.2 + 0.06 * (px + 1)) * (1 - st.spec) + 0.05 * st.spec;
+      // our light opens wider for the two figures of Vertical than for the one object of Motion
+      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.05 * st.spec;
       const lGain = 2.6 * iP * kept;
       const hw = 0.5 * Math.abs(Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE))) + wedge;
       const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
       const lFov = 1.9;
       const lvp = lightClip(O, [Math.cos(amid) * Math.cos(0.1), Math.sin(0.1), Math.sin(amid) * Math.cos(0.1)], lFov, Math.tan(Math.min(1.2, hw + 0.1)) / Math.tan(lFov / 2), 0.05, L_FAR);
-      const shadowOn = objs.ok && items.some((it) => it.fade > 0.3 && objs.has(it.mesh));
+      const off = (import.meta.env.DEV && (window as unknown as { __stPrismOff?: Record<string, boolean> }).__stPrismOff) || {};
+      if (off.objects) items.length = 0;
+      const shadowOn = !off.shadow && objs.ok && items.some((it) => it.fade > 0.3 && objs.has(it.mesh));
       const prof = import.meta.env.DEV && window.__stPrismProf ? { t: performance.now(), px: new Uint8Array(4), marks: [] as number[] } : null;
       const mark = () => { if (prof) { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, prof.px); const t = performance.now(); prof.marks.push(Math.round(t - prof.t)); prof.t = t; } };
       if (shadowOn) objs.shadow(items, lvp, O, L_FAR);
@@ -637,7 +646,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uIF", iF * kept); f1("uFront", front); f1("uIP", iP * kept);
       f1("uSpecW", st.spec);
       // the haze our light lights in the air (fainter for the spectrum, whose fan already draws itself)
-      f1("uAirCone", (0.055 - 0.035 * st.spec) * S.haze);
+      f1("uAirCone", off.air ? 0 : (0.055 - 0.035 * st.spec) * S.haze);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       mark();
 
@@ -664,7 +673,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loop = (now: number) => {
       // debug clock frozen: draw only when what is shown changes (keeps headless captures responsive)
       const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
-      if (!key || key !== lastKey) draw(now);
+      if (!key || key !== lastKey) {
+        const tq = performance.now();
+        draw(now);
+        if (import.meta.env.DEV && window.__stPrismTime) { const px1 = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); window.__stPrismTime.push(performance.now() - tq); }
+      }
       lastKey = key;
       raf = running ? requestAnimationFrame(loop) : 0;
     };

@@ -194,7 +194,7 @@ vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
   if (c.r + c.g + c.b < 1e-5) return vec3(0.0);
   float sm = lite > 0.5 ? 0.8 : mix(0.35, 1.35, smokeLite(vec2(r * 2.4, (p.x - p.z) * 3.0 + p.y * 4.0)));
   // the objects cut the sheet of light in the haze: their shadows run through the air
-  float vis = lite > 0.5 ? 1.0 : shadowVis(p);
+  float vis = lite > 0.5 ? 1.0 : shadowVis1(p);
   return c * vis * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
 }
 

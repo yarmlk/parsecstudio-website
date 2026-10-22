@@ -35,7 +35,7 @@ vec3 coneLight(vec3 p){
   float el = atan(v.y, max(r, 1e-3));
   float E = smoothstep(-0.66, -0.34, el) * smoothstep(0.85, 0.5, el);
   float near = smoothstep(0.1, 0.5, r);
-  float fall = 1.0 / (1.0 + r * r * 0.42);
+  float fall = 1.0 / (1.0 + r * r * 0.26);
   float s = wrapPi(a - uLAE) / (abs(da) < 1e-3 ? 1e-3 : da);
   return spectrum(s) * A * E * near * fall * uLGain;
 }
@@ -259,7 +259,7 @@ void main(){
   vec3 N = normalize(vN);
   if (dot(N, V) < 0.0) N = -N;
   vec3 L = normalize(uLO - vW);
-  vec3 Li = coneLight(vW) * shadowVis(vW + N * 0.02);
+  vec3 Li = coneLight(vW) * shadowVis(vW + N * 0.02) * 1.7;   // the things catch more of the light than the satin floor
   float ndl = dot(N, L);
   // marble lets a little light through: the shadow side warms a touch (wrap)
   float diff = max((ndl + uWrap) / (1.0 + uWrap), 0.0);
