@@ -168,6 +168,12 @@
    the light can leave the active one for the prism. Nothing crosses the rule (the stage keeps below it too).
    The one in the middle of the window is lit; a click opens the service. */
 .st-svc { display: flex; flex-direction: column; padding-bottom: 0; }
+/* the head here is a quiet caption: the stage is the section */
+.st-site--desk .st-svc { padding-top: 104px; }
+.st-site--desk .st-svc .st-head { margin-bottom: 26px; }
+.st-site--desk .st-svc .st-head__rule { width: 120px; margin-bottom: 18px; }
+.st-site--desk .st-svc .st-h2 { font-size: 52px; line-height: 1; }
+.st-site--desk .st-svc .st-head__t .st-lbl { margin-top: 14px; }
 /* the block sits in the band under the rule, the middle name on the band's centre line (the padding offsets the
    reserved line under each name), so the light to the prism leaves the middle name level */
 .st-svc__list { flex: 1; align-self: flex-start; list-style: none; margin: 0; padding: 0 0 24px; display: flex; flex-direction: column; justify-content: center; }
