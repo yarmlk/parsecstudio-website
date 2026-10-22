@@ -70,10 +70,14 @@ vec3 spectrum(float s){
 vec3 spectrumW(float s, float w){ return texture2D(uSpec, vec2((s + 0.75) / 2.5, clamp(w / 2.4, 0.0, 1.0))).rgb * 1.6; }
 /* the light leaving the glass as it falls on the objects and the floor, and their shadows (shared with the objects) */
 ${CONE_GLSL}
-/* our light in the haze: the whole cone glows faintly in the air, and the objects cut shafts of shadow through it
+/* our light in the haze (left out of the LITE build, the fallback for GPUs that cannot link the full one): the whole
+   cone glows faintly in the air, and the objects cut shafts of shadow through it
    (marched in 12 dithered steps inside the light's reach) */
 uniform float uAirCone;
 vec3 coneAir(vec3 ro, vec3 rd, float tmax){
+#ifdef LITE
+  return vec3(0.0);
+#else
   if (uAirCone < 1e-4) return vec3(0.0);
   vec3 oc = ro - uLO;
   float b = dot(oc, rd), c = dot(oc, oc) - 10.0;
@@ -94,6 +98,7 @@ vec3 coneAir(vec3 ro, vec3 rd, float tmax){
   }
   vec3 pm = ro + rd * (0.5 * (t0 + t1));
   return acc * dt * uAirCone * mix(0.7, 1.3, smokeLite(pm.xz * 1.7 + pm.y));
+#endif
 }
 
 /* closest approach of the ray ro + rd t (t0..t1) to the segment a → b: (distance, t, u 0..1) */

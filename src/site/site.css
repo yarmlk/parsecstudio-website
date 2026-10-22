@@ -154,6 +154,9 @@
 .st-stage__scene { position: absolute; inset: 0; opacity: 0; filter: blur(14px); transition: opacity 700ms var(--ease-enter), filter 700ms var(--ease-enter); }
 .st-stage__scene.is-on { opacity: 1; filter: blur(0); }
 .st-stage__fill, .st-stage__scene > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* the scene's canvas shows with its first frame (the shader may still be compiling when the section arrives) */
+.st-stage__fill > canvas { opacity: 0; transition: opacity 600ms var(--ease-enter); }
+.st-stage__fill[data-ready] > canvas { opacity: 1; }
 /* the list's side stays calm, but the light leaves the names at full strength */
 .st-stage__shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(11, 11, 13, .6) 0%, rgba(11, 11, 13, .22) 22%, rgba(11, 11, 13, 0) 32%),
   linear-gradient(180deg, rgba(11, 11, 13, .9) 0%, rgba(11, 11, 13, 0) 26%); }

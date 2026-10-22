@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
 import { CERAMIC, FROST, MARBLE, Objects, axisAngle, camClip, dirXZ, lightClip, loadMesh, model, puck, ring, sphere, type Item } from "./ScenePrism.objects";
@@ -188,11 +188,25 @@ declare global {
 /** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
 const BEAM_OUT = 0.22, BEAM_IN = 0.5;
 
+/* How hard the scene works, kept for the whole visit (it survives remounts): the canvas's pixel budget and whether the
+   light is marched through the haze. The scene starts one step below the top and moves by measured frame times: down
+   at once when frames run slow, up slowly when they have room; a lost GPU context drops it two steps. */
+const TIERS = [
+  { budget: 2_600_000, air: true },
+  { budget: 1_800_000, air: true },
+  { budget: 1_200_000, air: true },
+  { budget: 800_000, air: false },
+  { budget: 500_000, air: false },
+];
+const quality = { tier: 1, losses: 0, lite: false };
+
 export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "mob" }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef(active);
   const wakeRef = useRef<(() => void) | null>(null);
   activeRef.current = active;
+  // a new generation of the scene after the GPU dropped its context
+  const [gen, setGen] = useState(0);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -203,62 +217,96 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     canvas.setAttribute("aria-hidden", "true");
     canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
     box.appendChild(canvas);
-    const gl = canvas.getContext("webgl", { antialias: !window.__stPrismNoAA, alpha: false, premultipliedAlpha: false, powerPreference: "high-performance" });
+    box.removeAttribute("data-ready");
+    const gl = canvas.getContext("webgl", { antialias: !window.__stPrismNoAA && quality.tier <= 1, alpha: false, premultipliedAlpha: false, powerPreference: "high-performance" });
     if (!gl) { canvas.remove(); return; }
     const deriv = !!gl.getExtension("OES_standard_derivatives");
+    // compile without blocking the page where the browser can (the scene's shader is large)
+    const par = gl.getExtension("KHR_parallel_shader_compile") as { COMPLETION_STATUS_KHR: number } | null;
 
     const sh = (type: number, src: string) => {
       const s = gl.createShader(type)!;
       gl.shaderSource(s, src); gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn("ScenePrism shader:", gl.getShaderInfoLog(s));
       return s;
     };
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, PRISM_VERT));
-    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, (deriv ? "#extension GL_OES_standard_derivatives : enable\n#define DERIV\n" : "") + PRISM_FRAG));
-    gl.bindAttribLocation(prog, 0, "a");
-    gl.linkProgram(prog);
-    // WebGL failure: render nothing, the stage stays dark
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn("ScenePrism link:", gl.getProgramInfoLog(prog)); canvas.remove(); return; }
-    gl.useProgram(prog);
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, "a");
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const build = (lite: boolean) => {
+      const p = gl.createProgram()!;
+      const vs = sh(gl.VERTEX_SHADER, PRISM_VERT);
+      const fs = sh(gl.FRAGMENT_SHADER, (deriv ? "#extension GL_OES_standard_derivatives : enable\n#define DERIV\n" : "") + (lite ? "#define LITE\n" : "") + PRISM_FRAG);
+      gl.attachShader(p, vs); gl.attachShader(p, fs);
+      gl.bindAttribLocation(p, 0, "a");
+      gl.linkProgram(p);
+      return { p, vs, fs, lite };
+    };
+    let built = build(quality.lite);
+    let prog = built.p;
+    /* everything the program needs, once it is linked */
     const U: Record<string, WebGLUniformLocation | null> = {};
     const u = (n: string) => (n in U ? U[n] : (U[n] = gl.getUniformLocation(prog, n)));
     const v3 = (n: string, v: V3) => gl.uniform3f(u(n), v[0], v[1], v[2]);
     const f1 = (n: string, v: number) => gl.uniform1f(u(n), v);
     const f2 = (n: string, a: number, b: number) => gl.uniform2f(u(n), a, b);
-
+    let buf: WebGLBuffer | null = null, tex: WebGLTexture | null = null;
     const warm = kelvinRGB(3500);
     const kc = kelvinRGB(3500 + 1700);
     const coreCol: V3 = [Math.min(1, kc[0] + 0.02), Math.min(1, kc[1] + 0.08), Math.min(1, kc[2] + 0.2)];
-    v3("uWarm", warm); v3("uCoreCol", coreCol);
-    v3("uEta", N_VIEW);
-    f1("uGrain", 0.03);
-
-    const tex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.uniform1i(u("uSpec"), 0);
-    gl.uniform1i(u("uShadow"), 3);
     let lutSat = NaN;
+    let objs: Objects | null = null;
+    let alive = true, ready = false, failed = false, meshes = false;
+    const init = () => {
+      gl.useProgram(prog);
+      buf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "a");
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-    /* the things the light falls on */
-    const objs = new Objects(gl);
-    objs.set(M_RING, ring(0.52, 0.12, 0.022, 224, 32));
-    objs.set(M_DISC, sphere(0.3, 128, 64));
-    objs.set(M_ORB, sphere(0.085));
-    objs.set(M_PILL, puck(0.11, 0.035));
-    let alive = true;
-    BUSTS.forEach((url, i) => loadMesh(url).then((m) => { if (alive) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      v3("uWarm", warm); v3("uCoreCol", coreCol);
+      v3("uEta", N_VIEW);
+      f1("uGrain", 0.03);
+
+      tex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.uniform1i(u("uSpec"), 0);
+      gl.uniform1i(u("uShadow"), 3);
+
+      /* the things the light falls on */
+      objs = new Objects(gl);
+      objs!.set(M_RING, ring(0.52, 0.12, 0.022, 224, 32));
+      objs!.set(M_DISC, sphere(0.3, 128, 64));
+      objs!.set(M_ORB, sphere(0.085));
+      objs!.set(M_PILL, puck(0.11, 0.035));
+      ready = true;
+    };
+    /** is the program linked yet? (never blocks where the browser compiles in parallel); a failed link falls back to
+     *  the lighter shader once, then gives up and leaves the stage dark */
+    const poll = () => {
+      if (ready || failed) return ready;
+      if (par && !gl.getProgramParameter(prog, par.COMPLETION_STATUS_KHR)) return false;
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        console.warn("ScenePrism link:", gl.getProgramInfoLog(prog) || gl.getShaderInfoLog(built.fs));
+        gl.deleteProgram(prog);
+        if (!built.lite) { quality.lite = true; built = build(true); prog = built.p; return false; }
+        failed = true;
+        return false;
+      }
+      init();
+      return true;
+    };
+    /** the busts arrive after the first frame, when the page is idle */
+    const loadMeshes = () => {
+      if (meshes) return;
+      meshes = true;
+      const go = () => BUSTS.forEach((url, i) => loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+      if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
+    };
 
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     let raf = 0, visible = true, running = false;
@@ -321,7 +369,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const r = box.getBoundingClientRect();
       const lh = Math.max(1, box.offsetHeight);
       const base = Math.min(window.devicePixelRatio || 1, 1.5);
-      const d = Math.min(base, Math.sqrt((window.__stPrismBudget ?? 2_600_000) / Math.max(1, r.width * r.height)));
+      const d = Math.min(base, Math.sqrt((window.__stPrismBudget ?? TIERS[quality.tier].budget) / Math.max(1, r.width * r.height)));
       canvas.width = Math.max(2, Math.round(r.width * d));
       canvas.height = Math.max(2, Math.round(r.height * d));
       cpx = canvas.height / lh;
@@ -330,6 +378,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     };
 
     const draw = (now: number) => {
+      const ob = objs;
+      if (!ready || !ob) return;
       gl.useProgram(prog);
       const S: Shot = { ...SHOTS[mode], ...(window.__stPrismDbg as Partial<Shot> | undefined ?? {}) };
       const dbgT = window.__stSceneT;
@@ -556,15 +606,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const kn: V3 = [c[0] - Math.cos(ph * 0.8 + 1) * 0.86 * sc, c[1] + Math.sin(ph * 0.8 + 1) * 0.36 * sc, c[2] - Math.sin(ph * 0.8 + 1) * 0.7 * sc];
         items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.4, 0.2], 0.6 * tSec, sc), mat: CERAMIC, fade: f });
       }
-      if (st.show[1] > 0.004 && objs.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
+      if (st.show[1] > 0.004 && ob.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
         // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
         const sd = stand[1] ?? { d: 1.4, s: 1 }, sc = sd.s;
         const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
         const tilt = COLOSSUS_TILT + 0.03 * Math.sin(0.21 * tSec);
-        const p: V3 = [p0[0], -objs.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
+        const p: V3 = [p0[0], -ob.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
         items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.75 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
       }
-      if (st.show[2] > 0.004 && objs.has(M_CAESAR) && objs.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
+      if (st.show[2] > 0.004 && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
         // Vertical Series: two busts in conversation, turned to each other, one answering the other
         const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
         // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
@@ -577,8 +627,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
         const ya = blend(toCam(a), facing(a, b), 0.5) + 0.06 * Math.sin(0.5 * tSec);
         const yb = blend(toCam(b), facing(b, a), 0.5) + 0.06 * Math.sin(0.5 * tSec + 2.2);
-        items.push({ mesh: M_CAESAR, m: model([a[0], -objs.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
-        items.push({ mesh: M_SENATOR, m: model([b[0], -objs.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
+        items.push({ mesh: M_CAESAR, m: model([a[0], -ob.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
+        items.push({ mesh: M_SENATOR, m: model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
@@ -591,10 +641,10 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const lvp = lightClip(O, [Math.cos(amid) * Math.cos(0.1), Math.sin(0.1), Math.sin(amid) * Math.cos(0.1)], lFov, Math.tan(Math.min(1.2, hw + 0.1)) / Math.tan(lFov / 2), 0.05, L_FAR);
       const off = (import.meta.env.DEV && (window as unknown as { __stPrismOff?: Record<string, boolean> }).__stPrismOff) || {};
       if (off.objects) items.length = 0;
-      const shadowOn = !off.shadow && objs.ok && items.some((it) => it.fade > 0.3 && objs.has(it.mesh));
+      const shadowOn = !off.shadow && ob.ok && items.some((it) => it.fade > 0.3 && ob.has(it.mesh));
       const prof = import.meta.env.DEV && window.__stPrismProf ? { t: performance.now(), px: new Uint8Array(4), marks: [] as number[] } : null;
       const mark = () => { if (prof) { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, prof.px); const t = performance.now(); prof.marks.push(Math.round(t - prof.t)); prof.t = t; } };
-      if (shadowOn) objs.shadow(items, lvp, O, L_FAR);
+      if (shadowOn) ob.shadow(items, lvp, O, L_FAR);
       mark();
       const setLight = (uu: (n: string) => WebGLUniformLocation | null) => {
         gl.uniform3f(uu("uLO"), O[0], O[1], O[2]);
@@ -602,7 +652,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         gl.uniform1f(uu("uLWedge"), wedge); gl.uniform1f(uu("uLGain"), lGain);
         gl.uniformMatrix4fv(uu("uLVP"), false, lvp);
         gl.uniform1f(uu("uShadowOn"), shadowOn ? 1 : 0); gl.uniform1f(uu("uLFar"), L_FAR);
-        gl.uniform1f(uu("uShadowTx"), 1 / objs.shadowSize);
+        gl.uniform1f(uu("uShadowTx"), 1 / ob.shadowSize);
         gl.uniform1i(uu("uShadow"), 3);
       };
 
@@ -616,7 +666,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       gl.disableVertexAttribArray(1);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, objs.shadowTex);
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, ob.shadowTex);
       setLight(u);
       gl.uniform2f(u("uRes"), canvas.width, canvas.height);
       f1("uTime", tSec);
@@ -648,16 +698,16 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uIF", iF * kept); f1("uFront", front); f1("uIP", iP * kept);
       f1("uSpecW", st.spec);
       // the haze our light lights in the air (fainter for the spectrum, whose fan already draws itself)
-      f1("uAirCone", off.air ? 0 : (0.055 - 0.035 * st.spec) * S.haze);
+      f1("uAirCone", off.air || !TIERS[quality.tier].air ? 0 : (0.055 - 0.035 * st.spec) * S.haze);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       mark();
 
       // the things, mirrored in the floor and then themselves, in the same light
-      if (objs.ok && items.length) {
+      if (ob.ok && items.length) {
         const vp = camClip(cam.pos, cam.f, cam.r, cam.u, cam.focal, cam.shift, A);
         const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
-        objs.draw(items, vp, (lp) => {
-          const uu = (n: string) => objs.u(lp, n);
+        ob.draw(items, vp, (lp) => {
+          const uu = (n: string) => ob.u(lp, n);
           setLight(uu);
           cols.forEach((c, i) => gl.uniform3f(uu(`uS${i}`), c[0], c[1], c[2]));
           gl.uniform3f(uu("uCamPos"), cam.pos[0], cam.pos[1], cam.pos[2]);
@@ -672,39 +722,85 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     };
 
     let lastKey = "";
+    /* frame pacing: the time between frames, smoothed; slow frames drop the quality a step at once, frames with room
+       to spare lift it a step after a long while */
+    let ema = 16, prev = 0, slowMs = 0, fastMs = 0, holdUntil = 0, errors = 0, drawn = false;
+    const pace = (now: number) => {
+      const dt = prev ? Math.min(200, now - prev) : 16;
+      prev = now;
+      ema += (dt - ema) * 0.08;
+      if (now < holdUntil || typeof window.__stSceneT === "number" || window.__stPrismBudget) return;
+      slowMs = ema > 30 ? slowMs + dt : 0;
+      fastMs = ema < 18 ? fastMs + dt : 0;
+      const step = (to: number) => { quality.tier = to; resize(); lastKey = ""; ema = 16; slowMs = fastMs = 0; holdUntil = now + 1500; };
+      if (slowMs > 700 && quality.tier < TIERS.length - 1) step(quality.tier + 1);
+      else if (fastMs > 6000 && quality.tier > 0) step(quality.tier - 1);
+    };
     const loop = (now: number) => {
+      raf = running ? requestAnimationFrame(loop) : 0;
+      if (!poll()) { prev = 0; return; }
+      if (dirty) { dirty = false; resize(); lastKey = ""; }
       // debug clock frozen: draw only when what is shown changes (keeps headless captures responsive)
       const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
       if (!key || key !== lastKey) {
         const tq = performance.now();
-        draw(now);
+        try {
+          draw(now);
+          errors = 0;
+        } catch (err) {
+          // one bad frame never takes the section down; a scene that keeps failing stops and stays dark
+          if (++errors === 1) console.warn("ScenePrism frame:", err);
+          if (errors > 4) { running = false; cancelAnimationFrame(raf); raf = 0; box.removeAttribute("data-ready"); return; }
+        }
+        if (!drawn && errors === 0) { drawn = true; box.setAttribute("data-ready", ""); loadMeshes(); }
         if (import.meta.env.DEV && window.__stPrismTime) { const px1 = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); window.__stPrismTime.push(performance.now() - tq); }
       }
       lastKey = key;
-      raf = running ? requestAnimationFrame(loop) : 0;
+      pace(now);
     };
     // the loop runs only while a service is on, on screen and the page is visible; reduced motion: one still frame
     const sync = () => {
-      const want = activeRef.current >= 0 && visible && !document.hidden && !reduce;
-      if (want && !running) { running = true; last = performance.now(); raf = requestAnimationFrame(loop); }
+      const want = activeRef.current >= 0 && visible && !document.hidden && !reduce && !lost;
+      if (want && !running) { running = true; last = performance.now(); prev = 0; raf = requestAnimationFrame(loop); }
       else if (!want && running) { running = false; cancelAnimationFrame(raf); raf = 0; }
+    };
+    /** reduced motion: one still frame, drawn as soon as the program is ready */
+    const still = () => {
+      if (!poll()) { setTimeout(still, 100); return; }
+      if (dirty) { dirty = false; resize(); }
+      try { draw(performance.now()); if (!drawn) { drawn = true; box.setAttribute("data-ready", ""); loadMeshes(); } } catch (err) { console.warn("ScenePrism frame:", err); }
     };
     let wasOn = false;
     const wake = () => {
       const isOn = activeRef.current >= 0;
-      if (isOn && !wasOn) { tOn = performance.now(); beam.svc = -1; beam.old = null; lastKey = ""; if (reduce) draw(performance.now()); }
-      if (isOn && reduce) draw(performance.now());
+      if (isOn && !wasOn) { tOn = performance.now(); beam.svc = -1; beam.old = null; lastKey = ""; }
+      if (isOn && reduce) still();
       wasOn = isOn;
       sync();
     };
     wakeRef.current = wake;
 
+    // the GPU can drop the context (an overloaded or sleeping GPU): build the scene again a step lighter
+    let lost = false;
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      lost = true;
+      running = false; cancelAnimationFrame(raf); raf = 0;
+      box.removeAttribute("data-ready");
+      quality.losses++;
+      quality.tier = Math.min(TIERS.length - 1, quality.tier + 2);
+      if (quality.losses <= 3) setTimeout(() => setGen((g) => g + 1), 400);
+    };
+    canvas.addEventListener("webglcontextlost", onLost);
+
+    // sizes change the canvas on the next frame (never a draw inside the observer)
+    let dirty = false;
     resize();
     wake();
-    const ro = new ResizeObserver(() => { resize(); if (activeRef.current >= 0) draw(performance.now()); });
+    const ro = new ResizeObserver(() => { dirty = true; if (reduce && activeRef.current >= 0) still(); });
     ro.observe(box);
     if (section) ro.observe(section);
-    document.fonts?.ready.then(measure).catch(() => {});
+    document.fonts?.ready.then(() => { dirty = true; }).catch(() => {});
     const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; sync(); });
     io.observe(box);
     const onMove = (e: PointerEvent) => {
@@ -713,7 +809,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       pxT = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
       // y in site px (the rows decide what it turns)
       yT = ((e.clientY - r.top) / r.height) * Math.max(1, box.offsetHeight);
-      if (reduce && activeRef.current >= 0) draw(performance.now());
+      if (reduce && activeRef.current >= 0) still();
     };
     window.addEventListener("pointermove", onMove);
     document.addEventListener("visibilitychange", sync);
@@ -724,13 +820,18 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       ro.disconnect(); io.disconnect();
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", sync);
+      canvas.removeEventListener("webglcontextlost", onLost);
       alive = false;
-      objs.dispose();
-      gl.deleteTexture(tex);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      if (!lost) {
+        objs?.dispose();
+        if (tex) gl.deleteTexture(tex);
+        if (buf) gl.deleteBuffer(buf);
+        gl.deleteProgram(prog);
+        gl.getExtension("WEBGL_lose_context")?.loseContext();
+      }
       canvas.remove();
     };
-  }, [mode]);
+  }, [mode, gen]);
 
   useEffect(() => { wakeRef.current?.(); }, [active]);
 
