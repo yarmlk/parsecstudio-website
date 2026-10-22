@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 
 /**
- * The showreel lives behind the disc of the hero. Behind the glass a light 540p cut loops, muted; "Showreel" switches
- * the same <video> to the full 1080p film with sound. HeroLightB owns the element and the transition; this file holds
- * what the site around it needs: the sources, the phases and the player state for the bar.
+ * The showreel lives behind the disc of the hero. On the desk the glass shows the 1080p film itself, muted and looping
+ * (sharp behind the glass), and "Showreel" restarts the same element at 0 with sound: no source switch, no wait. The
+ * phone loops a light 540p cut behind the glass and switches to the film on "Showreel". HeroLightB owns the element
+ * and the transition; this file holds what the site around it needs: the sources, the phases and the player state.
  */
 export const REEL_SRC = {
-  /** behind the glass: 960×540, no sound track, ~5 MB */
+  /** behind the glass on the phone: 960×540, no sound track, ~5 MB */
   glass: "video/site/showreel-540.mp4",
-  /** watching: 1920×1080 with sound */
+  /** watching, and behind the glass on the desk: 1920×1080 with sound, ~31 MB */
   film: "video/site/showreel-1080.mp4",
   /** reduced motion, save-data, before the first frame */
   poster: "video/site/showreel.jpg",

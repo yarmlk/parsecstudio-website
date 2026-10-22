@@ -11,11 +11,14 @@ import "./hero-b.css";
  * the right. The edge is a thin 3500 K light strip over a fine steel bevel; light escapes underneath into warm haze.
  * Phone: the same object as a horizon, plane below, light rising behind its far edge.
  *
- * The showreel plays behind the glass all the time: faint across it, clearer near the lit rim, clearest under the
- * hot spot (our light shows our work), out of focus because it sits further away. "Showreel": the rim flares, then
- * comes down past the lens like a curtain of light; behind it the glass clears and the film comes into focus, the
- * words dissolve as the light passes them, the sound comes in with it. Then the <video> itself takes over (sharp,
- * cheap to play) and the canvas rests. Closing runs it back.
+ * The showreel plays behind the glass all the time, sharp: dark glass, but lit. The glass sinks the film's darks
+ * into deep black and lets its light through with its colour, clearly across the disc, clearer near the lit rim,
+ * clearest under the hot spot (our light shows our work). The film's own highlights bloom softly into the glass, and
+ * the rim's light enters the glass edge and glows inside it like edge-lit acrylic. On the desk the glass shows the
+ * film itself (muted), so "Showreel" only restarts it with sound; the phone runs a light cut. "Showreel": the rim
+ * flares, then comes down past the lens like a curtain of light; behind it the glass clears, the words dissolve as
+ * the light passes them, the sound comes in with it. Then the <video> itself takes over (cheap to play) and the
+ * canvas rests. Closing runs it back.
  *
  * Motion is a camera and the light, nothing else:
  * - the hot spot follows the pointer x along the rim with the cover's inertia (lerp 0.035 / frame at 60 fps);
@@ -46,14 +49,17 @@ uniform float uDrop;     // how far the disc has come down (hero units)
 uniform float uFlare;    // the rim flares before it moves
 uniform float uClr;      // the glass clears: 0 smoked … 1 nothing between us and the film
 uniform float uFit;      // phone: from filling the frame to the whole film
-uniform float uBlur;     // defocus of the film behind the glass (frame heights)
 uniform float uTease;    // hover anticipation: 0 rest … 1 the rim warms up, the glass clears a little
-uniform vec2 uTap[8];
+uniform sampler2D uHaloN, uHaloW, uHaloF; // the film's light blurred: near (≈ 1/50 of the frame), wide (≈ 1/12),
+                                           // far (≈ 1/3, what the eye adapts to); √-encoded
+uniform float uLook;     // the glass: 0 lit (A, production) … 1 ember (B, dev only)
 /* the same 3500 K source seen through haze: scattering leaves it a little deeper */
 #define HZ mix(uWarm, uDeep, 0.62)
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
-/* shared by the scene functions and main() */
-vec2 gUV; float gAsp; float gJit; float gGlass;
+/* shared by the scene functions and main(). The film through the glass is kept apart from the light (gFilm), so the
+   light's shoulder never squashes the film's own highlights. */
+vec2 gUV; float gAsp; float gGlass; vec3 gFilm, gHaloN, gHaloW, gAdapt;
 
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
@@ -100,40 +106,37 @@ vec2 reelScale(){
   if (A < V) s *= pow(V / A, uFit);
   return s / (1.0 + 0.014 * (1.0 - uClr));
 }
-/* the film, linear. Behind the glass it sits further away: a little overscan, its own small parallax, out of focus.
-   As the glass clears the focus pulls to it and it settles to exactly the frame the <video> will take over. */
+/* the film, linear and sharp. Behind the glass it sits further away: a little overscan and its own small parallax.
+   As the glass clears it settles to exactly the frame the <video> will take over. Its blurred light comes with it. */
 vec3 reel(){
   vec2 s = reelScale();
   float o = 1.0 - uClr;
   vec2 par = vec2(uCam.x / gAsp, -uCam.y) * 0.006 * o;
   vec2 q = 0.5 + (gUV + par - 0.5) * s;
-  float rad = uBlur * o * o;
-  vec3 c;
-  if (rad < 0.0003) {
-    vec3 t0 = texture2D(uReel, q).rgb;
-    c = vec3(s2l(t0.r), s2l(t0.g), s2l(t0.b));
-  } else {
-    // eight taps on a Vogel spiral, turned per pixel: the defocus of a far plane
-    float a = gJit * 6.2832, cs = cos(a), sn = sin(a);
-    vec2 S = vec2(1.0 / gAsp, 1.0) * rad * s;
-    c = vec3(0.0);
-    for (int i = 0; i < 8; i++) {
-      vec2 o2 = uTap[i];
-      o2 = vec2(o2.x * cs - o2.y * sn, o2.x * sn + o2.y * cs);
-      c += pow(max(texture2D(uReel, q + o2 * S).rgb, vec3(1e-5)), vec3(2.2));
-    }
-    c *= 0.125;
-  }
+  vec3 t0 = texture2D(uReel, q).rgb;
+  vec3 c = vec3(s2l(t0.r), s2l(t0.g), s2l(t0.b));
   // outside the film (the phone's whole frame): the room
   vec2 pq = s / uRes;
   vec2 e = smoothstep(-pq, pq, q) * smoothstep(-pq, pq, 1.0 - q);
-  return mix(VOIDL, c, e.x * e.y);
+  float m = e.x * e.y;
+  vec3 hn = texture2D(uHaloN, q).rgb, hw = texture2D(uHaloW, q).rgb, hf = texture2D(uHaloF, q).rgb;
+  gHaloN = hn * hn * m; gHaloW = hw * hw * m; gAdapt = hf * hf * m;
+  return mix(VOIDL, c, m);
 }
-/* seen through smoked glass: less colour, cooler; warm where the rim's light falls on it */
-vec3 smoked(vec3 c, float warm){
-  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-  vec3 g = mix(vec3(l), c, 0.6);
-  return g * mix(vec3(0.82, 0.90, 1.0), mix(uWarm, uCore, 0.45) * 1.15, warm);
+/* The film seen through the dark glass. The glass sinks the film's darks and mids (a toe) and lets its light through
+   with its colour (a light desaturation, a neutral tint, never cold). The eye adapts to the glass: a large bright
+   field sinks back into it while its detail and its small lights stay, so a white frame never turns the disc into a
+   grey slab. Only the film's lights bloom into the glass: what shines brighter than its surroundings spills its
+   blurred light around it (warm, like halation on film), so dark detail inside a bright frame stays crisp.
+   T: the glass's transmission here. */
+vec3 glass(vec3 R, float T){
+  float k = mix(0.09, 0.2, uLook);
+  float ad = 1.0 / (1.0 + mix(3.2, 4.0, uLook) * dot(gAdapt, LUMA));
+  vec3 S = R * R / (R + k) * (1.0 + k) * ad;
+  S = mix(vec3(dot(S, LUMA)), S, mix(0.92, 0.85, uLook));
+  vec3 bl = max(gHaloN * 0.55 + gHaloW * 0.45 - gAdapt * mix(1.25, 1.1, uLook), 0.0);
+  bl = mix(bl, dot(bl, LUMA) * vec3(1.12, 0.97, 0.80), 0.35);
+  return (S + bl * ad * mix(0.9, 1.6, uLook)) * T * vec3(1.0, 0.975, 0.945);
 }
 
 vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
@@ -157,7 +160,9 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float outTop = smoothstep(-aa, aa, dN);
   float inE = smoothstep(aa, -aa, dE);
   float inB = smoothstep(aa, -aa, dB);
-  float plane = 1.0 - outTop;
+  // the back edge (top right, behind the nav) is no cut: the glass melts into the dark there
+  float aaN = r.y > 0.0 ? mix(aa, 0.05, smoothstep(0.05, 0.35, r.y)) : aa;
+  float plane = 1.0 - smoothstep(-aaN, aaN, dN);
   float strip = outTop * inE;
   float steel = outTop * inB * (1.0 - inE);
   float open = outTop * (1.0 - inB);
@@ -182,10 +187,14 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   vec3 col = vec3(0.0010, 0.0010, 0.0011);
   col += cool * 0.016 * smoothstep(0.35, 0.95, pw.x) * smoothstep(-0.2, 0.55, pw.y);
 
-  // the underside of the disc: soft environment high in the frame, the lit haze reflected near the rim
+  // the glass itself: near black, no grey lift; what makes it glass is what it reflects and the light inside it
   float hIn = max(-dN, 0.0);
-  float env = smoothstep(-0.08, 0.55, pn.y + uDrop) * exp(-pow((pn.x - 0.12) / 0.74, 2.0));
-  vec3 pc = cool * (0.0009 + 0.027 * env * sqrt(env));
+  vec3 pc = vec3(0.0006, 0.00058, 0.00055);
+  // a soft-box far above, reflected in the top surface: a faint cool panel on the far part of the disc, defined
+  // edges, soft ends. A reflection slides against the surface as the camera moves.
+  vec2 sbq = r - vec2(0.30 - cam.x * 0.30, 0.095 + cam.y * 0.04);
+  float sbx = smoothstep(0.40, 0.16, abs(sbq.x)), sby = smoothstep(0.034, 0.022, abs(sbq.y));
+  pc += cool * 0.0042 * sbx * sby * smoothstep(0.0, 0.08, hIn) * (0.75 + 0.25 * sbq.y / 0.034);
   // the gleam: the glowing haze under the disc, reflected soft and stretched along the rim. A reflection
   // slides against its surface when the camera moves, so it travels further than the light itself.
   float us = uHot + 0.06 + cam.x * 0.22;
@@ -198,17 +207,24 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   // the chamfer just above the strip catches its light: a thin deep line that keeps the cut crisp
   float ch = smoothstep(-aa, aa, 2.2 * lp - hIn);
   pc += uDeep * ch * L * 0.075 + uDeep * exp(-hIn / (5.0 * lp)) * L * 0.012;
-  // the film behind the glass: barely across it, more near the lit rim, most under the hot spot.
-  // Smoked glass holds its highlights down, so a white frame never flashes through.
+  // the rim's light enters the glass at its edge and scatters inside it, like edge-lit acrylic: a warm luminous
+  // gradient rising to the lit rim, strongest at the hot spot
+  float lit = (0.30 * pk + 0.55 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
+  pc += mix(uDeep, uWarm, 0.6) * lit * I * front * (0.040 * exp(-hIn / 0.03) + 0.014 * exp(-hIn / 0.13));
+  // the film behind the glass: clearly there across the disc, clearer near the lit rim, clearest under the hot spot
+  vec3 film = vec3(0.0);
   if (plane > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
     vec3 R = reel();
-    float near = exp(-hIn / 0.13);
-    float lit = (0.30 * pk + 0.55 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-    float Tg = 0.03 + 0.06 * uTease + 0.20 * near * lit;
-    vec3 behind = smoked(R / (1.0 + 1.6 * R), clamp(near * lit, 0.0, 1.0)) * Tg * uReelA;
-    pc = mix(pc + behind, R, uClr);
+    // transmission: clearest under the lit rim, falling away into the disc (its far part is seen at a grazing angle
+    // and reflects more), least at the top of the frame, so the film's cuts never jump behind the nav
+    float nl = clamp(exp(-hIn / 0.09) * lit, 0.0, 1.0);
+    float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
+    float base = mix(mix(0.24, 0.10, uLook), mix(0.085, 0.035, uLook), smoothstep(0.02, 0.5, hIn));
+    float Tr = mix(base, mix(0.68, 0.52, uLook), nl) * top * (1.0 + 0.4 * uTease);
+    film = mix(glass(R, Tr) * uReelA, R, uClr);
   }
-  col = mix(col, pc, plane);
+  col = mix(col, pc * (1.0 - uClr), plane);
+  gFilm = film * plane;
 
   // the strip: an emitter on the upper part of the edge; it burns to cream only where it is hottest
   float f = clamp(dN / max(dN - dE, 1e-5), 0.0, 1.0);
@@ -216,11 +232,13 @@ vec3 desk(vec2 p, float px, float lp, float t, float I, float ign){
   float E = L * 4.8 * mix(0.62, 1.12, pow(across, 0.7));
   vec3 sc = mix(uDeep, uWarm, smoothstep(0.15, 0.85, L)) * E + uWarm * 0.004;
   col = mix(col, sc, strip);
+  gFilm *= 1.0 - strip;
 
   // steel bevel under the strip: a polished edge, lit warm by the strip, silver where the light is weak
   float g = clamp(dE / max(dE - dB, 1e-5), 0.0, 1.0);
   vec3 stc = cool * 0.085 * (1.0 - 0.5 * g) + mix(uWarm, uCore, 0.6) * L * 0.30 * (1.0 - 0.55 * g);
   col = mix(col, stc, steel);
+  gFilm *= 1.0 - steel;
 
   // under the disc: the light pours out into haze, two smoke layers at their own depths
   float hb = max(dB, 0.0);
@@ -282,17 +300,20 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   float reveal = smoothstep(reach, reach - 0.3, abs(du)) * smoothstep(0.0, 0.12, ign);
   float L = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * I * (1.0 + 0.12 * s) * (1.0 + 0.55 * uFlare + 0.30 * uTease);
 
-  vec3 col = vec3(0.0010, 0.0010, 0.0011);
-  // the film beyond the far rim: faint across the dark, lit where the light rises
+  vec3 col = vec3(0.0010, 0.0010, 0.0011) * (1.0 - uClr * above);
+  // the film beyond the far rim: clearly there across the dark, lit where the light rises
   float h = max(dN, 0.0);
+  vec3 film = vec3(0.0);
   if (above > 0.0 && (uReelA > 0.0 || uClr > 0.0)) {
     vec3 fm = reel();
-    float near = exp(-h / 0.12);
     float lit = (0.45 * pk + 0.40 * body + 0.15 * tail) * reveal * (1.0 + 0.3 * uFlare);
-    float Tg = 0.016 + 0.05 * uTease + 0.17 * near * lit;
-    vec3 behind = smoked(fm / (1.0 + 1.6 * fm), clamp(near * lit, 0.0, 1.0)) * Tg * uReelA;
-    col = mix(col + behind, fm, uClr);
+    float nl = clamp(exp(-h / 0.10) * lit, 0.0, 1.0);
+    float top = 1.0 - 0.75 * smoothstep(0.72, 0.95, gUV.y);
+    float base = mix(mix(0.22, 0.09, uLook), mix(0.08, 0.032, uLook), smoothstep(0.02, 0.5, h));
+    float T = mix(base, mix(0.62, 0.48, uLook), nl) * top * (1.0 + 0.4 * uTease);
+    film = mix(glass(fm, T) * uReelA, fm, uClr);
   }
+  gFilm = film * above;
   // satin plane: near black, a faint sheen falling away from the rim, the light's reflection running towards us
   float hIn = max(-dN, 0.0);
   vec3 pc = cool * (0.0007 + 0.0028 * exp(-hIn / 0.12));
@@ -340,7 +361,7 @@ void main(){
   vec2 fc = gl_FragCoord.xy;
   vec2 uv = fc / uRes;
   float aspect = uRes.x / uRes.y;
-  gUV = uv; gAsp = aspect; gJit = hash12(fc + 23.17); gGlass = 0.0;
+  gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0); gHaloN = vec3(0.0); gHaloW = vec3(0.0); gAdapt = vec3(0.0);
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
   // the slow push-in of the camera
   float zoom = 1.0 + 0.03 * uPush;
@@ -353,11 +374,15 @@ void main(){
   float I = 1.0 + 0.012 * sin(uTime * 0.31) + 0.008 * sin(uTime * 0.173 + 1.3);
   vec3 col = uMob > 0.5 ? mob(p, px, lp, t, I, uIgn) : desk(p, px, lp, t, I, uIgn);
 
-  // where the glass has cleared the film is shown as it is: no vignette, no shoulder, no grain
+  // the light gets the vignette and its shoulder; the film shows through it (screen), its highlights untouched.
+  // Where the glass has cleared the film is shown as it is: no vignette, no shoulder, no grain
   float clr = gGlass * uClr;
   vec2 q = uv - 0.5;
-  col *= mix(1.0 - dot(q, q) * 0.55, 1.0, clr);
-  col = mix(vec3(1.0) - exp(-col * 1.05), min(col, vec3(1.0)), clr);
+  float d2 = dot(q, q);
+  col *= mix(1.0 - d2 * 0.55, 1.0, clr);
+  vec3 fl = min(gFilm * mix(1.0 - d2 * 0.3, 1.0, clr), vec3(1.0));
+  vec3 lc = vec3(1.0) - exp(-col * 1.05);
+  col = mix(lc + fl * (1.0 - lc), min(col + fl, vec3(1.0)), clr);
   col = mix(col * 12.92, 1.055 * pow(col, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), col));
   // static fine grain and dither: no per-frame noise, nothing flickers
   float n = hash12(fc) + hash12(fc + 71.37) - 1.0;
@@ -365,6 +390,52 @@ void main(){
   col += n * (1.4 / 255.0 + 0.018 * l * (1.0 - l)) * (1.0 - clr);
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
+
+/* The film's light, blurred, for its halation in the glass: the film texture is boxed down into a small target
+   (sRGB → linear, stored √-encoded so 8 bits hold the darks) and blurred there, only when a new frame arrives. */
+const DOWN = `
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uSize;     // the target (px)
+uniform float uSrgb;    // 1: the film (sRGB), 0: a √-encoded target
+vec3 dec(vec3 s){
+  return uSrgb > 0.5 ? mix(s / 12.92, pow((s + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), s)) : s * s;
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / uSize;
+  vec3 c = vec3(0.0);
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++)
+    c += dec(texture2D(uSrc, uv + (vec2(float(i), float(j)) - 1.5) * 0.25 / uSize).rgb);
+  gl_FragColor = vec4(sqrt(c / 16.0), 1.0);
+}`;
+const BLUR = `
+precision highp float;
+uniform sampler2D uSrc;
+uniform vec2 uSize, uDir;
+uniform float uW0;
+uniform vec4 uOff, uW;  // bilinear pairs of a 17-tap gaussian
+vec3 L(vec2 q){ vec3 c = texture2D(uSrc, q).rgb; return c * c; }
+void main(){
+  vec2 uv = gl_FragCoord.xy / uSize, s = uDir / uSize;
+  vec3 c = L(uv) * uW0;
+  c += (L(uv + s * uOff.x) + L(uv - s * uOff.x)) * uW.x;
+  c += (L(uv + s * uOff.y) + L(uv - s * uOff.y)) * uW.y;
+  c += (L(uv + s * uOff.z) + L(uv - s * uOff.z)) * uW.z;
+  c += (L(uv + s * uOff.w) + L(uv - s * uOff.w)) * uW.w;
+  gl_FragColor = vec4(sqrt(c), 1.0);
+}`;
+/** the film's light at three scales (target px; the gaussian's sigma is 2.2 of their texels): the halation near
+    (≈ 1/50 of the frame) and wide (≈ 1/12), and far (≈ 1/3), what the eye adapts to */
+const HALO = { near: [192, 108], wide: [48, 27], far: [12, 7], sigma: 2.2 } as const;
+/** a 17-tap gaussian as a centre tap and four bilinear pairs a side */
+function gauss(sigma: number) {
+  const w = Array.from({ length: 9 }, (_, i) => Math.exp(-(i * i) / (2 * sigma * sigma)));
+  const sum = w[0] + 2 * w.slice(1).reduce((a, b) => a + b, 0);
+  const n = w.map((x) => x / sum);
+  const off: number[] = [], wt: number[] = [];
+  for (let i = 1; i < 9; i += 2) { wt.push(n[i] + n[i + 1]); off.push((i * n[i] + (i + 1) * n[i + 1]) / (n[i] + n[i + 1])); }
+  return { w0: n[0], off, wt };
+}
 
 /* sRGB → linear */
 const lin = (h: string): [number, number, number] => {
@@ -390,14 +461,15 @@ const WAIT_MS = 6000;                                    // … at most this lon
 const DOWN_MS: Record<Mode, number> = { desk: 1900, mob: 1700 };
 const UP_MS: Record<Mode, number> = { desk: 1500, mob: 1400 };
 const DROP: Record<Mode, number> = { desk: 1.05, mob: 0.95 };   // hero units: the rim and its haze leave the frame
-const BLUR: Record<Mode, number> = { desk: 0.0075, mob: 0.0065 };
 /** the words go a little before the light reaches them, over this soft edge (px) */
 const WIPE = { desk: { lead: 12, soft: 64 }, mob: { lead: 10, soft: 48 } } as const;
-/** eight taps on a Vogel spiral (unit disc) */
-const TAPS = new Float32Array(Array.from({ length: 8 }, (_, i) => {
-  const r = Math.sqrt((i + 0.5) / 8), a = i * 2.39996;
-  return [r * Math.cos(a), r * Math.sin(a)];
-}).flat());
+/** dev only: the glass look to compare, "a" lit glass (production) or "b" ember glass (window.__hlbGlass, ?glass=) */
+const GLASS_Q = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("glass") : null;
+const glassLook = () => {
+  if (!import.meta.env.DEV) return 0;
+  const g = (window as unknown as { __hlbGlass?: string }).__hlbGlass ?? GLASS_Q;
+  return g === "b" ? 1 : 0;
+};
 
 interface Tw { a: number; b: number; t0: number; ms: number; e: (x: number) => number }
 const tw = (a: number, b: number, ms: number, e: (x: number) => number, t0: number): Tw => ({ a, b, t0, ms, e });
@@ -513,19 +585,22 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     canvas.setAttribute("aria-hidden", "true");
     box.insertBefore(canvas, box.firstChild);
     const gl = canvas.getContext("webgl", { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: "high-performance" });
-    let prog: WebGLProgram | null = null;
-    if (gl) {
+    /* every program draws the same full-frame triangle from attribute 0 */
+    const link = (fs: string) => {
+      if (!gl) return null;
       const sh = (type: number, s: string) => {
         const o = gl.createShader(type)!; gl.shaderSource(o, s); gl.compileShader(o);
         if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.warn("HeroLightB shader:", gl.getShaderInfoLog(o));
         return o;
       };
-      prog = gl.createProgram()!;
-      gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
-      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-      gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) prog = null;
-    }
+      const p = gl.createProgram()!;
+      gl.attachShader(p, sh(gl.VERTEX_SHADER, VERT));
+      gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+      gl.bindAttribLocation(p, 0, "a");
+      gl.linkProgram(p);
+      return gl.getProgramParameter(p, gl.LINK_STATUS) ? p : null;
+    };
+    const prog = link(FRAG);
     /** no light to ride: the film just fades in over the plate (no WebGL, or reduced motion) */
     let fade = !gl || !prog || reduce;
     const plate = () => {
@@ -539,6 +614,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     if (fade && section) section.dataset.fade = "1"; else if (section) delete section.dataset.fade;
     /** the muted film runs behind the glass (otherwise the poster sits there) */
     const glassFilm = !fade && !saveData;
+    /** what plays behind the glass: desk, the film itself (sharp, and "Showreel" only restarts it with sound);
+        the phone, the light cut */
+    const glassSrc = mode === "desk" ? REEL_SRC.film : REEL_SRC.glass;
 
     /* ── the words: wiped along the light as it passes ── */
     const rims = () => Array.from(section?.querySelectorAll<HTMLElement>("[data-rim]") ?? []);
@@ -599,9 +677,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (volOk) { try { v.volume = 1; } catch { /* fixed */ } }
       v.loop = true;
       if (glassFilm) {
-        // back to the light cut, from where the film was
+        // back behind the glass, from where the film was (desk: the same source, it just plays on, muted)
         const at = v.ended ? 0 : v.currentTime;
-        setSrc(REEL_SRC.glass, at);
+        setSrc(glassSrc, at);
         if (visible && !document.hidden) v.play().catch(() => {});
       } else {
         v.pause();
@@ -703,26 +781,61 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       const buf = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, buf);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      const loc = gl.getAttribLocation(prog, "a");
-      gl.enableVertexAttribArray(loc);
-      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-      const U = (n: string) => gl.getUniformLocation(prog!, n);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      const U = (n: string) => gl.getUniformLocation(prog, n);
       const u = {
         res: U("uRes"), time: U("uTime"), mob: U("uMob"), hot: U("uHot"), ign: U("uIgn"), push: U("uPush"),
         scroll: U("uScroll"), unit: U("uUnit"), cam: U("uCam"), warm: U("uWarm"), core: U("uCore"), deep: U("uDeep"),
         reel: U("uReel"), reelA: U("uReelA"), reelAsp: U("uReelAsp"), k: U("uK"), drop: U("uDrop"), flare: U("uFlare"),
-        clr: U("uClr"), fit: U("uFit"), blur: U("uBlur"), tap: U("uTap"), tease: U("uTease"),
+        clr: U("uClr"), fit: U("uFit"), tease: U("uTease"), haloN: U("uHaloN"), haloW: U("uHaloW"), haloF: U("uHaloF"),
+        look: U("uLook"),
       };
       gl.uniform3f(u.warm, WARM[0], WARM[1], WARM[2]);
       gl.uniform3f(u.core, CORE[0], CORE[1], CORE[2]);
       gl.uniform3f(u.deep, DEEP[0], DEEP[1], DEEP[2]);
       gl.uniform1f(u.mob, mode === "mob" ? 1 : 0);
-      gl.uniform2fv(u.tap, TAPS);
-      gl.uniform1f(u.blur, BLUR[mode]);
       gl.uniform1f(u.reelAsp, 16 / 9);
+      gl.uniform1i(u.haloN, 1);
+      gl.uniform1i(u.haloW, 2);
+      gl.uniform1i(u.haloF, 4);
+
+      /* the film's light: boxed down into three small targets and blurred there (units 1, 2 and 4 hold the results,
+         unit 3 is the passes' scratch), redone only when a new frame of the film arrives */
+      const pDown = link(DOWN), pBlur = link(BLUR);
+      const target = (w: number, h: number, unit: number) => {
+        const t = gl.createTexture()!;
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        const fb = gl.createFramebuffer()!;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+        const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+        return { t, fb, w, h, ok };
+      };
+      const nA = target(HALO.near[0], HALO.near[1], 1), wA = target(HALO.wide[0], HALO.wide[1], 2), fA = target(HALO.far[0], HALO.far[1], 4);
+      const nB = target(HALO.near[0], HALO.near[1], 3), wB = target(HALO.wide[0], HALO.wide[1], 3), fB = target(HALO.far[0], HALO.far[1], 3);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const haloOk = !!pDown && !!pBlur && [nA, wA, fA, nB, wB, fB].every((t) => t.ok);
+      const G = gauss(HALO.sigma);
+      const dU = pDown ? { src: gl.getUniformLocation(pDown, "uSrc"), size: gl.getUniformLocation(pDown, "uSize"), srgb: gl.getUniformLocation(pDown, "uSrgb") } : null;
+      const bU = pBlur ? { src: gl.getUniformLocation(pBlur, "uSrc"), size: gl.getUniformLocation(pBlur, "uSize"), dir: gl.getUniformLocation(pBlur, "uDir") } : null;
+      if (pDown && dU) { gl.useProgram(pDown); gl.uniform1i(dU.src, 3); }
+      if (pBlur && bU) {
+        gl.useProgram(pBlur); gl.uniform1i(bU.src, 3);
+        gl.uniform1f(gl.getUniformLocation(pBlur, "uW0"), G.w0);
+        gl.uniform4fv(gl.getUniformLocation(pBlur, "uOff"), G.off);
+        gl.uniform4fv(gl.getUniformLocation(pBlur, "uW"), G.wt);
+      }
+      gl.useProgram(prog);
 
       // the film as a texture: the last good frame stays while the next source loads
-      const tex = gl.createTexture();
+      const tex = gl.createTexture()!;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -732,6 +845,36 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([3, 3, 3, 255]));
       gl.uniform1i(u.reel, 0);
+      type Tgt = typeof nA;
+      const pass = (src: WebGLTexture, dst: Tgt) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
+        gl.viewport(0, 0, dst.w, dst.h);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, src);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      };
+      const halo = () => {
+        if (!haloOk || !pDown || !pBlur || !dU || !bU) return;
+        const blur2 = (a: Tgt, b: Tgt) => {
+          gl.useProgram(pBlur);
+          gl.uniform2f(bU.size, a.w, a.h);
+          gl.uniform2f(bU.dir, 1, 0); pass(a.t, b);
+          gl.uniform2f(bU.dir, 0, 1); pass(b.t, a);
+        };
+        const down = (src: WebGLTexture, dst: Tgt, srgb: number) => {
+          gl.useProgram(pDown);
+          gl.uniform1f(dU.srgb, srgb); gl.uniform2f(dU.size, dst.w, dst.h);
+          pass(src, dst);
+        };
+        down(tex, nA, 1); blur2(nA, nB);
+        down(nA.t, wA, 0); blur2(wA, wB);
+        down(wA.t, fA, 0); blur2(fA, fB);
+        // back to the frame
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(prog);
+      };
       let texW = 0, texH = 0, texOk = false, fresh = true, lastCb = 0;
       const got = (w: number, h: number) => {
         if (w !== texW || h !== texH) { texW = w; texH = h; gl.uniform1f(u.reelAsp, w / h); }
@@ -754,7 +897,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
           if (v.videoWidth !== texW || v.videoHeight !== texH) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, v);
           else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGB, gl.UNSIGNED_BYTE, v);
           got(v.videoWidth, v.videoHeight);
-        } catch { /* a frame that cannot be read: keep the last one */ }
+        } catch { return; /* a frame that cannot be read: keep the last one */ }
+        // its light, blurred, for the glow in the glass
+        halo();
       };
       posterTex = () => {
         const img = new Image();
@@ -762,6 +907,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         img.onload = () => {
           if (R.phase !== "idle") return;
           try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img); got(img.naturalWidth, img.naturalHeight); } catch { return; }
+          halo();
           if (!running) draw(performance.now());
         };
         img.src = REEL_SRC.poster;
@@ -821,6 +967,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         st.zoom = 1 + 0.03 * push; st.drop = drop; st.drawn = true;
         gl.uniform2f(u.res, canvas.width, canvas.height);
         gl.uniform1f(u.tease, st.tease);
+        gl.uniform1f(u.look, glassLook());
         gl.uniform1f(u.time, reduce ? 20 : el + 20);
         gl.uniform1f(u.hot, st.hot);
         gl.uniform1f(u.ign, ign);
@@ -872,7 +1019,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (R.phase !== "idle" || src) return;
       if (!visible || document.hidden) { wantGlass = true; return; }
       wantGlass = false;
-      setSrc(REEL_SRC.glass);
+      setSrc(glassSrc);
       v.play().catch(() => {});
     };
     if (glassFilm) startT = window.setTimeout(startGlass, 900);
