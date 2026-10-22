@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
+import { CERAMIC, FROST, MARBLE, Objects, axisAngle, camClip, dirXZ, lightClip, loadMesh, model, puck, ring, sphere, type Item } from "./ScenePrism.objects";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
 /* Services: one stage, one real glass prism at the centre of the section, level with the middle of the three names. The
@@ -46,6 +47,20 @@ function exitAz(P: ReturnType<typeof makePrism>, o: V3, d: V3, ns: number[]) {
 const AZ_PREF = [8, -20, -8];
 /** index per channel for what is seen through the glass (a modest, real-looking fringe) */
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
+/** the busts (packed meshes, public/mesh): fetched the first time the stage mounts */
+const BUSTS = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/colossus.bin"] as const;
+/** mesh slots: the Motion sculpture (a frosted ring-disc around a black ceramic disc), then the busts */
+const M_RING = 0, M_DISC = 1, M_ORB = 2, M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_PILL = 6;
+/** each service's things, as the frame sees them: their height and their reach around their base (world units at
+ *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
+const DIMS = [{ h: 1.15, r: 0.85 }, { h: 0.55, r: 0.6 }, { h: 0.95, r: 0.9 }];
+/** where each service's things sit across the frame (their middle, as a fraction of the section's width) */
+const AIM_X = [0.775, 0.77, 0.775];
+const STAND_MAX = 2.6;
+/** the colossal head lies back on the floor, its face turned up to the camera above */
+const COLOSSUS_TILT = -1.05;
+/** the shadow map's reach from the light's origin */
+const L_FAR = 7;
 interface Shot {
   /** camera position, what it looks at, vertical field of view (deg) */
   cam: V3; target: V3; fov: number;
@@ -157,6 +172,14 @@ declare global {
     __stPrismPy?: number;
     /** debug: override any of the shot's settings live */
     __stPrismDbg?: Partial<Shot>;
+    /** debug: when an array, each drawn frame's time to completion (ms) is pushed to it */
+    __stPrismTime?: number[];
+    /** debug: no multisampling (a software GPU captures multisampled canvases very slowly) */
+    __stPrismNoAA?: boolean;
+    /** debug: set true to time the next frame's passes (shadow, prism, objects; ms) — it is replaced by the times */
+    __stPrismProf?: boolean | number[];
+    /** debug: the canvas's pixel budget (headless checks run on a software GPU) */
+    __stPrismBudget?: number;
     /** debug: what the scene laid out last frame (site px), for checks */
     __stPrismInfo?: Record<string, unknown>;
   }
@@ -180,7 +203,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     canvas.setAttribute("aria-hidden", "true");
     canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
     box.appendChild(canvas);
-    const gl = canvas.getContext("webgl", { antialias: false, alpha: false, premultipliedAlpha: false, powerPreference: "high-performance" });
+    const gl = canvas.getContext("webgl", { antialias: !window.__stPrismNoAA, alpha: false, premultipliedAlpha: false, powerPreference: "high-performance" });
     if (!gl) { canvas.remove(); return; }
     const deriv = !!gl.getExtension("OES_standard_derivatives");
 
@@ -193,6 +216,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const prog = gl.createProgram()!;
     gl.attachShader(prog, sh(gl.VERTEX_SHADER, PRISM_VERT));
     gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, (deriv ? "#extension GL_OES_standard_derivatives : enable\n#define DERIV\n" : "") + PRISM_FRAG));
+    gl.bindAttribLocation(prog, 0, "a");
     gl.linkProgram(prog);
     // WebGL failure: render nothing, the stage stays dark
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn("ScenePrism link:", gl.getProgramInfoLog(prog)); canvas.remove(); return; }
@@ -224,7 +248,17 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.uniform1i(u("uSpec"), 0);
+    gl.uniform1i(u("uShadow"), 3);
     let lutSat = NaN;
+
+    /* the things the light falls on */
+    const objs = new Objects(gl);
+    objs.set(M_RING, ring(0.52, 0.12, 0.022, 224, 32));
+    objs.set(M_DISC, sphere(0.3, 128, 64));
+    objs.set(M_ORB, sphere(0.085));
+    objs.set(M_PILL, puck(0.11, 0.035));
+    let alive = true;
+    BUSTS.forEach((url, i) => loadMesh(url).then((m) => { if (alive) objs.set(M_CAESAR + i, m); }).catch(() => {}));
 
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     let raf = 0, visible = true, running = false;
@@ -238,7 +272,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /** the pointer's height (site px); NaN until it moves */
     let yT = NaN;
     // eased state: the service's weights and the prism's turn
-    const st = { spec: 0, proj: 1, k: 0, rot: NaN, svc: Math.max(0, activeRef.current) };
+    const st = { spec: 0, proj: 1, k: 0, rot: NaN, svc: Math.max(0, activeRef.current), show: [0, 0, 0] };
+    /** where each service's things stand: its light's origin and direction at the middle of its turn (per layout) */
+    let place: { o: V3; az: number }[] = [];
+    /** how far along its light each service's things stand, and their scale (fitted to the frame per layout) */
+    let stand: { d: number; s: number }[] = [];
     /* the beam: where it starts (the active name) and since when; the one before it, going where it was */
     const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 } };
     /* each service's working turn of the prism (deg): from where its name's beam comes, every colour of its light gets
@@ -283,7 +321,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const r = box.getBoundingClientRect();
       const lh = Math.max(1, box.offsetHeight);
       const base = Math.min(window.devicePixelRatio || 1, 1.5);
-      const d = Math.min(base, Math.sqrt(2_600_000 / Math.max(1, r.width * r.height)));
+      const d = Math.min(base, Math.sqrt((window.__stPrismBudget ?? 2_600_000) / Math.max(1, r.width * r.height)));
       canvas.width = Math.max(2, Math.round(r.width * d));
       canvas.height = Math.max(2, Math.round(r.height * d));
       cpx = canvas.height / lh;
@@ -292,6 +330,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     };
 
     const draw = (now: number) => {
+      gl.useProgram(prog);
       const S: Shot = { ...SHOTS[mode], ...(window.__stPrismDbg as Partial<Shot> | undefined ?? {}) };
       const dbgT = window.__stSceneT;
       const frozen = typeof dbgT === "number";
@@ -371,6 +410,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const key = `${Math.round(W)}x${Math.round(Hs)}|${ans.map((a) => `${Math.round(a.x)},${Math.round(a.y)}`).join(";")}`;
       if (wins.key !== key) {
         const w: { lo: number; hi: number }[] = [];
+        place = [];
         for (let i = 0; i < 3; i++) {
           const a = ans[Math.min(i, ans.length - 1)];
           const o = startAt(a.x, a.y, S.slope), d = norm(sub([0, S.hb, 0], o));
@@ -395,7 +435,45 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           let sh = 0;
           if (w.length) { const pc = (w[w.length - 1].lo + w[w.length - 1].hi) / 2; sh = Math.round((pc + 20 - (lo + hi) / 2) / 120) * 120; }
           w.push(best ? { lo: lo + sh, hi: hi + sh } : w[w.length - 1] ?? { lo: 0, hi: 0 });
+          // the light at the middle of that turn: the service's things stand in it
+          const wc = w[w.length - 1];
+          const tc = traceBeam(makePrism([0, 0, 0], S.R, S.H, ((wc.lo + wc.hi) / 2) * DEG), o, d, nAt(0.95, i === 1 ? 1 : 0));
+          const ok = tc?.rays.filter((r) => r.dir) ?? [];
+          if (tc && ok.length) {
+            const a0 = ok[0].dir!, a1 = ok[ok.length - 1].dir!;
+            place.push({ o: mul(add(ok[0].out, ok[ok.length - 1].out), 0.5), az: Math.atan2(a0[2] + a1[2], a0[0] + a1[0]) });
+          } else place.push({ o: [0, S.hb, 0], az: (AZ_PREF[i] * Math.PI) / 180 });
         }
+        // as far out along the light as the frame allows: right of the prism, under the head's hairline, above the
+        // section's foot, clear of the right edge
+        const prismX = project(cam, [0, S.H * 0.5, 0], A)[0] * W;
+        stand = place.map((pl0, i) => {
+          const f = dirXZ(pl0.az), dm = DIMS[i];
+          const fits = (d: number, sc: number) => {
+            const b: V3 = [pl0.o[0] + f[0] * d, 0, pl0.o[2] + f[2] * d];
+            for (const y of [0, dm.h * sc]) for (const ox of [-1, 1]) for (const oz of [-1, 1]) {
+              // the top is narrower than the footprint (a head, a ring's crown): its far corner is pulled in
+              const rz = y > 0 ? dm.r * 0.6 : dm.r;
+              const q = project(cam, [b[0] + ox * dm.r * sc, y, b[2] + oz * rz * sc], A);
+              const X = q[0] * W, Y = q[1] * Hs;
+              if (X < prismX + W * 0.06 || X > W - (mode === "mob" ? 14 : 56) || Y < ruleY + 40 || Y > Hs - 8) return false;
+            }
+            return true;
+          };
+          // as large as the frame takes them (monumental), at the distance that puts them nearest their spot across
+          for (const sc of [3.2, 2.9, 2.6, 2.35, 2.1, 1.9, 1.7, 1.5, 1.3, 1.15, 1, 0.85, 0.7, 0.6, 0.5]) {
+            let bestD = -1, bestE = 1e9;
+            for (let d = STAND_MAX; d >= 0.55; d -= 0.05) {
+              if (!fits(d, sc)) continue;
+              const q = project(cam, [pl0.o[0] + f[0] * d, dm.h * sc * 0.4, pl0.o[2] + f[2] * d], A);
+              const e = Math.abs(q[0] - AIM_X[i]);
+              if (e < bestE) { bestE = e; bestD = d; }
+            }
+            if (bestD > 0) return { d: bestD, s: sc };
+          }
+          // no room for them in this frame (a narrow phone): the light alone
+          return { d: 0, s: 0 };
+        });
         wins = { key, w };
       }
       // the pointer's height turns the prism, smoothly, all the time: over a service's row through that service's
@@ -433,7 +511,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (import.meta.env.DEV) {
         const pin = project(cam, tr.pin, A), pc = project(cam, [0, S.H * 0.5, 0], A), po = project(cam, origin, A);
         window.__stPrismInfo = {
-          W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
+          W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, stand, place, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
           prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx,
         };
       }
@@ -452,8 +530,96 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const oldF = beam.old && sw < BEAM_OUT ? 1 - easeEnter(clamp01(sw / BEAM_OUT)) : 0;
       if (oldF <= 0) beam.old = null;
 
+      /* the things on the stage this frame: each service's fade in and out with its light */
+      const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
+      for (let i = 0; i < 3; i++) st.show[i] += ((svc === i ? 1 : 0) - st.show[i]) * kk(0.05);
+      const items: Item[] = [];
+      const at = (i: number, along: number, side = 0, y = 0): V3 => {
+        const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
+        const f = dirXZ(pl0.az), r: V3 = [-f[2], 0, f[0]];
+        return [pl0.o[0] + f[0] * along + r[0] * side, y, pl0.o[2] + f[2] * along + r[2] * side];
+      };
+      const facing = (p: V3, q: V3) => Math.atan2(q[0] - p[0], q[2] - p[2]);
+      if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
+        // Motion, 3D & CGI: the orbital object — a glossy black ceramic sphere inside a wide frosted ring-disc, the ring
+        // slowly precessing, a frosted moon and a small black disc on their orbits; the light lines their edges and the
+        // ring throws its ellipse of shadow across the sphere and the floor
+        const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
+        const c = at(0, sd.d, 0, 0.62 * sc), f = st.show[0];
+        const pre = 0.13 * tSec;
+        const tilt = axisAngle([0, 0, 0], [Math.cos(pre), 0, Math.sin(pre)], 1.05 + 0.08 * Math.sin(0.21 * tSec));
+        items.push({ mesh: M_RING, m: axisAngle(c, [0, 1, 0], 0.07 * tSec, sc, tilt), mat: FROST, fade: f });
+        items.push({ mesh: M_DISC, m: axisAngle(c, [0.15, 1, 0.1], 0.1 * tSec, sc), mat: CERAMIC, fade: f });
+        const ph = 0.31 * tSec;
+        const orb: V3 = [c[0] + Math.cos(ph) * 0.92 * sc, c[1] + Math.sin(ph) * 0.3 * sc, c[2] + Math.sin(ph) * 0.78 * sc];
+        items.push({ mesh: M_ORB, m: model(orb, 0, 0, 0, sc), mat: FROST, fade: f });
+        const kn: V3 = [c[0] - Math.cos(ph * 0.8 + 1) * 0.86 * sc, c[1] + Math.sin(ph * 0.8 + 1) * 0.36 * sc, c[2] - Math.sin(ph * 0.8 + 1) * 0.7 * sc];
+        items.push({ mesh: M_PILL, m: axisAngle(kn, [1, 0.4, 0.2], 0.6 * tSec, sc), mat: CERAMIC, fade: f });
+      }
+      if (st.show[1] > 0.004 && objs.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
+        // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
+        const sd = stand[1] ?? { d: 1.4, s: 1 }, sc = sd.s;
+        const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
+        const tilt = COLOSSUS_TILT + 0.03 * Math.sin(0.21 * tSec);
+        const p: V3 = [p0[0], -objs.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
+        items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.75 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
+      }
+      if (st.show[2] > 0.004 && objs.has(M_CAESAR) && objs.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
+        // Vertical Series: two busts in conversation, turned to each other, one answering the other
+        const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
+        // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
+        // half to us and half to the other, leaning back a touch so the faces meet the camera above
+        // two figures on a stage: side by side along the light, each cheated out to us and turned to the other, the
+        // further one a step back so the nearer one's shadow passes it by; the light keys one face and rims the other
+        const a = at(2, sd.d - 0.42 * sc, -0.2 * sc, 0), b = at(2, sd.d + 0.42 * sc, 0.22 * sc, 0), f = st.show[2];
+        const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
+        const lean = -0.24;
+        const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
+        const ya = blend(toCam(a), facing(a, b), 0.5) + 0.06 * Math.sin(0.5 * tSec);
+        const yb = blend(toCam(b), facing(b, a), 0.5) + 0.06 * Math.sin(0.5 * tSec + 2.2);
+        items.push({ mesh: M_CAESAR, m: model([a[0], -objs.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
+        items.push({ mesh: M_SENATOR, m: model([b[0], -objs.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
+      }
+      // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
+      const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
+      // our light opens wider for the two figures of Vertical than for the one object of Motion
+      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.05 * st.spec;
+      const lGain = 2.6 * iP * kept;
+      const hw = 0.5 * Math.abs(Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE))) + wedge;
+      const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
+      const lFov = 1.9;
+      const lvp = lightClip(O, [Math.cos(amid) * Math.cos(0.1), Math.sin(0.1), Math.sin(amid) * Math.cos(0.1)], lFov, Math.tan(Math.min(1.2, hw + 0.1)) / Math.tan(lFov / 2), 0.05, L_FAR);
+      const off = (import.meta.env.DEV && (window as unknown as { __stPrismOff?: Record<string, boolean> }).__stPrismOff) || {};
+      if (off.objects) items.length = 0;
+      const shadowOn = !off.shadow && objs.ok && items.some((it) => it.fade > 0.3 && objs.has(it.mesh));
+      const prof = import.meta.env.DEV && window.__stPrismProf ? { t: performance.now(), px: new Uint8Array(4), marks: [] as number[] } : null;
+      const mark = () => { if (prof) { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, prof.px); const t = performance.now(); prof.marks.push(Math.round(t - prof.t)); prof.t = t; } };
+      if (shadowOn) objs.shadow(items, lvp, O, L_FAR);
+      mark();
+      const setLight = (uu: (n: string) => WebGLUniformLocation | null) => {
+        gl.uniform3f(uu("uLO"), O[0], O[1], O[2]);
+        gl.uniform1f(uu("uLAE"), lAE); gl.uniform1f(uu("uLAM"), lAM);
+        gl.uniform1f(uu("uLWedge"), wedge); gl.uniform1f(uu("uLGain"), lGain);
+        gl.uniformMatrix4fv(uu("uLVP"), false, lvp);
+        gl.uniform1f(uu("uShadowOn"), shadowOn ? 1 : 0); gl.uniform1f(uu("uLFar"), L_FAR);
+        gl.uniform1f(uu("uShadowTx"), 1 / objs.shadowSize);
+        gl.uniform1i(uu("uShadow"), 3);
+      };
+
+      // the prism's own picture
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.disableVertexAttribArray(1);
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, objs.shadowTex);
+      setLight(u);
       gl.uniform2f(u("uRes"), canvas.width, canvas.height);
-      f1("uTime", frozen ? 20 + (dbgT as number) : (now - t0) / 1000);
+      f1("uTime", tSec);
       v3("uCamPos", cam.pos); v3("uCamF", cam.f); v3("uCamR", cam.r); v3("uCamU", cam.u);
       f1("uFocal", cam.focal);
       f2("uShift", cam.shift[0], cam.shift[1]);
@@ -480,17 +646,40 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uTopSoft", 70 * cpx);
       f1("uIB", iB); f1("uBeamF", beamF); f1("uIG", iG); f1("uIForm", iForm);
       f1("uIF", iF * kept); f1("uFront", front); f1("uIP", iP * kept);
-      f1("uSpecW", st.spec); f1("uProjW", st.proj); f1("uProjK", st.k);
-      // how wide our light spreads on the floor: the pointer's x opens it a little
-      f1("uWedge", 0.2 + 0.06 * (px + 1));
+      f1("uSpecW", st.spec);
+      // the haze our light lights in the air (fainter for the spectrum, whose fan already draws itself)
+      f1("uAirCone", off.air ? 0 : (0.055 - 0.035 * st.spec) * S.haze);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      mark();
+
+      // the things, mirrored in the floor and then themselves, in the same light
+      if (objs.ok && items.length) {
+        const vp = camClip(cam.pos, cam.f, cam.r, cam.u, cam.focal, cam.shift, A);
+        const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
+        objs.draw(items, vp, (lp) => {
+          const uu = (n: string) => objs.u(lp, n);
+          setLight(uu);
+          cols.forEach((c, i) => gl.uniform3f(uu(`uS${i}`), c[0], c[1], c[2]));
+          gl.uniform3f(uu("uCamPos"), cam.pos[0], cam.pos[1], cam.pos[2]);
+          gl.uniform2f(uu("uRes"), canvas.width, canvas.height);
+          gl.uniform1f(uu("uTopY"), ruleY > 0 ? (Hs - ruleY - 28) * cpx : 1e5);
+          gl.uniform1f(uu("uTopSoft"), 70 * cpx);
+          gl.uniform1f(uu("uGain"), S.gain); gl.uniform1f(uu("uGrain"), 0.03); gl.uniform1f(uu("uTime"), tSec);
+        }, canvas.width, canvas.height);
+      }
+      mark();
+      if (prof) window.__stPrismProf = prof.marks;
     };
 
     let lastKey = "";
     const loop = (now: number) => {
       // debug clock frozen: draw only when what is shown changes (keeps headless captures responsive)
       const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
-      if (!key || key !== lastKey) draw(now);
+      if (!key || key !== lastKey) {
+        const tq = performance.now();
+        draw(now);
+        if (import.meta.env.DEV && window.__stPrismTime) { const px1 = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px1); window.__stPrismTime.push(performance.now() - tq); }
+      }
       lastKey = key;
       raf = running ? requestAnimationFrame(loop) : 0;
     };
@@ -535,6 +724,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       ro.disconnect(); io.disconnect();
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", sync);
+      alive = false;
+      objs.dispose();
       gl.deleteTexture(tex);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
       canvas.remove();
