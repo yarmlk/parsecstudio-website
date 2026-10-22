@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
 import { easeMove } from "../lib/ease";
-import { CONTACT, REVIEWS } from "../lib/facts";
+import { CONTACT } from "../lib/facts";
 import { AiFlux } from "../ui/AiFlux";
 import { CutProgress } from "../ui/Cut";
 import { Icon } from "../ui/Icons";
 import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, type Case, type Rect } from "./cases";
 import { LogoGrid } from "./clients";
+import { ReviewColumns } from "./reviews";
 import { CutLine, useCutTrack, useReduced } from "./ui";
 import { ContactForm } from "./contact";
 import { SvcStage } from "./svc/SvcStage";
@@ -138,7 +139,6 @@ export function Site({
   const root = useRef<HTMLDivElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const row = useRef<HTMLDivElement | null>(null);
-  const reviewsRef = useRef<HTMLDivElement | null>(null);
   const [sec, setSec] = useState<SecId>("hero");
   const [scrolled, setScrolled] = useState(false);
   const [navOn, setNavOn] = useState(-1);
@@ -207,7 +207,6 @@ export function Site({
     startCase != null ? { list: CASES, i: startCase, from: null, src: "row" } : null,
   );
   const [rowHover, setRowHover] = useState<number | null>(null);
-  const [rev, setRev] = useState(0);
   const lock = useRef(0);
 
   /* site-local rect of an element (the site may be scaled inside a frame) */
@@ -348,13 +347,6 @@ export function Site({
     });
   };
 
-  /* reviews: one line cut in four; the light runs along the current piece for 8 s, then the next review comes.
-     Pauses on hover and focus. */
-  const [pause, setPause] = useState(false);
-  const revW = desk ? 640 : 330;
-  const revMax = desk ? REVIEWS.length - 2 : REVIEWS.length - 1;
-  const revShift = Math.min(rev, revMax) * revW;
-
   const svcOn = svcHover ?? Math.max(0, svc);
 
   return (
@@ -483,48 +475,10 @@ export function Site({
           <LogoGrid logos={LOGOS} widths={LOGO_W} />
         </section>
 
-        {/* 05 reviews */}
-        <section
-          data-sec="reviews"
-          className="st-sec st-reviews"
-          onPointerEnter={() => setPause(true)}
-          onPointerLeave={() => setPause(false)}
-          onFocus={() => setPause(true)}
-          onBlur={() => setPause(false)}
-        >
-          <Head label="In their words" title="Reviews">
-            <div className="st-rowctl" data-own-keys="">
-              <div className={`st-revbar${pause || reduced ? " is-paused" : ""}`} role="tablist" aria-label="Reviews">
-                {REVIEWS.map((r, i) => (
-                  <button
-                    key={r.client}
-                    type="button"
-                    role="tab"
-                    aria-selected={i === rev}
-                    aria-label={`${r.client} review`}
-                    className={`st-revbar__seg${i === rev ? " is-on" : i < rev ? " is-done" : ""}`}
-                    onClick={() => setRev(i)}
-                  >
-                    {i === rev && <i key={`run-${rev}`} className="st-revbar__run" onAnimationEnd={() => setRev((x) => (x + 1) % REVIEWS.length)} />}
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="st-round" onClick={() => setRev((r) => (r + REVIEWS.length - 1) % REVIEWS.length)} aria-label="Previous review"><Icon name="arrow-left" size={16} /></button>
-              <button type="button" className="st-round" onClick={() => setRev((r) => (r + 1) % REVIEWS.length)} aria-label="Next review"><Icon name="arrow-right" size={16} /></button>
-            </div>
-          </Head>
-          <div className="st-rev" ref={reviewsRef}>
-            <div className="st-rev__track" style={{ transform: `translate3d(${-revShift}px, 0, 0)` }}>
-              {REVIEWS.map((r, i) => (
-                <figure key={r.client} className={`st-quote${i === rev ? " is-on" : ""}`} aria-hidden={desk ? i < Math.min(rev, revMax) || i > Math.min(rev, revMax) + 1 : i !== rev}>
-                  <blockquote>{r.text.map((p, k) => <p key={k}>{p}</p>)}</blockquote>
-                  <figcaption>
-                    <img src={r.logo} alt={r.client} />
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          </div>
+        {/* 05 reviews: the head on the left, two columns of cards drifting past each other on the right (reviews.tsx) */}
+        <section data-sec="reviews" className="st-sec st-reviews">
+          <Head label="In their words" title="Reviews" />
+          <ReviewColumns mode={mode} />
         </section>
 
         {/* 06 contact: the head on the left, the form as one frosted plate over the Horizon light; a quiet footer */}

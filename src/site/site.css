@@ -324,30 +324,38 @@
   box-shadow: inset 0 1px 0 rgba(255, 236, 204, .5), inset 0 -60px 80px -50px rgba(246, 190, 120, .24);
 }
 
-/* 05 reviews: verbatim, in the quote face */
-.st-revbar { display: flex; gap: 4px; width: 200px; margin-right: 14px; }
-.st-revbar__seg { position: relative; flex: 1 1 0; height: 22px; }
-.st-revbar__seg::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(242, 240, 235, .2); transition: background var(--t-button) var(--ease-enter); }
-.st-revbar__seg:hover::before { background: rgba(242, 240, 235, .45); }
-.st-revbar__seg.is-done::before { background: rgba(242, 240, 235, .55); }
-.st-revbar__run { position: absolute; left: 0; top: 50%; width: 100%; height: 2px; margin-top: -.5px; border-radius: 2px; transform-origin: 0 50%;
-  background: linear-gradient(90deg, rgba(246, 200, 140, .35), var(--ember) 80%, var(--light-core)); box-shadow: 0 0 8px 1px rgba(246, 200, 140, .5);
-  animation: st-run 8000ms linear both; }
-.st-revbar.is-paused .st-revbar__run { animation-play-state: paused; }
-@keyframes st-run { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@media (prefers-reduced-motion: reduce) { .st-revbar__run { animation: none; } }
-.st-rev { position: relative; z-index: 1; margin-right: -72px; overflow: hidden; padding-bottom: 40px; margin-bottom: -40px; }
-.st-rev__track { display: flex; gap: 20px; transition: transform 760ms var(--ease-move); }
-.st-quote {
-  flex: none; width: 620px; margin: 0; padding: 36px 40px 30px; border-radius: 22px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
-  background: var(--glass-fill); box-shadow: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
-  transition: background var(--t-panel) var(--ease-enter), box-shadow var(--t-panel) var(--ease-enter);
+/* 05 reviews (reviews.tsx): verbatim, in the quote face. The head on the left; on the right two columns run the
+   full height of the section, faded in at the top and out at the bottom. The cards are glass without the blur:
+   they move over plain black, where the blur would show nothing and cost a frame. .st-quote__lit (its opacity
+   set per frame) is the light a card catches as it passes the middle. */
+.st-reviews { display: grid; grid-template-columns: minmax(0, 1fr) 780px; column-gap: 40px; align-items: start; }
+.st-reviews .st-head { grid-column: 1; grid-row: 1; margin-bottom: 0; }
+.st-rev {
+  grid-column: 2; grid-row: 1; position: relative; z-index: 1; height: 802px; margin: -116px 0 -72px; overflow: hidden;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; align-items: start;
+  --st-rev-fade: linear-gradient(180deg, transparent 0%, #000 21%, #000 79%, transparent 100%);
+  -webkit-mask-image: var(--st-rev-fade); mask-image: var(--st-rev-fade);
 }
-.st-quote.is-on { background: var(--glass-active-fill); box-shadow: var(--glass-active); }
-.st-quote blockquote { margin: 0; display: flex; flex-direction: column; gap: 12px; }
-.st-quote p { margin: 0; font-family: var(--font-quote); font-style: italic; font-weight: 400; font-size: 25px; line-height: 1.3; color: #e8e4dc; text-wrap: pretty; }
-.st-quote figcaption { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.st-quote figcaption img { height: 42px; width: auto; }
+.st-rev:focus-visible { outline-offset: -2px; }
+.st-rev__col { min-width: 0; }
+.st-rev__track { position: relative; will-change: transform; }
+.st-rev__set { display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px; }
+.st-quote {
+  position: relative; margin: 0; padding: 32px 32px 28px; border-radius: 22px; display: flex; flex-direction: column; gap: 36px;
+  background: var(--glass-fill); box-shadow: var(--glass-edge);
+}
+.st-quote__lit {
+  position: absolute; inset: 0; border-radius: inherit; opacity: 0; pointer-events: none; will-change: opacity;
+  background: linear-gradient(180deg, rgba(242, 240, 235, .045), rgba(242, 240, 235, 0) 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 204, .45), inset 0 0 0 1px rgba(255, 255, 255, .03), inset 0 -60px 80px -40px rgba(243, 190, 120, .26);
+}
+.st-quote blockquote { position: relative; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.st-quote p { margin: 0; font-family: var(--font-quote); font-style: italic; font-weight: 400; font-size: 22px; line-height: 1.3; color: #e8e4dc; text-wrap: pretty; }
+.st-quote figcaption { position: relative; display: flex; align-items: center; gap: 16px; }
+.st-quote figcaption img { height: 36px; width: auto; }
+/* reduced motion: nothing moves, every card in view */
+.st-rev.is-still { height: auto; margin: 0; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+.st-rev.is-still .st-quote__lit { display: none; }
 
 /* 06 contact: the head on the left, the form as one frosted plate on the right; the Horizon light runs behind the
    glass. A quiet footer closes the page (the lockup, the address, the year). */
@@ -570,12 +578,14 @@
 .st-site--mob .st-clients__plate { top: 200px; bottom: 0; }
 .st-site--mob .st-logos { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 8px; --k: .3; }
 .st-site--mob .st-logo { border-radius: 16px; }
-.st-site--mob .st-rev { margin-right: -20px; }
-.st-site--mob .st-rev__track { gap: 10px; }
-.st-site--mob .st-quote { width: 320px; padding: 24px 22px 20px; gap: 28px; }
+.st-site--mob .st-reviews { display: block; padding-bottom: 24px; }
+.st-site--mob .st-reviews .st-head { margin-bottom: 14px; }
+.st-site--mob .st-rev { height: 620px; margin: 0 -20px; padding: 0 20px; grid-template-columns: minmax(0, 1fr); --st-rev-fade: linear-gradient(180deg, transparent 0%, #000 17%, #000 80%, transparent 100%); }
+.st-site--mob .st-rev.is-still { height: auto; margin: 14px 0 0; padding: 0; }
+.st-site--mob .st-rev__set { gap: 12px; padding-bottom: 12px; }
+.st-site--mob .st-quote { padding: 24px 22px 20px; gap: 28px; }
 .st-site--mob .st-quote p { font-size: 19.5px; line-height: 1.32; }
 .st-site--mob .st-quote figcaption img { height: 34px; }
-.st-site--mob .st-revbar { width: 132px; margin-right: 8px; }
 .st-site--mob .st-contact { padding-bottom: 0; }
 .st-site--mob .st-contact__plate img { object-position: 50% 100%; }
 .st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 32px; }
