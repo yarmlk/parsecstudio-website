@@ -335,39 +335,117 @@
 .st-quote figcaption { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .st-quote figcaption img { height: 42px; width: auto; }
 
-/* 06 contact (the address and the form) + a minimal footer over the Horizon plate */
-.st-contact { padding-bottom: 120px; }
+/* 06 contact: the head on the left, the form as one frosted plate on the right; the Horizon light runs behind the
+   glass. A quiet footer closes the page (the lockup, the address, the year). */
+.st-contact { display: flex; flex-direction: column; padding-bottom: 0; }
 .st-contact__plate { position: absolute; inset: 0; z-index: 0; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%); mask-image: linear-gradient(180deg, transparent 0%, #000 16%); }
 .st-contact__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; }
-.st-contact__in { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; align-items: stretch; }
-/* two columns: the address on the left, the form on the right */
-.st-contact__l { grid-column: 1 / span 6; display: flex; flex-direction: column; padding: 2px 0 4px; }
-.st-contact__top { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
-.st-contact__mail { font-family: var(--font-display); font-size: 40px; line-height: 1.2; color: var(--paper); transition: color var(--t-button) var(--ease-enter); }
-.st-contact__mail:hover { color: var(--ember-text); }
-.st-form {
-  grid-column: 8 / span 5; padding: 24px; border-radius: 22px; display: flex; flex-direction: column; gap: 12px;
-  background: rgba(242, 240, 235, .06); box-shadow: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+.st-contact__in { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 760px; column-gap: 64px; align-items: start; }
+.st-contact__l { display: flex; flex-direction: column; align-items: flex-start; }
+.st-contact__l .st-head { margin-bottom: 0; }
+.st-contact__p { margin: 40px 0 0; font-size: 16px; line-height: 1.6; color: var(--fog); text-wrap: pretty; }
+
+/* the plate: brand glass, a little brighter at the top; it warms from below while you write, and lights up once sent */
+.st-cf {
+  position: relative; padding: 36px 40px; border-radius: var(--r-xl);
+  background: linear-gradient(180deg, rgba(242, 240, 235, .085), rgba(242, 240, 235, .045) 46%, rgba(242, 240, 235, .055));
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+  -webkit-backdrop-filter: blur(34px) saturate(1.3); backdrop-filter: blur(34px) saturate(1.3);
 }
-.st-field { display: flex; flex-direction: column; gap: 8px; }
-.st-field__l { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--ash); }
-.st-field input, .st-field textarea {
-  width: 100%; height: 46px; padding: 0 16px; border: 0; border-radius: 14px; outline: none; resize: none;
-  background: rgba(242, 240, 235, .05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
-  color: var(--paper); font-size: 14.5px; font-weight: 300; line-height: 1.5;
-  transition: box-shadow var(--t-button) var(--ease-enter), background-color var(--t-button) var(--ease-enter);
+.st-cf::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: radial-gradient(70% 60% at 50% 115%, rgba(246, 190, 120, .26), rgba(246, 190, 120, 0) 72%);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 204, .42);
+  transition: opacity 900ms var(--ease-enter);
 }
-.st-field textarea { height: 92px; padding: 13px 16px; }
-.st-field input:focus, .st-field textarea:focus { background: rgba(242, 240, 235, .07); box-shadow: inset 0 0 0 1px rgba(157, 176, 194, .5), inset 0 1px 0 rgba(157, 176, 194, .6); }
-.st-field ::placeholder { color: var(--mute); }
-.st-form__row { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 4px; }
-.st-form--sent { align-items: flex-start; justify-content: center; gap: 10px; min-height: 380px; animation: st-fade 500ms var(--ease-enter) both; }
-.st-form__thanks { margin: 8px 0 0; font-family: var(--font-display); font-size: 34px; line-height: 1.1; }
-.st-form__note { margin: 0; color: var(--fog); }
-.st-form__mock { margin: 14px 0 6px; color: var(--mute); }
-.st-foot { position: absolute; z-index: 2; left: 72px; right: 72px; bottom: 0; height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.st-cf:focus-within::before { opacity: .55; }
+.st-cf.is-sent::before { opacity: 1; transition-duration: 1400ms; }
+.st-cf__form, .st-cf__sent { position: relative; }
+.st-cf__form { display: flex; flex-direction: column; gap: 28px; }
+
+/* what it's about: frosted chips; a chosen one takes the warm light */
+.st-cf__about { min-width: 0; margin: 0; padding: 0; border: 0; }
+.st-cf__legend, .st-cf__l { font-family: var(--font-mono); font-size: 10px; line-height: 14px; font-weight: 400; letter-spacing: .16em; text-transform: uppercase; color: var(--ash); }
+.st-cf__legend { padding: 0; margin-bottom: 14px; }
+.st-cf__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.st-cf__chip {
+  position: relative; display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: var(--r-pill);
+  font-size: 13.5px; font-weight: 400; color: var(--fog); white-space: nowrap; cursor: pointer; user-select: none;
+  background: rgba(242, 240, 235, .05); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .3), inset 0 0 0 1px rgba(255, 255, 255, .07);
+  transition: background-color var(--t-panel) var(--ease-enter), box-shadow var(--t-panel) var(--ease-enter), color var(--t-panel) var(--ease-enter);
+}
+.st-cf__chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.st-cf__chip:hover { color: var(--paper); background: rgba(242, 240, 235, .09); }
+.st-cf__chip:has(input:checked) {
+  color: var(--light-core); background: rgba(246, 200, 140, .1);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 204, .55), inset 0 0 0 1px rgba(246, 200, 140, .22), inset 0 -16px 22px -14px rgba(246, 190, 120, .5), 0 10px 28px -14px rgba(246, 190, 120, .55);
+}
+.st-site .st-cf__chip:has(input:focus-visible) { outline: 1.5px solid var(--frost); outline-offset: 3px; }
+
+/* fields: recessed wells in the glass, the label small inside; focus brings a soft warm light from below */
+.st-cf__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.st-cf__field {
+  position: relative; height: 64px; border-radius: 16px; cursor: text;
+  background: rgba(10, 10, 12, .34); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .055), inset 0 1px 2px rgba(0, 0, 0, .28);
+  transition: background-color var(--t-panel) var(--ease-enter);
+}
+.st-cf__field:nth-child(n + 3) { grid-column: 1 / -1; }
+.st-cf__field--area { height: 148px; }
+.st-cf__field::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: radial-gradient(80% 130% at 50% 135%, rgba(246, 190, 120, .26), rgba(246, 190, 120, 0) 72%);
+  box-shadow: inset 0 -1px 0 rgba(255, 236, 204, .32), inset 0 0 0 1px rgba(246, 200, 140, .07), 0 16px 40px -20px rgba(246, 190, 120, .6);
+  transition: opacity 420ms var(--ease-enter);
+}
+.st-cf__field:hover { background: rgba(14, 14, 17, .4); }
+.st-cf__field:focus-within { background: rgba(18, 17, 18, .42); }
+.st-cf__field:focus-within::after { opacity: 1; }
+.st-cf__field input, .st-cf__field textarea {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: inherit; outline: none; resize: none;
+  padding: 30px 18px 0; background: transparent; color: var(--paper); caret-color: var(--light-core);
+  font-size: 15px; font-weight: 400; line-height: 22px;
+}
+.st-cf__field textarea { padding: 34px 18px 14px; scrollbar-width: none; }
+.st-site .st-cf__field input:focus-visible, .st-site .st-cf__field textarea:focus-visible { outline: none; }
+.st-cf__field input:-webkit-autofill { -webkit-text-fill-color: var(--paper); caret-color: var(--light-core); transition: background-color 600000s 0s, color 600000s 0s; }
+.st-cf__top { position: absolute; left: 18px; right: 18px; top: 13px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; pointer-events: none; }
+.st-cf__l { flex: 1; display: flex; justify-content: space-between; gap: 16px; transition: color var(--t-panel) var(--ease-enter); }
+.st-cf__opt { color: var(--mute); }
+.st-cf__field:focus-within .st-cf__l { color: var(--ember-text); }
+.st-cf__err { flex: none; font-size: 12.5px; line-height: 14px; color: var(--ember-text); animation: st-fade 320ms var(--ease-enter) both; }
+.st-cf__field.is-bad::after { opacity: .6; }
+.st-cf__field.is-bad .st-cf__l { color: var(--ember-text); }
+
+/* send, and the address beside it */
+.st-cf__acts { display: flex; align-items: center; gap: 24px; }
+.st-cf__send { padding: 0 22px 0 26px; gap: 12px; transition: background-color var(--t-button) var(--ease-enter), box-shadow var(--t-panel) var(--ease-enter); }
+.st-cf__send svg { transition: transform var(--t-panel) var(--ease-move); }
+.st-cf__send:hover { box-shadow: 0 12px 40px -12px rgba(246, 200, 140, .55); }
+.st-cf__send:hover svg, .st-cf__send:focus-visible svg { transform: translateX(3px); }
+.st-cf__alt { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ash); }
+.st-cf__alt a, .st-cf__line a { color: var(--paper); transition: color var(--t-button) var(--ease-enter); }
+.st-cf__alt a:hover, .st-cf__line a:hover { color: var(--ember-text); }
+
+/* sent: the plate lights up; the thank-you in the middle, the honest note at the foot */
+.st-cf__sent { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; }
+.st-cf.is-sent { display: flex; flex-direction: column; }
+.st-cf.is-sent .st-cf__sent { flex: 1; }
+.st-cf__msg { margin: auto 0; padding-top: 40px; animation: st-rise 900ms var(--ease-enter) 120ms both; }
+.st-cf__thanks { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 52px; line-height: 1.04; letter-spacing: .004em; color: var(--paper); }
+.st-cf__thanks:focus { outline: none; }
+.st-cf__line { margin: 20px 0 0; font-size: 16px; line-height: 1.55; color: var(--fog); }
+.st-cf__note { display: flex; align-items: center; justify-content: space-between; gap: 24px; animation: st-fade 700ms var(--ease-enter) 500ms both; }
+.st-cf__mock { font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: .16em; text-transform: uppercase; color: var(--mute); }
+.st-cf__links { display: flex; align-items: center; gap: 24px; }
+.st-cf__link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 400; color: var(--fog); white-space: nowrap; transition: color var(--t-button) var(--ease-enter); }
+.st-cf__link:hover { color: var(--paper); }
+
+/* the footer: the lockup, the address, the year */
+.st-foot { position: relative; z-index: 2; flex: none; height: 96px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
 .st-foot__logo { height: 17px; width: auto; }
-.st-foot__c { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ash); white-space: nowrap; }
+.st-foot__mail { font-size: 13.5px; color: var(--fog); transition: color var(--t-button) var(--ease-enter); }
+.st-foot__mail:hover { color: var(--paper); }
+.st-foot__c { justify-self: end; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ash); white-space: nowrap; }
 
 /* a service, opened inside the site: head, real frames, what's inside (under the nav, over the page) */
 .st-sv { position: absolute; inset: 0; z-index: 15; background: var(--void); animation: st-fade 360ms var(--ease-enter) both; }
@@ -486,15 +564,31 @@
 .st-site--mob .st-revbar { width: 132px; margin-right: 8px; }
 .st-site--mob .st-contact { padding-bottom: 0; }
 .st-site--mob .st-contact__plate img { object-position: 50% 100%; }
-.st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 28px; }
-.st-site--mob .st-contact__l { display: contents; }
-.st-site--mob .st-contact__top { order: 0; }
-.st-site--mob .st-form { order: 1; }
-.st-site--mob .st-contact__mail { font-size: 24px; }
-.st-site--mob .st-form { width: 100%; padding: 20px; }
-.st-site--mob .st-form__row { flex-direction: column; align-items: stretch; }
-.st-site--mob .st-form--sent { min-height: 300px; }
-.st-site--mob .st-foot { position: relative; left: auto; right: auto; height: auto; margin: 0 -20px; padding: 56px 20px 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 32px; }
+.st-site--mob .st-contact__p { margin-top: 20px; font-size: 15px; }
+.st-site--mob .st-cf { padding: 24px 18px 20px; border-radius: 24px; }
+.st-site--mob .st-cf__form { gap: 24px; }
+.st-site--mob .st-cf__legend { margin-bottom: 12px; }
+.st-site--mob .st-cf__chip { height: 44px; padding: 0 17px; font-size: 13.5px; }
+.st-site--mob .st-cf__grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.st-site--mob .st-cf__field { height: 62px; border-radius: 14px; }
+.st-site--mob .st-cf__field--area { height: 150px; }
+.st-site--mob .st-cf__top { left: 16px; right: 16px; }
+.st-site--mob .st-cf__field input, .st-site--mob .st-cf__field textarea { padding-left: 16px; padding-right: 16px; font-size: 16px; }
+.st-site--mob .st-cf__acts { flex-direction: column; align-items: stretch; gap: 18px; }
+.st-site--mob .st-cf__send { height: 52px; }
+.st-site--mob .st-cf__alt { text-align: center; font-size: 13.5px; }
+.st-site--mob .st-cf.is-sent { min-height: 460px; }
+.st-site--mob .st-cf__msg { padding-top: 24px; }
+.st-site--mob .st-cf__thanks { font-size: 38px; }
+.st-site--mob .st-cf__line { margin-top: 14px; font-size: 15px; }
+.st-site--mob .st-cf__note { flex-direction: column; align-items: flex-start; gap: 14px; }
+.st-site--mob .st-cf__links { gap: 20px; }
+.st-site--mob .st-cf__link { min-height: 44px; }
+.st-site--mob .st-foot { height: auto; margin: 0; padding: 64px 0 48px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.st-site--mob .st-foot__logo { height: 15px; margin-bottom: 6px; }
+.st-site--mob .st-foot__mail { font-size: 15px; }
+.st-site--mob .st-foot__c { justify-self: auto; }
 .st-site--mob .st-sv__scroll { padding: 128px 20px 56px; }
 .st-site--mob .st-sv__head { flex-direction: column; align-items: flex-start; gap: 22px; margin-bottom: 26px; }
 .st-site--mob .st-sv__t .st-back { margin: 0 0 22px; }
