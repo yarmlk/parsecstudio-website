@@ -430,7 +430,9 @@ export function Site({
           )}
         </section>
 
-        {/* 02 services */}
+        {/* 02 services: one block on the left (the head, the rule, three names); the stage owns the centre and the
+            right. Each name ends well left of the centre so the light can leave it for the prism. The open arrow
+            follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
         <section data-sec="services" className="st-sec st-svc">
           <SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} />
           <Head label="From treatment to master" title="Services" />
@@ -447,13 +449,17 @@ export function Site({
                   onClick={() => setSvOpen(i)}
                   aria-label={`${s.name}. ${s.line} Open the service`}
                 >
-                  <span className="st-svc__main">
-                    <span className="st-svc__name">{s.name}</span>
-                    <span className="st-svc__line">{s.line}</span>
-                  </span>
-                  <span className="st-svc__aside" aria-hidden>
-                    {s.ai && <AiFlux form="line" className="st-svc__mark" />}
-                    <span className="st-svc__go"><Icon name="arrow-up-right" size={16} /></span>
+                  <span className="st-svc__name">{s.name}</span>
+                  <span className="st-svc__line">
+                    {s.line.slice(0, s.line.lastIndexOf(" ") + 1)}
+                    {/* the last word keeps the arrow with it if the line ever wraps */}
+                    <span className="st-svc__tail">
+                      {s.line.slice(s.line.lastIndexOf(" ") + 1)}
+                      <span className="st-svc__go" aria-hidden>
+                        {s.ai ? <AiFlux form="line" className="st-svc__shaft" /> : <span className="st-svc__shaft" />}
+                        <svg className="st-svc__head" width="12" height="14" viewBox="0 0 12 14"><path d="M3 1.5 9 7l-6 5.5" /></svg>
+                      </span>
+                    </span>
                   </span>
                 </button>
               </li>
