@@ -66,17 +66,14 @@ uniform float uFlare;    // the rim flares before it moves
 uniform float uClr;      // the glass clears: 0 smoked … 1 nothing between us and the film
 uniform float uFit;      // phone: from filling the frame to the whole film
 uniform float uTease;    // hover anticipation: 0 rest … 1 the rim warms up, the glass clears a little
-uniform sampler2D uHaloN, uHaloW, uHaloF; // the film's light blurred: near (≈ 1/50 of the frame), wide (≈ 1/12),
-                                           // far (≈ 1/3, what the eye adapts to); √-encoded
-uniform float uLook;     // the glass: 0 lit (A, production) … 1 ember (B, dev only)
+uniform sampler2D uHaloN, uHaloW;  // the film's light blurred: near (≈ 1/50 of the frame), wide (≈ 1/12); √-encoded
 uniform vec3 uLens;      // the pointer's window of clearer glass: its centre (screen hero units) and strength
 /* the same 3500 K source seen through haze: scattering leaves it a little deeper */
 #define HZ mix(uWarm, uDeep, 0.62)
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /* shared by the scene functions and main(). The film through the glass is kept apart from the light (gFilm), so the
    light's shoulder never squashes the film's own highlights. */
-vec2 gUV; float gAsp; float gGlass; vec3 gFilm, gHaloN, gHaloW, gAdapt; float gLens;
+vec2 gUV; float gAsp; float gGlass; vec3 gFilm; float gLens;
 
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.xx + p3.yz) * p3.zy); }
@@ -136,19 +133,12 @@ vec3 reel(){
   vec2 pq = s / uRes;
   vec2 e = smoothstep(-pq, pq, q) * smoothstep(-pq, pq, 1.0 - q);
   float m = e.x * e.y;
-  vec3 hn = texture2D(uHaloN, q).rgb, hw = texture2D(uHaloW, q).rgb, hf = texture2D(uHaloF, q).rgb;
-  gHaloN = hn * hn * m; gHaloW = hw * hw * m; gAdapt = hf * hf * m;
+  vec3 hn = texture2D(uHaloN, q).rgb;
   // behind the glass a light, clean blur (half the sharp frame, half its near blur); clear once the glass has gone
   c = mix(c, hn * hn, 0.45 * (1.0 - uClr));
   return mix(VOIDL, c, m);
 }
-/* The film seen through the dark glass. The glass sinks the film's darks and mids (a toe) and lets its light through
-   with its colour (a light desaturation, a neutral tint, never cold). The eye adapts to the glass: a large bright
-   field sinks back into it while its detail and its small lights stay, so a white frame never turns the disc into a
-   grey slab. Only the film's lights bloom into the glass: what shines brighter than its surroundings spills its
-   blurred light around it (warm, like halation on film), so dark detail inside a bright frame stays crisp.
-   Under the pointer's lens the glass all but goes: the toe, the adaptation and the desaturation ease off.
-   T: the glass's transmission here. */
+/* The film seen through the dark glass. T: the glass's transmission here. */
 vec3 glass(vec3 R, float T){
   // clean glass: the film as it is (no toe, no tint, no glow), only a little light lost in it
   return R * T;
@@ -377,7 +367,7 @@ void main(){
   vec2 fc = gl_FragCoord.xy;
   vec2 uv = fc / uRes;
   float aspect = uRes.x / uRes.y;
-  gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0); gHaloN = vec3(0.0); gHaloW = vec3(0.0); gAdapt = vec3(0.0);
+  gUV = uv; gAsp = aspect; gGlass = 0.0; gFilm = vec3(0.0);
   vec2 p = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
   // the lens sits on the screen, where the pointer is: a soft round window
   // a soft clearing, not a spotlight: wide falloff, never all the way
@@ -444,9 +434,9 @@ void main(){
   c += (L(uv + s * uOff.w) + L(uv - s * uOff.w)) * uW.w;
   gl_FragColor = vec4(sqrt(c), 1.0);
 }`;
-/** the film's light at three scales (target px; the gaussian's sigma is 2.2 of their texels): the halation near
-    (≈ 1/50 of the frame) and wide (≈ 1/12), and far (≈ 1/3), what the eye adapts to */
-const HALO = { near: [192, 108], wide: [48, 27], far: [12, 7], sigma: 2.2 } as const;
+/** the film's light at two scales (target px; the gaussian's sigma is 2.2 of their texels): near (≈ 1/50 of the
+    frame), the glass's diffusion, and wide (≈ 1/12) */
+const HALO = { near: [192, 108], wide: [48, 27], sigma: 2.2 } as const;
 /** a 17-tap gaussian as a centre tap and four bilinear pairs a side */
 function gauss(sigma: number) {
   const w = Array.from({ length: 9 }, (_, i) => Math.exp(-(i * i) / (2 * sigma * sigma)));
@@ -485,13 +475,6 @@ const UP_MS: Record<Mode, number> = { desk: 1500, mob: 1400 };
 const DROP: Record<Mode, number> = { desk: 1.05, mob: 0.95 };   // hero units: the rim and its haze leave the frame
 /** the words go a little before the light reaches them, over this soft edge (px) */
 const WIPE = { desk: { lead: 12, soft: 64 }, mob: { lead: 10, soft: 48 } } as const;
-/** dev only: the glass look to compare, "a" lit glass (production) or "b" ember glass (window.__hlbGlass, ?glass=) */
-const GLASS_Q = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("glass") : null;
-const glassLook = () => {
-  if (!import.meta.env.DEV) return 0;
-  const g = (window as unknown as { __hlbGlass?: string }).__hlbGlass ?? GLASS_Q;
-  return g === "b" ? 1 : 0;
-};
 
 interface Tw { a: number; b: number; t0: number; ms: number; e: (x: number) => number }
 const tw = (a: number, b: number, ms: number, e: (x: number) => number, t0: number): Tw => ({ a, b, t0, ms, e });
@@ -856,8 +839,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         res: U("uRes"), time: U("uTime"), mob: U("uMob"), hot: U("uHot"), ign: U("uIgn"), span: U("uSpan"), push: U("uPush"),
         scroll: U("uScroll"), unit: U("uUnit"), cam: U("uCam"), warm: U("uWarm"), core: U("uCore"), deep: U("uDeep"),
         reel: U("uReel"), reelA: U("uReelA"), reelAsp: U("uReelAsp"), k: U("uK"), drop: U("uDrop"), flare: U("uFlare"),
-        clr: U("uClr"), fit: U("uFit"), tease: U("uTease"), haloN: U("uHaloN"), haloW: U("uHaloW"), haloF: U("uHaloF"),
-        look: U("uLook"), lens: U("uLens"),
+        clr: U("uClr"), fit: U("uFit"), tease: U("uTease"), haloN: U("uHaloN"), haloW: U("uHaloW"),
+        lens: U("uLens"),
       };
       gl.uniform3f(u.warm, WARM[0], WARM[1], WARM[2]);
       gl.uniform3f(u.core, CORE[0], CORE[1], CORE[2]);
@@ -866,9 +849,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       gl.uniform1f(u.reelAsp, 16 / 9);
       gl.uniform1i(u.haloN, 1);
       gl.uniform1i(u.haloW, 2);
-      gl.uniform1i(u.haloF, 4);
 
-      /* the film's light: boxed down into three small targets and blurred there (units 1, 2 and 4 hold the results,
+      /* the film's light: boxed down into two small targets and blurred there (units 1 and 2 hold the results,
          unit 3 is the passes' scratch), redone only when a new frame of the film arrives */
       const pDown = link(DOWN), pBlur = link(BLUR);
       const target = (w: number, h: number, unit: number) => {
@@ -886,10 +868,10 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
         return { t, fb, w, h, ok };
       };
-      const nA = target(HALO.near[0], HALO.near[1], 1), wA = target(HALO.wide[0], HALO.wide[1], 2), fA = target(HALO.far[0], HALO.far[1], 4);
-      const nB = target(HALO.near[0], HALO.near[1], 3), wB = target(HALO.wide[0], HALO.wide[1], 3), fB = target(HALO.far[0], HALO.far[1], 3);
+      const nA = target(HALO.near[0], HALO.near[1], 1), wA = target(HALO.wide[0], HALO.wide[1], 2);
+      const nB = target(HALO.near[0], HALO.near[1], 3), wB = target(HALO.wide[0], HALO.wide[1], 3);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      const haloOk = !!pDown && !!pBlur && [nA, wA, fA, nB, wB, fB].every((t) => t.ok);
+      const haloOk = !!pDown && !!pBlur && [nA, wA, nB, wB].every((t) => t.ok);
       const G = gauss(HALO.sigma);
       const dU = pDown ? { src: gl.getUniformLocation(pDown, "uSrc"), size: gl.getUniformLocation(pDown, "uSize"), srgb: gl.getUniformLocation(pDown, "uSrgb") } : null;
       const bU = pBlur ? { src: gl.getUniformLocation(pBlur, "uSrc"), size: gl.getUniformLocation(pBlur, "uSize"), dir: gl.getUniformLocation(pBlur, "uDir") } : null;
@@ -936,7 +918,6 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         };
         down(tex, nA, 1); blur2(nA, nB);
         down(nA.t, wA, 0); blur2(wA, wB);
-        down(wA.t, fA, 0); blur2(fA, fB);
         // back to the frame
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.activeTexture(gl.TEXTURE0);
@@ -1047,7 +1028,6 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         const drop = DROP[mode] * R.k;
         st.zoom = 1 + 0.03 * push; st.drop = drop; st.drawn = true;
         gl.uniform2f(u.res, canvas.width, canvas.height);
-        gl.uniform1f(u.look, glassLook());
         // dev only: pin the tease (window.__hlbTease = 0..1) and the lens (window.__hlbLens = { x, y, s }, section px)
         let tease = st.tease, lx = st.lx, ly = st.ly, ls = st.ls;
         if (import.meta.env.DEV) {
