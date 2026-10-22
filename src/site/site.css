@@ -112,13 +112,37 @@
 .st-hero__plate { position: absolute; inset: 0; animation: st-push 12s var(--ease-move) both; }
 .st-hero__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; transition: transform 1400ms var(--ease-enter); }
 .st-hero__shade { position: absolute; inset: 0; z-index: 31; pointer-events: none; background: linear-gradient(180deg, rgba(11, 11, 13, 0) 42%, rgba(11, 11, 13, .82) 100%); transition: opacity 900ms var(--ease-enter) 200ms; }
-.st-hero__in { position: absolute; z-index: 32; left: 72px; bottom: 120px; width: 760px; display: flex; flex-direction: column; gap: 26px; }
+.st-hero__in { position: absolute; z-index: 32; left: 72px; bottom: 120px; width: 1020px; display: flex; flex-direction: column; gap: 30px; }
 .st-hero__in > * { animation: st-rise 900ms var(--ease-enter) backwards; }
 .st-hero__in > :nth-child(1) { animation-delay: 300ms; }
 .st-hero__in > :nth-child(2) { animation-delay: 420ms; }
 .st-hero__in > :nth-child(3) { animation-delay: 560ms; }
 .st-hero__h { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 64px; line-height: 1.04; letter-spacing: .004em; }
-.st-hero__acts { display: flex; gap: 10px; }
+.st-hero__acts { display: flex; align-items: center; gap: 10px; }
+/* "Selected works" (hero/WorksPill.tsx): a frosted capsule with a window where the works pass by, one still after
+   another; on hover the window opens wider and the capsule's edge catches the warm light */
+.wp { position: relative; display: inline-flex; align-items: center; gap: 16px; height: 60px; padding: 6px 12px 6px 6px; border-radius: 999px;
+  color: var(--paper); font-size: 15px; font-weight: 500; letter-spacing: .005em; background: rgba(242, 240, 235, .07);
+  -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 0 0 1px rgba(255, 255, 255, .08), 0 24px 48px -28px rgba(0, 0, 0, .8);
+  transition: background var(--t-button) var(--ease-enter), box-shadow var(--t-panel) var(--ease-enter); }
+.wp__win { position: relative; flex: none; width: 84px; height: 48px; border-radius: 999px; overflow: hidden; background: #111113; transition: width 600ms var(--ease-enter); }
+.wp__win img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(1.1);
+  transition: opacity 900ms var(--ease-move), transform 3600ms linear; }
+.wp__win img.is-on { opacity: 1; transform: scale(1); }
+.wp__win::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), inset 0 1px 0 rgba(255, 255, 255, .18), inset 0 -12px 18px -12px rgba(0, 0, 0, .55); }
+.wp__go { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: var(--paper);
+  background: rgba(242, 240, 235, .1); transition: transform var(--t-button) var(--ease-enter), background var(--t-button) var(--ease-enter), color var(--t-button) var(--ease-enter); }
+.wp:focus-visible { outline: none; box-shadow: inset 0 1px 0 rgba(255, 236, 204, .5), inset 0 0 0 1px rgba(246, 200, 140, .6), 0 0 0 3px rgba(246, 200, 140, .22); }
+@media (hover: hover) {
+  .wp:hover { background: rgba(242, 240, 235, .11); box-shadow: inset 0 1px 0 rgba(255, 236, 204, .45), inset 0 0 0 1px rgba(255, 255, 255, .1),
+    inset 0 -18px 30px -22px rgba(246, 190, 120, .45), 0 30px 60px -30px rgba(246, 190, 120, .3); }
+  .wp:hover .wp__win { width: 116px; }
+  .wp:hover .wp__go { transform: translateX(3px); background: var(--paper); color: #0b0b0d; }
+}
+.wp:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .wp__win img { transition: none; } .wp__win { transition: none; } }
 /* the rail: one hairline, the proof on the left, six client marks on the grid */
 .st-hero__rail { position: absolute; z-index: 32; left: 72px; right: 72px; bottom: 0; height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 48px;
   border-top: 1px solid rgba(242, 240, 235, .12); animation: st-fade 900ms var(--ease-enter) 700ms backwards; }
@@ -550,6 +574,9 @@
 .st-site--mob .st-hero__plate img { object-position: 50% 74%; }
 .st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 56px; width: auto; gap: 16px; }
 .st-site--mob .st-hero__h { font-size: 38px; line-height: 1.08; }
+.st-site--mob .wp { height: 54px; gap: 12px; font-size: 14px; }
+.st-site--mob .wp__win { width: 72px; height: 42px; }
+.st-site--mob .wp__go { width: 32px; height: 32px; }
 .st-site--mob .st-hero__acts { flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .st-site--mob .st-pill--lg { height: 46px; padding: 0 20px; font-size: 14px; }
 .st-site--mob .st-sec { min-height: 0; padding: 136px 20px 80px; }

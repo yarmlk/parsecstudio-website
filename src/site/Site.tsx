@@ -14,6 +14,7 @@ import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
+import { WorksPill } from "./hero/WorksPill";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -357,9 +358,9 @@ export function Site({
           <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} />
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
-            <h1 className="st-hero__h" data-rim="">Director-led<br />video production.</h1>
+            <h1 className="st-hero__h" data-rim="">Director-led, AI{"\u2011"}enhanced{desk ? <br /> : " "}video production</h1>
             <div className="st-hero__acts" data-rim="">
-              <button type="button" className="st-pill st-pill--paper st-pill--lg" onClick={() => goTo("cases")}>Selected works</button>
+              <WorksPill onGo={() => goTo("cases")} />
               {reelDock && <ReelButton btnRef={reelBtn} onOpen={openReel} tease={tease} />}
             </div>
           </div>
