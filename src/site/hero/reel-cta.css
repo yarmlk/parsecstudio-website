@@ -1,22 +1,54 @@
-/* The showreel's controls (hero/ReelCta.tsx). All of them are the site's frost; the light under the disc is their only
-   warm source: hovered or focused they take the 3500 K edge on top and a soft glow from below. No effects on text. */
+/* The showreel's control (hero/ReelCta.tsx). The site's frost, a shade darker so it reads over any frame of the film;
+   the light under the disc is its only warm source: a warm lower edge, the play circle warms when it is active.
+   No effects on text. */
 
 .rc-play { display: block; flex: none; fill: currentColor; }
 .rc-time { font-family: var(--font-mono); font-size: 11px; line-height: 1; letter-spacing: .06em; color: var(--ash); font-variant-numeric: tabular-nums;
   transition: color var(--t-button) var(--ease-enter); }
+.rc-orb { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--paper);
+  background: rgba(242, 240, 235, .1); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .45), inset 0 0 0 1px rgba(255, 255, 255, .08);
+  transition: background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter), color var(--t-button) var(--ease-enter); }
+.rc-pill__l { display: block; }
 
-/* ── A, C: the pill under the headline ── */
+/* ── "Play showreel": on the pointer over the glass, on the light at rest. .rc-ride is the pill's top left, moved
+   by ReelCta; the pill itself only fades and scales (from its play circle, where the pointer is) ── */
+.rc-ride { position: absolute; z-index: 34; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+.rc-ride__btn {
+  position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 10px; height: 38px; padding: 0 15px 0 6px; border-radius: var(--r-pill);
+  font-size: 13px; font-weight: 400; line-height: 1; color: var(--paper); white-space: nowrap;
+  background: rgba(18, 18, 21, .34);
+  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .3), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(246, 200, 140, .26), 0 12px 30px -16px rgba(0, 0, 0, .7);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+  opacity: 0; transform: scale(.88); transform-origin: 19px 50%; pointer-events: none;
+  transition: opacity var(--t-button) var(--ease-enter), transform var(--t-button) var(--ease-enter), background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter);
+}
+.rc-ride__btn .rc-orb { width: 26px; height: 26px; }
+.rc-ride[data-show="follow"] .rc-ride__btn, .rc-ride[data-show="rest"] .rc-ride__btn { opacity: 1; transform: none; transition-duration: var(--t-panel); }
+/* on the light it is a button to tap or press; on the pointer it is the pointer, the glass under it takes the click */
+.rc-ride[data-show="rest"] .rc-ride__btn { pointer-events: auto; }
+.rc-ride.is-press .rc-ride__btn { transform: scale(.95); transition-duration: var(--t-chip); }
+/* active (on the pointer, focused, hovered): the warm edge on top, the light from below, the play circle warms */
+.rc-ride[data-show="follow"] .rc-ride__btn, .rc-ride__btn:focus-visible { background: rgba(18, 18, 21, .4);
+  box-shadow: inset 0 1px 0 rgba(246, 200, 140, .5), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(246, 200, 140, .4), inset 0 -16px 20px -14px rgba(243, 190, 120, .3), 0 12px 30px -16px rgba(0, 0, 0, .7); }
+.rc-ride[data-show="follow"] .rc-orb, .rc-ride__btn:focus-visible .rc-orb, .rc-pill:focus-visible .rc-orb { color: var(--light-core); background: rgba(246, 200, 140, .16); box-shadow: inset 0 1px 0 rgba(246, 200, 140, .6), inset 0 0 0 1px rgba(246, 200, 140, .18); }
+.rc-ride[data-show="follow"] .rc-time, .rc-ride__btn:focus-visible .rc-time { color: var(--fog); }
+@media (hover: hover) {
+  .rc-ride__btn:hover .rc-orb, .rc-pill:hover .rc-orb { color: var(--light-core); background: rgba(246, 200, 140, .16); box-shadow: inset 0 1px 0 rgba(246, 200, 140, .6), inset 0 0 0 1px rgba(246, 200, 140, .18); }
+  .rc-ride__btn:hover .rc-time { color: var(--fog); }
+}
+/* over the glass the pill is the pointer */
+.st-hero[data-glass="follow"], .st-hero[data-glass="follow"] * { cursor: none; }
+
+/* ── no light: the plain pill under the headline ── */
 .rc-pill {
-  position: relative; display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 22px 0 10px; border-radius: var(--r-pill);
+  position: relative; display: inline-flex; align-items: center; gap: 11px; height: 48px; padding: 0 22px 0 13px; border-radius: var(--r-pill);
   font-size: 14.5px; font-weight: 400; line-height: 1; color: var(--paper); white-space: nowrap;
   background: rgba(242, 240, 235, .08);
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .07), inset 0 -18px 24px -16px rgba(243, 190, 120, 0), 0 16px 34px -20px rgba(246, 200, 140, 0);
   -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
   transition: background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter);
 }
-.rc-pill__l { display: block; }
 .rc-pill .rc-time { margin-left: 2px; }
-/* frost-active: the warm edge on top, the light from below */
 .rc-pill:focus-visible { background: rgba(242, 240, 235, .11);
   box-shadow: inset 0 1px 0 rgba(246, 200, 140, .55), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -18px 24px -16px rgba(243, 190, 120, .34), 0 16px 34px -20px rgba(246, 200, 140, .3); }
 .rc-pill:focus-visible .rc-time { color: var(--fog); }
@@ -26,88 +58,9 @@
   .rc-pill:hover .rc-time { color: var(--fog); }
 }
 
-/* A: the lens, the film itself in a small round window */
-.rc-lens { position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; background: var(--graphite);
-  transition: transform var(--t-button) var(--ease-enter); }
-.rc-lens img, .rc-lens canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.rc-lens canvas { opacity: 0; transition: opacity var(--t-panel) var(--ease-enter); }
-.rc-lens.is-live canvas { opacity: 1; }
-/* a lens, not a sticker: darker at its edge, the steel rim on top, the glyph stays legible over a bright frame */
-.rc-lens::after { content: ""; position: absolute; inset: 0; border-radius: inherit;
-  background: radial-gradient(closest-side, rgba(11, 11, 13, .22), rgba(11, 11, 13, .38) 70%, rgba(11, 11, 13, .62));
-  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .5), inset 0 0 0 1px rgba(255, 255, 255, .1); }
-.rc-lens .rc-play { position: absolute; z-index: 1; left: 50%; top: 50%; margin: -5px 0 0 -5px; color: var(--paper); }
-.rc-pill--a:focus-visible .rc-lens { transform: scale(1.08); }
-@media (hover: hover) { .rc-pill--a:hover .rc-lens { transform: scale(1.08); } }
-
-/* C: a frost circle with the glyph, the name, a hairline, the length */
-.rc-pill--c { gap: 11px; padding-left: 13px; }
-.rc-orb { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--paper);
-  background: rgba(242, 240, 235, .1); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .45), inset 0 0 0 1px rgba(255, 255, 255, .08);
-  transition: background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter), color var(--t-button) var(--ease-enter); }
-.rc-pill__rule { flex: none; width: 1px; height: 14px; background: rgba(242, 240, 235, .16); }
-.rc-pill .rc-pill__rule + .rc-time { margin-left: 0; }
-.rc-pill--c:focus-visible .rc-orb, .rc-ride__btn:focus-visible .rc-orb { color: var(--light-core); background: rgba(246, 200, 140, .14); box-shadow: inset 0 1px 0 rgba(246, 200, 140, .6), inset 0 0 0 1px rgba(246, 200, 140, .16); }
-@media (hover: hover) {
-  .rc-pill--c:hover .rc-orb, .rc-ride__btn:hover .rc-orb { color: var(--light-core); background: rgba(246, 200, 140, .14); box-shadow: inset 0 1px 0 rgba(246, 200, 140, .6), inset 0 0 0 1px rgba(246, 200, 140, .16); }
-}
-
-/* ── B: the label that rides the light. .rc-ride is a point (its lower-left corner, eased along the hot spot); the
-   label stands on it, just above the strip ── */
-.rc-ride { position: absolute; z-index: 33; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
-.rc-ride__btn {
-  position: absolute; left: 0; bottom: 0; display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px 0 7px; border-radius: var(--r-pill);
-  font-size: 13.5px; font-weight: 400; line-height: 1; color: var(--paper); white-space: nowrap;
-  /* lit from below by the strip: a warm lower edge and a glow inside, the steel edge on top */
-  background: rgba(242, 240, 235, .08);
-  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .07), inset 0 -1px 0 rgba(246, 200, 140, .3), inset 0 -16px 20px -14px rgba(243, 190, 120, .22), 0 14px 30px -18px rgba(246, 200, 140, .16);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
-  opacity: 0; transform: translateY(6px);
-  transition: opacity var(--t-panel) var(--ease-enter), transform var(--t-panel) var(--ease-enter), background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter);
-}
-.rc-ride__btn .rc-orb { width: 26px; height: 26px; }
-.rc-ride.is-ready .rc-ride__btn { opacity: 1; transform: none; }
-/* the film is coming: it steps out of the light's way, quickly */
-.rc-ride.is-away .rc-ride__btn { opacity: 0; transform: translateY(4px); transition-duration: var(--t-button); pointer-events: none; }
-.rc-ride__btn:focus-visible { background: rgba(242, 240, 235, .11);
-  box-shadow: inset 0 1px 0 rgba(246, 200, 140, .55), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(246, 200, 140, .45), inset 0 -16px 20px -14px rgba(243, 190, 120, .4), 0 14px 30px -18px rgba(246, 200, 140, .32); }
-.rc-ride__btn:focus-visible .rc-time { color: var(--fog); }
-@media (hover: hover) {
-  .rc-ride__btn:hover { background: rgba(242, 240, 235, .11);
-    box-shadow: inset 0 1px 0 rgba(246, 200, 140, .55), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(246, 200, 140, .45), inset 0 -16px 20px -14px rgba(243, 190, 120, .4), 0 14px 30px -18px rgba(246, 200, 140, .32); }
-  .rc-ride__btn:hover .rc-time { color: var(--fog); }
-}
-.rc-ride--mob .rc-ride__btn { height: 38px; padding: 0 15px 0 6px; font-size: 13px; gap: 9px; }
-.rc-ride--mob .rc-ride__btn .rc-orb { width: 26px; height: 26px; }
-
-/* ── the glass as the play control: over it the pointer becomes the badge (A, C) or a hand (B) ── */
-.st-hero[data-glass="badge"], .st-hero[data-glass="badge"] * { cursor: none; }
-.st-hero[data-glass="hand"], .st-hero[data-glass="hand"] * { cursor: pointer; }
-.rc-cursor { position: absolute; z-index: 36; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform; --rc-warm: 0; }
-.rc-cursor__in {
-  position: absolute; left: -44px; top: -44px; width: 88px; height: 88px; border-radius: 50%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--paper);
-  background: rgba(242, 240, 235, .08);
-  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .4), inset 0 0 0 1px rgba(255, 255, 255, .07), 0 18px 40px -20px rgba(0, 0, 0, .75);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3); backdrop-filter: blur(24px) saturate(1.3);
-  opacity: 0; transform: scale(.72);
-  transition: opacity var(--t-button) var(--ease-enter), transform var(--t-button) var(--ease-enter);
-}
-/* the closer to the hot spot, the warmer its underside */
-.rc-cursor__in::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  box-shadow: inset 0 -1px 0 rgba(246, 200, 140, .4), inset 0 -26px 30px -22px rgba(243, 190, 120, .45); opacity: var(--rc-warm); }
-.rc-cursor.is-on .rc-cursor__in { opacity: 1; transform: scale(1); }
-.rc-cursor.is-on.is-press .rc-cursor__in { transform: scale(.94); transition-duration: var(--t-chip); }
-.rc-cursor__l { margin-top: 2px; font-size: 12px; font-weight: 400; line-height: 1; letter-spacing: .01em; }
-.rc-cursor .rc-time { font-size: 10px; }
-
 @media (prefers-reduced-motion: reduce) {
-  .rc-pill--a .rc-lens, .rc-pill--a:hover .rc-lens, .rc-pill--a:focus-visible .rc-lens { transform: none; }
-  .rc-cursor__in, .rc-cursor.is-on .rc-cursor__in, .rc-cursor.is-on.is-press .rc-cursor__in { transform: none; }
-  .rc-ride__btn, .rc-ride.is-ready .rc-ride__btn, .rc-ride.is-away .rc-ride__btn { transform: none; }
+  .rc-ride__btn, .rc-ride[data-show] .rc-ride__btn, .rc-ride.is-press .rc-ride__btn { transform: none; }
 }
 
 /* ── phone ── */
-.st-site--mob .rc-pill { height: 46px; font-size: 14px; padding-right: 20px; }
-.st-site--mob .rc-pill--a { padding-left: 9px; gap: 11px; }
-.st-site--mob .rc-pill--c { padding-left: 12px; gap: 10px; }
+.st-site--mob .rc-pill { height: 46px; font-size: 14px; padding: 0 20px 0 12px; gap: 10px; }

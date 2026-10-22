@@ -13,7 +13,7 @@ import { ContactForm } from "./contact";
 import { SvcStage } from "./svc/SvcStage";
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
-import { GlassPlay, ReelButton, RideLabel, useTease } from "./hero/ReelCta";
+import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
 
 /* parsec.studio, rebuilt in the FINAL look. Client-facing, so the site is English in both book languages.
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
@@ -157,11 +157,11 @@ export function Site({
   const [reelIdle, setReelIdle] = useState(false);
   const idleT = useRef<number | undefined>(undefined);
   const reelPl = useReelPlayer(reelRef, reelPh === "open" || reelPh === "opening");
-  /* the showreel's controls (hero/ReelCta): the glass itself plays the film; the button is A, B or C (DEV compares) */
-  /* the showreel's one control: "Play showreel" riding the light on the disc (no button under the headline) */
-  const cta = "b" as const;
+  /* the showreel's one control (hero/ReelCta): the glass plays the film; "Play showreel" is the pointer over it, and
+     stands on the light for touch and the keyboard. With no light a plain button docks under the headline. */
   const tease = useTease(heroCtl);
-  const [rideDock, setRideDock] = useState(false);
+  const [reelDock, setReelDock] = useState(false);
+  const dockReel = useCallback(() => setReelDock(true), []);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
   /** focus goes back to the Showreel control once it is interactive again (it leaves `inert` with the idle render) */
   const focusReelBtn = useCallback(() => {
@@ -360,15 +360,10 @@ export function Site({
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production.</h1>
             <div className="st-hero__acts" data-rim="">
               <button type="button" className="st-pill st-pill--paper st-pill--lg" onClick={() => goTo("cases")}>Selected works</button>
-              {(cta !== "b" || rideDock) && (
-                <ReelButton variant={cta === "b" ? "c" : cta} btnRef={reelBtn} reel={reelRef} idle={reelPh === "idle"} onOpen={openReel} tease={tease} />
-              )}
+              {reelDock && <ReelButton btnRef={reelBtn} onOpen={openReel} tease={tease} />}
             </div>
           </div>
-          {cta === "b" && !rideDock && (
-            <RideLabel ctl={heroCtl} mode={mode} idle={reelPh === "idle"} btnRef={reelBtn} onOpen={openReel} tease={tease} onNoLight={() => setRideDock(true)} />
-          )}
-          <GlassPlay hero={heroRef} ctl={heroCtl} mode={mode} variant={cta} phase={reelPh} tease={tease} />
+          <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
