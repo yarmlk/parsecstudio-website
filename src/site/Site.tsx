@@ -559,7 +559,7 @@ export function Site({
           </div>
         </section>
 
-        {/* 06 contact + footer */}
+        {/* 06 contact + a minimal footer (the lockup and the year) */}
         <section data-sec="contact" className="st-sec st-contact">
           <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" loading="lazy" /></div>
           <Head label="Contact" title="Let’s talk" />
@@ -568,29 +568,12 @@ export function Site({
               <div className="st-contact__top">
                 <span className="st-lbl">Write to us</span>
                 <a className="st-contact__mail" href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
-                <p className="st-contact__p">Or leave the brief here: the idea, the timing, the budget.</p>
-              </div>
-              <div className="st-next">
-                <span className="st-lbl">What happens next</span>
-                <ol className="st-next__list">
-                  {["Treatment", "Moodboard", "Storyboard", "Video draft"].map((t, i) => (
-                    <li key={t}><span className="st-next__t">{t}</span></li>
-                  ))}
-                </ol>
               </div>
             </div>
             <ContactForm />
           </div>
           <footer className="st-foot">
-            <div className="st-foot__brand">
-              <img src={LOGO.lockupWhite} alt="parsec studio" />
-              <span className="st-foot__tag">We direct the light.</span>
-            </div>
-            {desk && (
-              <nav className="st-foot__nav" aria-label="Footer">
-                {SECTIONS.slice(0, 4).map((n) => <button key={n.id} type="button" onClick={() => goTo(n.id)}>{n.label}</button>)}
-              </nav>
-            )}
+            <img className="st-foot__logo" src={LOGO.lockupWhite} alt="parsec studio" />
             <span className="st-foot__c">© 2026 Parsec Studio</span>
           </footer>
         </section>

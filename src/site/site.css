@@ -335,20 +335,14 @@
 .st-quote figcaption { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .st-quote figcaption img { height: 42px; width: auto; }
 
-/* 06 contact (the form and the address, nothing else) + footer over the Horizon plate */
+/* 06 contact (the address and the form) + a minimal footer over the Horizon plate */
 .st-contact { padding-bottom: 120px; }
 .st-contact__plate { position: absolute; inset: 0; z-index: 0; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%); mask-image: linear-gradient(180deg, transparent 0%, #000 16%); }
 .st-contact__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; }
 .st-contact__in { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; align-items: stretch; }
-/* two columns that share a top and a bottom: the address and the next steps on the left, the form on the right */
-.st-contact__l { grid-column: 1 / span 6; display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 2px 0 4px; }
+/* two columns: the address on the left, the form on the right */
+.st-contact__l { grid-column: 1 / span 6; display: flex; flex-direction: column; padding: 2px 0 4px; }
 .st-contact__top { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
-.st-contact__p { margin: 4px 0 0; max-width: 40ch; font-size: 15px; line-height: 1.55; color: var(--fog); }
-.st-next { display: flex; flex-direction: column; gap: 16px; }
-.st-next__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: 16px; }
-.st-next__list li { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid rgba(242, 240, 235, .16); }
-.st-next__list li:first-child { border-top-color: rgba(246, 200, 140, .55); }
-.st-next__t { font-size: 15px; line-height: 1.35; color: var(--paper); }
 .st-contact__mail { font-family: var(--font-display); font-size: 40px; line-height: 1.2; color: var(--paper); transition: color var(--t-button) var(--ease-enter); }
 .st-contact__mail:hover { color: var(--ember-text); }
 .st-form {
@@ -371,14 +365,9 @@
 .st-form__thanks { margin: 8px 0 0; font-family: var(--font-display); font-size: 34px; line-height: 1.1; }
 .st-form__note { margin: 0; color: var(--fog); }
 .st-form__mock { margin: 14px 0 6px; color: var(--mute); }
-.st-foot { position: absolute; z-index: 2; left: 72px; right: 72px; bottom: 0; height: 88px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
-.st-foot__brand { display: flex; align-items: center; gap: 18px; }
-.st-foot__brand img { height: 17px; width: auto; }
-.st-foot__tag { font-family: var(--font-quote); font-style: italic; font-size: 17px; color: var(--fog); white-space: nowrap; }
-.st-foot__nav { display: flex; gap: 28px; }
-.st-foot__nav button { font-size: 13px; font-weight: 400; color: var(--ash); transition: color var(--t-button) var(--ease-enter); }
-.st-foot__nav button:hover { color: var(--paper); }
-.st-foot__c { justify-self: end; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ash); white-space: nowrap; }
+.st-foot { position: absolute; z-index: 2; left: 72px; right: 72px; bottom: 0; height: 88px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.st-foot__logo { height: 17px; width: auto; }
+.st-foot__c { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ash); white-space: nowrap; }
 
 /* a service, opened inside the site: head, real frames, what's inside (under the nav, over the page) */
 .st-sv { position: absolute; inset: 0; z-index: 15; background: var(--void); animation: st-fade 360ms var(--ease-enter) both; }
@@ -501,16 +490,11 @@
 .st-site--mob .st-contact__l { display: contents; }
 .st-site--mob .st-contact__top { order: 0; }
 .st-site--mob .st-form { order: 1; }
-.st-site--mob .st-next { order: 2; margin-top: 8px; }
-.st-site--mob .st-contact__p { font-size: 14px; }
-.st-site--mob .st-next__list { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 16px; }
-.st-site--mob .st-next__t { font-size: 14px; }
 .st-site--mob .st-contact__mail { font-size: 24px; }
 .st-site--mob .st-form { width: 100%; padding: 20px; }
 .st-site--mob .st-form__row { flex-direction: column; align-items: stretch; }
 .st-site--mob .st-form--sent { min-height: 300px; }
 .st-site--mob .st-foot { position: relative; left: auto; right: auto; height: auto; margin: 0 -20px; padding: 56px 20px 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
-.st-site--mob .st-foot__c { justify-self: auto; }
 .st-site--mob .st-sv__scroll { padding: 128px 20px 56px; }
 .st-site--mob .st-sv__head { flex-direction: column; align-items: flex-start; gap: 22px; margin-bottom: 26px; }
 .st-site--mob .st-sv__t .st-back { margin: 0 0 22px; }
