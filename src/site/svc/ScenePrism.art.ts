@@ -97,7 +97,9 @@ export class ShadowArt {
         const base = { O: b.O, at: s.at, px: s.px, toScreen: b.toScreen, ball: s.ball, span: [0.12, 0.7] as [number, number], size: b.size, N: b.N, seed: 7 + k * 31 + i * 7 };
         // one ball for all of a slot's pictures: as wide as the widest needs
         if (rho[i] === undefined) rho[i] = Math.max(...loaded[i].map((p) => ballRadius({ ...base, pic: p })));
+        const t0 = performance.now();
         const m = shards({ ...base, pic, rho: rho[i] });
+        if (import.meta.env.DEV) (window as unknown as { __stArtMs?: number[] }).__stArtMs?.push(Math.round(performance.now() - t0));
         if (m) this.sets[i].push({ pos: m.pos, nrm: m.nrm });
         else if (k === 0) { this.sets[i].push({ pos: new Float32Array(b.N * SH), nrm: new Float32Array(b.N * SH) }); }
         if (!this.ready && this.sets.every((x) => x.length)) {
@@ -112,11 +114,14 @@ export class ShadowArt {
     }).catch(() => {});
   }
 
-  /** this frame's shards: t (s) runs the pictures' cycle, come (0..1) gathers them in from a scatter, sc the scale */
-  frame(t: number, come: number, sc: number, drift = 0.09) {
+  /** this frame's shards: t (s) runs the pictures' cycle, come (0..1) gathers them in from a scatter, sc the scale,
+   *  Ol where the light leaves the glass now. The pointer turns the prism and moves that point a little: each shard
+   *  then slides with it by as much as keeps its own shadow where it was (the nearer the light, the more), so the
+   *  picture on the floor holds while the ball sways */
+  frame(t: number, come: number, sc: number, Ol: V3 = this.O, drift = 0.09) {
     const P = this.live, Nn = this.liveN, ph = this.ph;
     if (!this.ready || !P || !Nn || !ph) return false;
-    const Ol = this.O, away = 1 - come;
+    const Ob = this.O, away = 1 - come, dO = [Ol[0] - Ob[0], Ol[1] - Ob[1], Ol[2] - Ob[2]];
     let j0 = 0;
     this.sets.forEach((sets, si) => {
       // the cycle starts once all of a slot's pictures are in (until then the first holds)
@@ -131,13 +136,16 @@ export class ShadowArt {
         const k = 1 + drift * Math.sin(ph[g + 1] * 0.6 * t + ph[g]);
         const ox = ph[g + 2] * away * sc, oy = ph[g + 3] * away * sc, oz = ph[g + 4] * away * sc;
         const o = j * SH, L = (j0 + j) * SH;
+        // how far along its ray from the light the shard hangs (0 at the light, 1 on the floor)
+        const yc = a.pos[o + 1] + (b.pos[o + 1] - a.pos[o + 1]) * mj, fr = Math.min(1, Math.max(0, 1 - yc / Math.max(Ob[1], 1e-3)));
+        const sx = dO[0] * (1 - fr), sy = dO[1] * (1 - fr), sz = dO[2] * (1 - fr);
         for (let v = 0; v < SH; v += 3) {
           const x = a.pos[o + v] + (b.pos[o + v] - a.pos[o + v]) * mj;
           const y = a.pos[o + v + 1] + (b.pos[o + v + 1] - a.pos[o + v + 1]) * mj;
           const z = a.pos[o + v + 2] + (b.pos[o + v + 2] - a.pos[o + v + 2]) * mj;
-          P[L + v] = Ol[0] + (x - Ol[0]) * k + ox;
-          P[L + v + 1] = Ol[1] + (y - Ol[1]) * k + oy;
-          P[L + v + 2] = Ol[2] + (z - Ol[2]) * k + oz;
+          P[L + v] = Ol[0] + (x + sx - Ol[0]) * k + ox;
+          P[L + v + 1] = Ol[1] + (y + sy - Ol[1]) * k + oy;
+          P[L + v + 2] = Ol[2] + (z + sz - Ol[2]) * k + oz;
           Nn[L + v] = a.nrm[o + v] + (b.nrm[o + v] - a.nrm[o + v]) * mj;
           Nn[L + v + 1] = a.nrm[o + v + 1] + (b.nrm[o + v + 1] - a.nrm[o + v + 1]) * mj;
           Nn[L + v + 2] = a.nrm[o + v + 2] + (b.nrm[o + v + 2] - a.nrm[o + v + 2]) * mj;

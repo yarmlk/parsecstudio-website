@@ -651,10 +651,10 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // where the light leaves the glass, its heading and its spread travel as one from the last service's to this
       // one's (never through where the turning glass happens to send it on the way, which jumps from face to face). Our
       // one warm light has no first or last colour, so its edges pair with the spectrum's the way that crosses least
-      // (the swap is made on whichever end is the warm light, where it shows nothing, and kept until the next switch)
+      // (the swap is made on the end that is our warm light, where it shows nothing, and kept until the next switch)
       if (lt.from && le < 1 && lt.swap === null) {
         const f = lt.from, keep = Math.abs(wrapA(tgt.aE - f.aE)) + Math.abs(wrapA(tgt.aM - f.aM)), cross_ = Math.abs(wrapA(tgt.aE - f.aM)) + Math.abs(wrapA(tgt.aM - f.aE));
-        lt.swap = cross_ < keep && lt.spec > 0.5 ? "to" : cross_ < keep ? "from" : "none";
+        lt.swap = cross_ < keep ? (svc !== 1 ? "to" : "from") : "none";
         if (lt.swap === "from") lt.from = { ...f, aE: f.aM, aM: f.aE, eE: f.eM, eM: f.eE };
       }
       if (lt.swap === "to") { const a = tgt.aE, e = tgt.eE; tgt.aE = tgt.aM; tgt.aM = a; tgt.eE = tgt.eM; tgt.eM = e; }
@@ -703,12 +703,14 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // shadow art: built for this layout's light while its service is on, then kept; the shards gather in from a
       // scatter as their service comes on and drift along their own rays (the picture holds) while it shows
       const toScreen = (p: V3): [number, number] => { const q = project(cam, p, A); return [q[0] * W, q[1] * Hs]; };
-      const layoutKey = (slots: ArtSlot[], extra: string) => [extra, ...OT, W, Hs, ...slots.flatMap((sl) => [...sl.at, sl.px])].map((x) => (typeof x === "number" ? x.toFixed(2) : x)).join();
+      // (built for where its service's light leaves the glass at the middle of its turn: the layout alone decides it)
+      const layoutKey = (slots: ArtSlot[], extra: string, o: V3) => [extra, ...o, W, Hs, ...slots.flatMap((sl) => [...sl.at, sl.px])].map((x) => (typeof x === "number" ? x.toFixed(3) : x)).join();
       const showArt = (art: ShadowArt, i: number, mesh: number, slots: ArtSlot[], N: number, size: number, mat: Item["mat"]) => {
-        if (svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, String(mesh)), { O: OT, slots, toScreen, size, N }, (m) => { if (alive && objs) objs.set(mesh, m); });
+        const ob0 = place[i]?.o;
+        if (ob0 && svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, String(mesh), ob0), { O: ob0, slots, toScreen, size, N }, (m) => { if (alive && objs) objs.set(mesh, m); });
         if (!art.ready || !ob.has(mesh)) return;
         const come = svc === i && !frozen ? easeEnter(clamp01((sw - 0.1) / 1.9)) : 1;
-        if (art.frame(tSec, come, stand[i]?.s || 1)) ob.update(mesh, art.positions!, art.normals!);
+        if (art.frame(tSec, come, stand[i]?.s || 1, O)) ob.update(mesh, art.positions!, art.normals!);
         items.push({ mesh, m: IDENT, mat, fade: st.show[i] });
       };
       if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
