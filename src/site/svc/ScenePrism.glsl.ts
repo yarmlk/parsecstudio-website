@@ -212,7 +212,7 @@ vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
   float sm = lite > 0.5 ? 0.8 : mix(0.35, 1.35, smokeLite(vec2(r * 2.4, (p.x - p.z) * 3.0 + p.y * 4.0)));
   // the objects cut the sheet of light in the haze: their shadows run through the air
   float vis = lite > 0.5 ? 1.0 : shadowVis1(p);
-  return c * vis * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
+  return c * vis * gobo(p) * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
 }
 
 /* ---------- the beam ---------- */
@@ -331,7 +331,7 @@ vec3 floorLight(vec3 p, vec3 rd){
     vec3 c3 = fanCol(p.xz, uPoolSoft * 4.5, r3);
     float th3 = th * 5.0 + 0.15;
     float bloom = exp(-(ys * ys) / (th3 * th3));
-    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis;
+    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis * gobo(p);
   }
   // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
   // shadows; the satin breaks it up a little

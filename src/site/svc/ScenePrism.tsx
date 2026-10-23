@@ -48,23 +48,30 @@ function exitAz(P: ReturnType<typeof makePrism>, o: V3, d: V3, ns: number[]) {
 const AZ_PREF = [8, -20, -8];
 /** index per channel for what is seen through the glass (a modest, real-looking fringe) */
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
-/** the busts (packed meshes, public/mesh): fetched the first time the stage mounts */
-const BUSTS = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/colossus.bin"] as const;
-/** mesh slots: the busts, then the shadow art of Motion and of Vertical */
-const M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_ART = 14, M_ART_V = 15;
+/** Vertical's marble groups (packed meshes, public/mesh): fetched after the first frame */
+const STATUES = ["mesh/hercules.bin", "mesh/warrior.bin"] as const;
+/** mesh slots: the marble groups, then the shadow art of Motion and of Vertical */
+const M_HERC = 3, M_WARRIOR = 4, M_ART = 14, M_ART_V = 15;
 /** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
- *  Motion: shadow art in black shards or glass ones. Vertical: two people talking in the shadow of two balls of shards,
- *  or the two marble busts */
-export const VARIANTS = { motion: ["shards", "glass"], vertical: ["shards", "busts"] } as const;
+ *  Motion: voxels or glass flakes. Vertical: Hercules raising Antaeus over himself, a warrior over the fallen, or
+ *  voxels that throw the Hercules group's shadow; each in the light's upright 9:16 frame */
+export const VARIANTS = { motion: ["voxels", "glass"], vertical: ["hercules", "warrior", "voxels"] } as const;
 export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
-const variant = <K extends keyof Variants>(k: K): Variants[K] => ((import.meta.env.DEV && window.__stVar?.[k]) || VARIANTS[k][0]) as Variants[K];
+const variant = <K extends keyof Variants>(k: K): Variants[K] => {
+  const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
+  return ((VARIANTS[k] as readonly string[]).includes(v ?? "") ? v : VARIANTS[k][0]) as Variants[K];
+};
 const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const base = import.meta.env.BASE_URL;
-/** Motion's pictures, one becoming the next: a head with mountains and the moon in it, a whale carrying a boat and stars,
- *  a horse at full gallop, a hummingbird */
-const MOTION_PICS = ["head", "whale", "horse", "bird"].map((n) => `${base}shadow/${n}.png`);
-/** Vertical's two people, face to face */
-const TALK_PICS = [`${base}shadow/pairL.png`, `${base}shadow/pairR.png`];
+/** Motion's story in the shadow: a city grows out of the floor, folds over onto itself, and the fold becomes a
+ *  fighter in a flying kick (modelling, effects, character: what the service makes) */
+const MOTION_SLOT = {
+  pics: ["city1", "city2", "city3", "fold", "kick"].map((n) => `${base}shadow/${n}.png`),
+  hold: [0.12, 0.12, 1.5, 1.9, 2.4],
+  morph: [0.6, 0.7, 1.5, 1.6, 1.7],
+};
+/** the shadow the voxels of Vertical throw */
+const STATUE_PIC = `${base}shadow/hercules.png`;
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
 const DIMS = [{ h: 1.05, r: 0.85 }, { h: 0.8, r: 0.62 }, { h: 0.95, r: 0.9 }];
@@ -73,12 +80,8 @@ const AIM_X = [0.775, 0.77, 0.775];
 /** the light lands this far below the prism's level (fraction of the section's height); at most this far turned (rad) */
 const AIM_DY = 0.07, AIM_MAX = 0.75;
 const STAND_MAX = 2.6;
-/** the colossal head in the spectrum (off: AI shows the colour alone) */
-const SHOW_HEAD = false;
 /** the largest each service's things may grow (the colossal head fills the frame quickly) */
 const SCALE_MAX = [3.2, 1.0, 3.2];
-/** the colossal head lies back on the floor, its face turned up to the camera above */
-const COLOSSUS_TILT = -0.7;
 /** the shadow map's reach from the light's origin */
 const L_FAR = 7;
 interface Shot {
@@ -348,11 +351,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       init();
       return true;
     };
-    /** the busts arrive after the first frame, when the page is idle */
+    /** the marble groups arrive after the first frame, when the page is idle */
     const loadMeshes = () => {
       if (meshes) return;
       meshes = true;
-      const go = () => BUSTS.forEach((url, i) => (i === 2 && !SHOW_HEAD) || loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      const go = () => STATUES.forEach((url, i) => loadMesh(url).then((m) => { if (alive && objs) objs.set(M_HERC + i, m); }).catch(() => {}));
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
     };
@@ -705,9 +708,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const toScreen = (p: V3): [number, number] => { const q = project(cam, p, A); return [q[0] * W, q[1] * Hs]; };
       // (built for where its service's light leaves the glass at the middle of its turn: the layout alone decides it)
       const layoutKey = (slots: ArtSlot[], extra: string, o: V3) => [extra, ...o, W, Hs, ...slots.flatMap((sl) => [...sl.at, sl.px])].map((x) => (typeof x === "number" ? x.toFixed(3) : x)).join();
-      const showArt = (art: ShadowArt, i: number, mesh: number, slots: ArtSlot[], N: number, size: number, mat: Item["mat"]) => {
+      const showArt = (art: ShadowArt, i: number, mesh: number, slots: ArtSlot[], N: number, size: number, mat: Item["mat"], shape: "flake" | "voxel" = "flake") => {
         const ob0 = place[i]?.o;
-        if (ob0 && svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, String(mesh), ob0), { O: ob0, slots, toScreen, size, N }, (m) => { if (alive && objs) objs.set(mesh, m); });
+        if (ob0 && svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, `${mesh}${shape}`, ob0), { O: ob0, slots, toScreen, size, N, shape }, (m) => { if (alive && objs) objs.set(mesh, m); });
         if (!art.ready || !ob.has(mesh)) return;
         const come = svc === i && !frozen ? easeEnter(clamp01((sw - 0.1) / 1.9)) : 1;
         if (art.frame(tSec, come, stand[i]?.s || 1, O)) ob.update(mesh, art.positions!, art.normals!);
@@ -717,48 +720,45 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
         // the shards turn into the next one (to the right of the stage, where the light lies widest)
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        const slots: ArtSlot[] = [{ pics: MOTION_PICS, at: at(0, sd.d + 0.42 * sc, 0.2 * sc, 0), px: 0.28 * Hs, ball: 0.42 }];
-        showArt(artM, 0, M_ART, slots, 4200, 0.0095 * sc, variant("motion") === "glass" ? FROST : CERAMIC);
+        const glass = variant("motion") === "glass";
+        const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
+        showArt(artM, 0, M_ART, slots, glass ? 4200 : 2700, (glass ? 0.0095 : 0.0095) * sc, glass ? FROST : CERAMIC, glass ? "flake" : "voxel");
       }
       // AI Production plays with colour alone: the spectrum over the floor, no object in it
-      if (SHOW_HEAD && st.show[1] > 0.004 && ob.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
-        // AI Production: a colossal head lying tilted back on the floor, the spectrum across its face
-        const sd = stand[1] ?? { d: 1.4, s: 1 }, sc = sd.s;
-        const p0 = at(1, sd.d, 0, 0), o = place[1]?.o ?? [0, 0, 0];
-        const tilt = COLOSSUS_TILT + 0.03 * Math.sin(0.21 * tSec);
-        const p: V3 = [p0[0], -ob.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
-        items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.42 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
-      }
-      if (st.show[2] > 0.004 && variant("vertical") === "shards" && (stand[2]?.s ?? 1) > 0) {
-        // Vertical Series: two people face to face, talking, in the shadows of two balls of shards side by side in the
-        // light (each ball on the way to its own face, so neither shades the other)
-        const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        const slots: ArtSlot[] = [
-          { pics: [TALK_PICS[0]], at: at(2, sd.d + 0.05 * sc, 0.06 * sc, 0), px: 0.27 * Hs, ball: 0.4 },
-          { pics: [TALK_PICS[1]], at: at(2, sd.d + 0.7 * sc, 0.06 * sc, 0), px: 0.27 * Hs, ball: 0.4 },
-        ];
-        showArt(artV, 2, M_ART_V, slots, 1500, 0.012 * sc, CERAMIC);
-      }
-      if (st.show[2] > 0.004 && variant("vertical") === "busts" && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
-        // Vertical Series: two busts in conversation, turned to each other, one answering the other
-        const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s * 0.55;
-        // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned
-        // half to us and half to the other, leaning back a touch so the faces meet the camera above
-        // two figures on a stage: side by side along the light, each cheated out to us and turned to the other, the
-        // further one a step back so the nearer one's shadow passes it by; the light keys one face and rims the other
-        const a = at(2, sd.d - 0.5 * sc, -0.24 * sc, 0), b = at(2, sd.d + 0.5 * sc, 0.06 * sc, 0), f = st.show[2];
-        const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
-        const lean = -0.24;
-        const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
-        const ya = blend(toCam(a), facing(a, b), 0.5) + 0.06 * Math.sin(0.5 * tSec);
-        const yb = blend(toCam(b), facing(b, [O[0], 0, O[2]]), 0.55) + 0.06 * Math.sin(0.5 * tSec + 2.2);
-        items.push({ mesh: M_CAESAR, m: model([a[0], -ob.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc), mat: MARBLE, fade: f });
-        items.push({ mesh: M_SENATOR, m: model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc), mat: MARBLE, fade: f });
+      // Vertical Series: the light comes down as an upright 9:16 screen on the floor, and in it a marble drama, one
+      // figure raised over the other (or the voxels that throw that group's shadow)
+      let frameC: [number, number] = [0, 0], frameU: [number, number] = [1, 0], frameV: [number, number] = [0, 1];
+      {
+        const sd = stand[2] ?? { d: 1.6, s: 1 };
+        const C0 = at(2, sd.d + 0.12, 0.04, 0), c0 = toScreen(C0), e = 0.05;
+        const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
+        const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
+        const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
+        const hpx = Math.min(0.68 * Hs, Hs - ruleY - 60), wpx = (hpx * 9) / 16;
+        frameC = [C0[0], C0[2]]; frameU = inv(wpx / 2, 0); frameV = inv(0, hpx / 2);
+        if (st.show[2] > 0.004) {
+          const vv = variant("vertical");
+          if (vv === "voxels") {
+            const slots: ArtSlot[] = [{ pics: [STATUE_PIC], at: C0, px: hpx * 0.78, ball: 0.4 }];
+            showArt(artV, 2, M_ART_V, slots, 2600, 0.016, CERAMIC, "voxel");
+          } else {
+            const mesh = vv === "warrior" ? M_WARRIOR : M_HERC;
+            if (ob.has(mesh)) {
+              // stood in the frame a little toward the light, turned mostly to the light (the faces catch it) and
+              // partly to us; the light keys the raised figure and throws the group's long shadow across the frame
+              const P0: V3 = [C0[0] - frameU[0] * 0.2 + frameV[0] * 0.25, 0, C0[2] - frameU[1] * 0.2 + frameV[1] * 0.25];
+              const sc = 1.1 * (sd.s || 1);
+              const toCam = facing(P0, [cam.pos[0], 0, cam.pos[2]]), toLight = facing(P0, [O[0], 0, O[2]]);
+              const yaw = toLight + 0.45 * Math.atan2(Math.sin(toCam - toLight), Math.cos(toCam - toLight)) + (vv === "warrior" ? -0.3 : 0.25) + 0.05 * Math.sin(0.2 * tSec);
+              items.push({ mesh, m: model([P0[0], -ob.lowest(mesh, 0) * sc, P0[2]], yaw, 0, 0, sc), mat: MARBLE, fade: st.show[2] });
+            }
+          }
+        }
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
-      // our light opens wider for the two figures of Vertical than for the one object of Motion
-      const wedge = (0.2 + 0.06 * (px + 1)) * (1 + 0.75 * st.k) * (1 - st.spec) + 0.17 * st.spec;
+      // our light opens wide (Motion's picture stands tall in it), a little wider still for Vertical's frame
+      const wedge = (0.3 + 0.05 * (px + 1)) * (1 + 0.45 * st.k) * (1 - st.spec) + 0.17 * st.spec;
       const lGain = 2.6 * iP * kept;
       const hw = 0.5 * Math.abs(Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE))) + wedge;
       const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
@@ -775,9 +775,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const mark = () => { if (prof) { gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, prof.px); const t = performance.now(); prof.marks.push(Math.round(t - prof.t)); prof.t = t; } };
       if (shadowOn) ob.shadow(items, lvp, O, L_FAR);
       mark();
-      const setLight = (uu: (n: string) => WebGLUniformLocation | null) => {
+      const setLight = (uu: (n: string) => WebGLUniformLocation | null, air = 1) => {
+        gl.uniform1f(uu("uGoboAll"), air);
         gl.uniform3f(uu("uLO"), O[0], O[1], O[2]);
         gl.uniform1f(uu("uLSpec"), st.spec);
+        gl.uniform1f(uu("uGobo"), st.k); gl.uniform1f(uu("uGoboR"), 0.14); gl.uniform1f(uu("uGoboSoft"), 0.025); gl.uniform1f(uu("uGoboOut"), 0.07);
+        gl.uniform2f(uu("uGoboC"), frameC[0], frameC[1]); gl.uniform2f(uu("uGoboU"), frameU[0], frameU[1]); gl.uniform2f(uu("uGoboV"), frameV[0], frameV[1]);
         gl.uniform1f(uu("uLAE"), lAE); gl.uniform1f(uu("uLAM"), lAM);
         gl.uniform1f(uu("uLWedge"), wedge); gl.uniform1f(uu("uLGain"), lGain);
         gl.uniformMatrix4fv(uu("uLVP"), false, lvp);
@@ -844,7 +847,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
         ob.draw(items, vp, (lp) => {
           const uu = (n: string) => ob.u(lp, n);
-          setLight(uu);
+          setLight(uu, 0);
           cols.forEach((c, i) => gl.uniform3f(uu(`uS${i}`), c[0], c[1], c[2]));
           gl.uniform3f(uu("uCamPos"), cam.pos[0], cam.pos[1], cam.pos[2]);
           gl.uniform2f(uu("uRes"), canvas.width, canvas.height);

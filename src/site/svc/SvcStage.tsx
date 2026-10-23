@@ -31,7 +31,10 @@ export function SvcStage({ active, mode }: { active: number; mode: "desk" | "mob
 function VariantSwitch() {
   const [v, setV] = useState<Variants>(() => {
     let x: Variants = { motion: VARIANTS.motion[0], vertical: VARIANTS.vertical[0] };
-    try { x = { ...x, ...JSON.parse(localStorage.getItem("st-variants") || "{}") }; } catch { /* no storage */ }
+    try {
+      const saved = JSON.parse(localStorage.getItem("st-variants") || "{}") as Partial<Record<keyof Variants, string>>;
+      (Object.keys(VARIANTS) as (keyof Variants)[]).forEach((k) => { const v = saved[k]; if (v && (VARIANTS[k] as readonly string[]).includes(v)) x = { ...x, [k]: v }; });
+    } catch { /* no storage */ }
     window.__stVar = x;
     return x;
   });

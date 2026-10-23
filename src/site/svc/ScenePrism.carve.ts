@@ -101,7 +101,22 @@ export interface ShardsIn {
   ball?: number;
   /** the ball's radius, when several pictures share one ball (see ballRadius) */
   rho?: number;
+  /** flakes (thin broken shards) or voxels (small cubes, square to the world: the stuff of 3D) */
+  shape?: "flake" | "voxel";
 }
+
+/** a shard set: its mesh, and where each shard's shadow falls in the picture (u, v), to pair shards between pictures */
+export interface ShardSet extends Mesh { uv: Float32Array; per: number }
+
+/* a voxel: 6 faces × 4 corners, flat normals (24 vertices, 36 indices) */
+const CUBE_F: [V3, V3[]][] = [
+  [[1, 0, 0], [[1, -1, -1], [1, 1, -1], [1, 1, 1], [1, -1, 1]]],
+  [[-1, 0, 0], [[-1, -1, 1], [-1, 1, 1], [-1, 1, -1], [-1, -1, -1]]],
+  [[0, 1, 0], [[-1, 1, -1], [-1, 1, 1], [1, 1, 1], [1, 1, -1]]],
+  [[0, -1, 0], [[-1, -1, 1], [-1, -1, -1], [1, -1, -1], [1, -1, 1]]],
+  [[0, 0, 1], [[1, -1, 1], [1, 1, 1], [-1, 1, 1], [-1, -1, 1]]],
+  [[0, 0, -1], [[-1, -1, -1], [-1, 1, -1], [1, 1, -1], [1, -1, -1]]],
+];
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const norm = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -121,10 +136,11 @@ function frame({ at, px, toScreen, pic }: ShardsIn) {
   const [cx, cy] = toScreen(at);
   const [bu0, bv0, bu1, bv1] = pic.box, mu = (bu0 + bu1) / 2, mv = (bv0 + bv1) / 2;
   const s = px / Math.max(bu1 - bu0, bv1 - bv0);
-  const sd = (q: V3) => { const [sx, sy] = toScreen(q); return pic.sdf((sx - cx) / s + mu, (sy - cy) / s + mv); };
+  const uvOf = (q: V3): [number, number] => { const [sx, sy] = toScreen(q); return [(sx - cx) / s + mu, (sy - cy) / s + mv]; };
+  const sd = (q: V3) => { const [u, v] = uvOf(q); return pic.sdf(u, v); };
   const a0 = toScreen([at[0] + 0.1, 0, at[2]]), a1 = toScreen([at[0], 0, at[2] + 0.1]);
   const pxU = Math.min(Math.hypot(a0[0] - cx, a0[1] - cy), Math.hypot(a1[0] - cx, a1[1] - cy)) / 0.1;
-  return { sd, reach: (px * 0.8) / Math.max(pxU, 1e-3) };
+  return { sd, uvOf, reach: (px * 0.8) / Math.max(pxU, 1e-3) };
 }
 
 /** the radius of the ball that holds this picture's cone at its place along the light */
@@ -143,10 +159,10 @@ export function ballRadius(o: ShardsIn): number {
 }
 
 /** exactly N shards (fewer found: some laid twice), so that sets for several pictures pair shard for shard */
-export function shards(o: ShardsIn): Mesh | null {
-  const { O, at, pic, span = [0.5, 0.93], size = 0.03, N = 900, seed = 7, ball } = o;
-  void pic;
-  const { sd, reach } = frame(o);
+export function shards(o: ShardsIn): ShardSet | null {
+  const { O, at, span = [0.5, 0.93], size = 0.03, N = 900, seed = 7, ball, shape = "flake" } = o;
+  const { sd, reach, uvOf } = frame(o);
+  const uv: number[] = [];
   const rand = rng(seed);
   let C: V3 | null = null;
   const rho = ball ? o.rho ?? ballRadius(o) : 0;
@@ -163,6 +179,28 @@ export function shards(o: ShardsIn): Mesh | null {
     const f = span[0] + (span[1] - span[0]) * rand();
     const p: V3 = [O[0] + (q[0] - O[0]) * f, O[1] * (1 - f), O[2] + (q[2] - O[2]) * f];
     if (C && Math.hypot(p[0] - C[0], p[1] - C[1], p[2] - C[2]) > rho) continue;
+    const inside = (u: V3) => { if (u[1] < 0.004) return false; const fq = toFloor(O, u); return !!fq && sd(fq) < -0.002; };
+    const mid = (a: V3, b: V3): V3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+    if (shape === "voxel") {
+      // a small cube, square to the world, on a fine grid (so the cloud reads as built, not broken)
+      // a cube square to the world where the ray put it (a grid would alias with the picture into stripes); the
+      // outline in smaller ones
+      const h = size * (edge ? 0.25 : 0.38 + 0.12 * rand()), key = "";
+      const c: V3 = p;
+      const corners: V3[] = [];
+      for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) corners.push([c[0] + x * h, c[1] + y * h, c[2] + z * h]);
+      if (!corners.every(inside) || !inside(c)) continue;
+      void key;
+      const base = pos.length / 3;
+      CUBE_F.forEach(([n, vs], fi) => {
+        for (const v of vs) { pos.push(c[0] + v[0] * h, c[1] + v[1] * h, c[2] + v[2] * h); nrm.push(n[0], n[1], n[2]); }
+        const b = base + fi * 4;
+        idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      });
+      uv.push(...uvOf(toFloor(O, c) ?? q));
+      made++;
+      continue;
+    }
     // a flake: a thin, irregular tetrahedron, randomly turned
     const sz = size * (0.55 + 0.9 * rand() * rand()) * (edge ? 0.45 : 1);
     const ax = norm([rand() - 0.5, rand() - 0.5, rand() - 0.5]), bx = norm(cross(ax, [rand() - 0.5, rand() - 0.5, rand() - 0.5])), cx2 = cross(ax, bx);
@@ -172,8 +210,6 @@ export function shards(o: ShardsIn): Mesh | null {
       const jx = x * L[0] + (rand() - 0.5) * 0.4, jy = y * L[1] + (rand() - 0.5) * 0.4, jz = z * L[2] * (rand() > 0.5 ? 1 : -1);
       v.push([p[0] + (ax[0] * jx + bx[0] * jy + cx2[0] * jz) * sz, p[1] + (ax[1] * jx + bx[1] * jy + cx2[1] * jz) * sz, p[2] + (ax[2] * jx + bx[2] * jy + cx2[2] * jz) * sz]);
     }
-    const inside = (u: V3) => { if (u[1] < 0.004) return false; const fq = toFloor(O, u); return !!fq && sd(fq) < -0.002; };
-    const mid = (a: V3, b: V3): V3 => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
     if (!v.every(inside) || ![[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]].every(([i, j]) => inside(mid(v[i], v[j])))) continue;
     const ctr: V3 = [(v[0][0] + v[1][0] + v[2][0] + v[3][0]) / 4, (v[0][1] + v[1][1] + v[2][1] + v[3][1]) / 4, (v[0][2] + v[1][2] + v[2][2] + v[3][2]) / 4];
     for (const [i0, i1, i2] of [[0, 1, 2], [0, 1, 3], [1, 2, 3], [0, 2, 3]]) {
@@ -183,15 +219,18 @@ export function shards(o: ShardsIn): Mesh | null {
       if (nn[0] * fc[0] + nn[1] * fc[1] + nn[2] * fc[2] < 0) { nn = [-nn[0], -nn[1], -nn[2]]; tri = [v[i0], v[i2], v[i1]]; }
       for (const u of tri) { idx.push(pos.length / 3); pos.push(u[0], u[1], u[2]); nrm.push(nn[0], nn[1], nn[2]); }
     }
+    uv.push(...uvOf(toFloor(O, ctr) ?? q));
     made++;
   }
   if (!made) return null;
   // pad to N with copies of shards already laid
-  const one = 36;
+  const per = shape === "voxel" ? 24 : 12, one = per * 3, ipe = shape === "voxel" ? 36 : 12, laid = made;
   while (made < N) {
-    const j = Math.floor(rand() * made) * one;
-    for (let k = 0; k < one; k += 3) { idx.push(pos.length / 3); pos.push(pos[j + k], pos[j + k + 1], pos[j + k + 2]); nrm.push(nrm[j + k], nrm[j + k + 1], nrm[j + k + 2]); }
+    const k0 = Math.floor(rand() * laid), j = k0 * one, base = pos.length / 3;
+    for (let k = 0; k < one; k += 3) { pos.push(pos[j + k], pos[j + k + 1], pos[j + k + 2]); nrm.push(nrm[j + k], nrm[j + k + 1], nrm[j + k + 2]); }
+    for (let k = 0; k < ipe; k++) idx.push(base + idx[k0 * ipe + k] - k0 * per);
+    uv.push(uv[k0 * 2], uv[k0 * 2 + 1]);
     made++;
   }
-  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx: new Uint16Array(idx) };
+  return { pos: new Float32Array(pos), nrm: new Float32Array(nrm), idx: new Uint16Array(idx), uv: new Float32Array(uv), per };
 }

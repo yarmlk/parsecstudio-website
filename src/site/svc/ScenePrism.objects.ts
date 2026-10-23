@@ -24,6 +24,26 @@ uniform sampler2D uShadow;
 uniform float uShadowOn, uLFar, uShadowTx;
 float unpackD(vec4 c){ return dot(c, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0)); }
 float wrapPi(float a){ return mod(a + 3.14159265, 6.2831853) - 3.14159265; }
+/* the light's frame (Vertical): a portrait 9:16 frame in front of the light, like a projector's gate, so the light lands
+   on the floor as an upright screen with rounded corners; a point is lit if its ray from the light lands inside.
+   uGobo: how much of it (0 off); centre, half-axes (floor xz), corner radius and softness in frame units; uGoboOut: the
+   light left outside the frame; uGoboAll: frame the air too (the prism's pass), or the floor alone (the things' pass) */
+uniform float uGobo, uGoboR, uGoboSoft, uGoboOut, uGoboAll;
+uniform vec2 uGoboC, uGoboU, uGoboV;
+float gobo(vec3 p){
+  // the things standing in the frame keep their light (only the floor and the air are framed)
+  if (uGobo < 0.001 || (uGoboAll < 0.5 && p.y > 0.01)) return 1.0;
+  vec3 d = p - uLO;
+  if (d.y > -1e-4) return mix(1.0, uGoboOut, uGobo);
+  vec2 q = uLO.xz + d.xz * (uLO.y / -d.y) - uGoboC;
+  // into the frame's own units: solve q = a U + b V
+  float det = uGoboU.x * uGoboV.y - uGoboU.y * uGoboV.x;
+  vec2 ab = vec2(q.x * uGoboV.y - q.y * uGoboV.x, uGoboU.x * q.y - uGoboU.y * q.x) / det;
+  vec2 e = abs(ab) - vec2(1.0) + uGoboR;
+  float sdf = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - uGoboR;
+  float inside = 1.0 - smoothstep(-uGoboSoft, uGoboSoft, sdf);
+  return mix(1.0, mix(uGoboOut, 1.0, inside), uGobo);
+}
 /* the light that reaches p: its colour across the bundle, the wedge, the cone's height, the distance */
 vec3 coneLight(vec3 p){
   vec3 v = p - uLO;
@@ -39,6 +59,7 @@ vec3 coneLight(vec3 p){
   float near = mix(smoothstep(0.1, 0.5, r), smoothstep(0.12, 1.15, r), uLSpec);
   float fall = 1.0 / (1.0 + r * r * 0.26);
   float s = wrapPi(a - uLAE) / (abs(da) < 1e-3 ? 1e-3 : da);
+  near *= gobo(p);
   // and the further its colours travel apart, the purer each gets
   vec3 c = spectrum(s);
   c = max(mix(vec3(dot(c, vec3(0.3, 0.5, 0.2))), c, 1.0 + 1.3 * uLSpec * smoothstep(0.5, 2.0, r)), 0.0);
