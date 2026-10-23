@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
-import { FILM_CAMERA, shards } from "./ScenePrism.carve";
-import { CERAMIC, FROST, MARBLE, MOON, ORBIT, PLANET, Objects, axisAngle, camClip, dirXZ, lightClip, loadMesh, model, ring, sphere, type Item } from "./ScenePrism.objects";
+import { CERAMIC, FROST, MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item } from "./ScenePrism.objects";
+import { ShadowArt, type ArtSlot } from "./ScenePrism.art";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
 /* Services: one stage, one real glass prism at the centre of the section, level with the middle of the three names. The
@@ -50,24 +50,21 @@ const AZ_PREF = [8, -20, -8];
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
 /** the busts (packed meshes, public/mesh): fetched the first time the stage mounts */
 const BUSTS = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/colossus.bin"] as const;
-/** mesh slots: the Motion sculpture (a frosted ring-disc around a black ceramic disc), then the busts */
-const M_PLANET = 0, M_MOON = 1, M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_ORBIT = 8, M_ART = 14;
-/** Motion's object, while Vlad compares them on localhost: shadow art in black shards or in glass ones, or the
- *  planet with its moons.
- *  Production shows the first. */
-export type MotionVar = "shards" | "glass" | "planet";
-export const MOTION_VARS: MotionVar[] = ["shards", "glass", "planet"];
-const motionVar = (): MotionVar => (import.meta.env.DEV && window.__stMotion) || "shards";
+/** mesh slots: the busts, then the shadow art of Motion and of Vertical */
+const M_CAESAR = 3, M_SENATOR = 4, M_COLOSSUS = 5, M_ART = 14, M_ART_V = 15;
+/** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
+ *  Motion: shadow art in black shards or glass ones. Vertical: two people talking in the shadow of two balls of shards,
+ *  or the two marble busts */
+export const VARIANTS = { motion: ["shards", "glass"], vertical: ["shards", "busts"] } as const;
+export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
+const variant = <K extends keyof Variants>(k: K): Variants[K] => ((import.meta.env.DEV && window.__stVar?.[k]) || VARIANTS[k][0]) as Variants[K];
 const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-/** Motion's moons: orbit radius, inclination, the line of nodes, size, phase (radii in the planet's units) */
-const MOONS = [
-  { r: 0.47, inc: 0.14, node: 0.2, s: 0.34, ph: 0.4 },
-  { r: 0.58, inc: -0.3, node: 1.3, s: 0.5, ph: 2.1 },
-  { r: 0.69, inc: 0.22, node: 2.5, s: 0.28, ph: 4.0 },
-  { r: 0.8, inc: -0.12, node: 3.6, s: 0.62, ph: 1.2 },
-  { r: 0.92, inc: 0.32, node: 4.6, s: 0.4, ph: 5.1 },
-  { r: 1.04, inc: -0.2, node: 5.6, s: 0.48, ph: 3.0 },
-];
+const base = import.meta.env.BASE_URL;
+/** Motion's pictures, one becoming the next: a head with mountains and the moon in it, a whale carrying a boat and stars,
+ *  a horse at full gallop, a hummingbird */
+const MOTION_PICS = ["head", "whale", "horse", "bird"].map((n) => `${base}shadow/${n}.png`);
+/** Vertical's two people, face to face */
+const TALK_PICS = [`${base}shadow/pairL.png`, `${base}shadow/pairR.png`];
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
 const DIMS = [{ h: 1.05, r: 0.85 }, { h: 0.8, r: 0.62 }, { h: 0.95, r: 0.9 }];
@@ -189,8 +186,8 @@ function spectrumLUT(stops: V3[], core: V3): Uint8Array {
 
 declare global {
   interface Window {
-    /** dev: which object Motion shows */
-    __stMotion?: MotionVar;
+    /** dev: which alternative each service shows */
+    __stVar?: Partial<Variants>;
     /** debug: freeze the scene's clock at this many seconds after it turned on (also snaps the pointer) */
     __stSceneT?: number;
     /** debug: pointer position over the scene, -1 (left) … 1 (right) */
@@ -308,7 +305,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let objs: Objects | null = null;
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
-    const art = { key: "", busy: false, ok: false, O: [0, 0, 0] as V3, base: null as Float32Array | null, live: null as Float32Array | null, ph: null as Float32Array | null };
+    const artM = new ShadowArt(), artV = new ShadowArt();
     const init = () => {
       gl.useProgram(prog);
       buf = gl.createBuffer();
@@ -334,9 +331,6 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
 
       /* the things the light falls on */
       objs = new Objects(gl);
-      objs!.set(M_PLANET, sphere(0.3, 192, 96));
-      objs!.set(M_MOON, sphere(0.085, 64, 32));
-      MOONS.forEach((o, i) => objs!.set(M_ORBIT + i, ring(o.r, 0.0026, 0.0026, 320, 6)));
       ready = true;
     };
     /** is the program linked yet? (never blocks where the browser compiles in parallel); a failed link falls back to
@@ -681,7 +675,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const pin = project(cam, tr.pin, A), pc = project(cam, [0, S.H * 0.5, 0], A), po = project(cam, origin, A);
         window.__stPrismInfo = {
           W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, stand, place, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
-          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos,
+          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos, art: [artM.ready, artM.key.slice(0, 60), artV.ready],
         };
       }
 
@@ -706,73 +700,23 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         return [pl0.o[0] + f[0] * along + r[0] * side, y, pl0.o[2] + f[2] * along + r[2] * side];
       };
       const facing = (p: V3, q: V3) => Math.atan2(q[0] - p[0], q[2] - p[2]);
+      // shadow art: built for this layout's light while its service is on, then kept; the shards gather in from a
+      // scatter as their service comes on and drift along their own rays (the picture holds) while it shows
+      const toScreen = (p: V3): [number, number] => { const q = project(cam, p, A); return [q[0] * W, q[1] * Hs]; };
+      const layoutKey = (slots: ArtSlot[], extra: string) => [extra, ...OT, W, Hs, ...slots.flatMap((sl) => [...sl.at, sl.px])].map((x) => (typeof x === "number" ? x.toFixed(2) : x)).join();
+      const showArt = (art: ShadowArt, i: number, mesh: number, slots: ArtSlot[], N: number, size: number, mat: Item["mat"]) => {
+        if (svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, String(mesh)), { O: OT, slots, toScreen, size, N }, (m) => { if (alive && objs) objs.set(mesh, m); });
+        if (!art.ready || !ob.has(mesh)) return;
+        const come = svc === i && !frozen ? easeEnter(clamp01((sw - 0.1) / 1.9)) : 1;
+        if (art.frame(tSec, come, stand[i]?.s || 1)) ob.update(mesh, art.positions!, art.normals!);
+        items.push({ mesh, m: IDENT, mat, fade: st.show[i] });
+      };
       if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
-        const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s, f = st.show[0];
-        const mv = motionVar();
-        // Motion, 3D & CGI, shadow art: black shards lying in the light; from the camera a scatter, but seen from where
-        // the light leaves the glass they close up, so their shadow on the floor is a film camera
-        const picAt = at(0, sd.d + 0.12 * sc, 0.11 * sc, 0), picPx = 0.25 * Hs;
-        if (mv !== "planet" && svc === 0 && (frozen || sw > 0.25)) {
-          const OT = mul(add(ET.out, MT.out), 0.5);
-          const key = [...OT, ...picAt, picPx, W, Hs].map((x) => (typeof x === "number" ? x.toFixed(2) : x)).join();
-          if (key !== art.key && !art.busy) {
-            art.busy = true;
-            const camT = cam, Wt = W, Ht = Hs, At = A;
-            setTimeout(() => {
-              if (!alive || !objs) return;
-              const t = performance.now();
-              const mesh = shards({ O: OT, at: picAt, px: picPx, pic: FILM_CAMERA, span: [0.18, 0.56], ball: 0.36, size: 0.012 * sc, N: 3200, toScreen: (p) => { const q = project(camT, p, At); return [q[0] * Wt, q[1] * Ht]; } });
-              if (mesh) {
-                objs.set(M_ART, mesh);
-                // each shard: a phase and a speed for its drift along its own ray, and where it starts from
-                const n = mesh.pos.length / 36, ph = new Float32Array(n * 5);
-                let sd0 = 11;
-                const r = () => { sd0 = (sd0 * 16807) % 2147483647; return sd0 / 2147483647; };
-                for (let j = 0; j < n; j++) {
-                  const a = r() * Math.PI * 2, z = r() * 2 - 1, q = Math.sqrt(1 - z * z), d = 0.12 + 0.3 * r();
-                  ph.set([r() * Math.PI * 2, 0.5 + 0.5 * r(), Math.cos(a) * q * d, Math.abs(z) * d * 0.6, Math.sin(a) * q * d], j * 5);
-                }
-                art.base = mesh.pos; art.live = new Float32Array(mesh.pos.length); art.ph = ph; art.O = OT;
-              }
-              art.ok = !!mesh; art.key = key; art.busy = false;
-              if (import.meta.env.DEV) console.info(`shadow art: ${mesh ? mesh.idx.length / 12 : 0} shards, ${Math.round(performance.now() - t)} ms, picture at ${project(camT, picAt, At).map((v, k) => Math.round(v * (k ? Ht : Wt)))} ${Math.round(picPx)}px, O ${OT.map((v) => v.toFixed(3))}`);
-            }, 0);
-          }
-        }
-        const artOn = mv !== "planet" && art.ok;
-        if (artOn && art.base && art.live && art.ph) {
-          // the shards drift, each along its own ray from the light, growing as it goes away and shrinking as it
-          // comes back, so its shadow never moves: the ball boils, the picture holds. Arriving, they fly in from
-          // a scatter and the picture assembles on the floor
-          const B = art.base, P = art.live, ph = art.ph, Ol = art.O, n = B.length / 36;
-          const come = svc === 0 && !frozen ? easeEnter(clamp01((sw - 0.15) / 1.9)) : 1, away = 1 - come;
-          for (let j = 0; j < n; j++) {
-            const k = 1 + 0.09 * Math.sin(ph[j * 5 + 1] * 0.6 * tSec + ph[j * 5]);
-            const ox = ph[j * 5 + 2] * away * sc, oy = ph[j * 5 + 3] * away * sc, oz = ph[j * 5 + 4] * away * sc;
-            for (let v = j * 36; v < j * 36 + 36; v += 3) {
-              P[v] = Ol[0] + (B[v] - Ol[0]) * k + ox;
-              P[v + 1] = Ol[1] + (B[v + 1] - Ol[1]) * k + oy;
-              P[v + 2] = Ol[2] + (B[v + 2] - Ol[2]) * k + oz;
-            }
-          }
-          ob.update(M_ART, P);
-        }
-        if (artOn) items.push({ mesh: M_ART, m: IDENT, mat: mv === "glass" ? FROST : CERAMIC, fade: f });
-        else {
-        // Motion, 3D & CGI: a planet turning slowly in the light, six moons on their own tilted orbits round it, each
-        // orbit drawn as a hairline; the planet and the moons throw their shadows down the floor
-        const c = at(0, sd.d, -0.1 * sc, 0.4 * sc);
-        items.push({ mesh: M_PLANET, m: axisAngle(c, [0.18, 1, 0.08], 0.045 * tSec, sc), mat: PLANET, fade: f });
-        MOONS.forEach((o, i) => {
-          const node = o.node + 0.02 * tSec;
-          const R = axisAngle([0, 0, 0], [Math.cos(node), 0, Math.sin(node)], o.inc);
-          const ang = o.ph + (0.16 / Math.pow(o.r, 1.5)) * tSec;
-          const lx = Math.cos(ang) * o.r, lz = Math.sin(ang) * o.r;
-          const p: V3 = [c[0] + (R[0] * lx + R[8] * lz) * sc, c[1] + (R[1] * lx + R[9] * lz) * sc, c[2] + (R[2] * lx + R[10] * lz) * sc];
-          items.push({ mesh: M_ORBIT + i, m: axisAngle(c, [Math.cos(node), 0, Math.sin(node)], o.inc, sc), mat: ORBIT, fade: f, cast: false });
-          items.push({ mesh: M_MOON, m: model(p, 0.3 * tSec + i, 0, 0, sc * o.s), mat: MOON, fade: f });
-        });
-        }
+        // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
+        // the shards turn into the next one (to the right of the stage, where the light lies widest)
+        const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
+        const slots: ArtSlot[] = [{ pics: MOTION_PICS, at: at(0, sd.d + 0.42 * sc, 0.2 * sc, 0), px: 0.28 * Hs, ball: 0.42 }];
+        showArt(artM, 0, M_ART, slots, 4200, 0.0095 * sc, variant("motion") === "glass" ? FROST : CERAMIC);
       }
       // AI Production plays with colour alone: the spectrum over the floor, no object in it
       if (SHOW_HEAD && st.show[1] > 0.004 && ob.has(M_COLOSSUS) && (stand[1]?.s ?? 1) > 0) {
@@ -783,7 +727,17 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const p: V3 = [p0[0], -ob.lowest(M_COLOSSUS, tilt) * sc, p0[2]];
         items.push({ mesh: M_COLOSSUS, m: model(p, facing(p, o) - 0.42 + 0.06 * Math.sin(0.15 * tSec), tilt, 0, sc), mat: MARBLE, fade: st.show[1] });
       }
-      if (st.show[2] > 0.004 && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
+      if (st.show[2] > 0.004 && variant("vertical") === "shards" && (stand[2]?.s ?? 1) > 0) {
+        // Vertical Series: two people face to face, talking, in the shadows of two balls of shards side by side in the
+        // light (each ball on the way to its own face, so neither shades the other)
+        const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s;
+        const slots: ArtSlot[] = [
+          { pics: [TALK_PICS[0]], at: at(2, sd.d + 0.05 * sc, 0.06 * sc, 0), px: 0.27 * Hs, ball: 0.4 },
+          { pics: [TALK_PICS[1]], at: at(2, sd.d + 0.7 * sc, 0.06 * sc, 0), px: 0.27 * Hs, ball: 0.4 },
+        ];
+        showArt(artV, 2, M_ART_V, slots, 1500, 0.012 * sc, CERAMIC);
+      }
+      if (st.show[2] > 0.004 && variant("vertical") === "busts" && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
         // Vertical Series: two busts in conversation, turned to each other, one answering the other
         const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s * 0.55;
         // side by side along the light (the nearer one a little toward us, so it never shades the other), each turned

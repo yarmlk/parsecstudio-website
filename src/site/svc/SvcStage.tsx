@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MOTION_VARS, ScenePrism, type MotionVar } from "./ScenePrism";
+import { ScenePrism, VARIANTS, type Variants } from "./ScenePrism";
 
 /* The services stage: one live scene behind the list, the prism at the centre of the section. The active service
    decides what the light does (ScenePrism). The scene is mounted ahead of time, when the section comes within about
@@ -22,24 +22,32 @@ export function SvcStage({ active, mode }: { active: number; mode: "desk" | "mob
         {seen && <ScenePrism active={active} mode={mode} />}
       </div>
       <i className="st-stage__shade" />
-      {import.meta.env.DEV && <MotionSwitch />}
+      {import.meta.env.DEV && <VariantSwitch />}
     </div>
   );
 }
 
-/** dev only: which object Motion shows, to compare on localhost (remembered in this browser) */
-function MotionSwitch() {
-  const [v, setV] = useState<MotionVar>(() => {
-    let x: MotionVar = "shards";
-    try { x = (localStorage.getItem("st-motion") as MotionVar) || x; } catch { /* no storage */ }
-    window.__stMotion = x;
+/** dev only: which alternative each service shows, to compare on localhost (remembered in this browser) */
+function VariantSwitch() {
+  const [v, setV] = useState<Variants>(() => {
+    let x: Variants = { motion: VARIANTS.motion[0], vertical: VARIANTS.vertical[0] };
+    try { x = { ...x, ...JSON.parse(localStorage.getItem("st-variants") || "{}") }; } catch { /* no storage */ }
+    window.__stVar = x;
     return x;
   });
-  const pick = (x: MotionVar) => { setV(x); window.__stMotion = x; try { localStorage.setItem("st-motion", x); } catch { /* no storage */ } };
+  const pick = (k: keyof Variants, x: string) => {
+    const nv = { ...v, [k]: x } as Variants;
+    setV(nv); window.__stVar = nv;
+    try { localStorage.setItem("st-variants", JSON.stringify(nv)); } catch { /* no storage */ }
+  };
   return (
     <div className="st-dev-switch" aria-hidden>
-      Motion:
-      {MOTION_VARS.map((x) => <button key={x} type="button" className={x === v ? "is-on" : undefined} onClick={() => pick(x)}>{x}</button>)}
+      {(Object.keys(VARIANTS) as (keyof Variants)[]).map((k) => (
+        <span key={k} className="st-dev-switch__row">
+          {k === "motion" ? "Motion" : "Vertical"}
+          {VARIANTS[k].map((x) => <button key={x} type="button" className={x === v[k] ? "is-on" : undefined} onClick={() => pick(k, x)}>{x}</button>)}
+        </span>
+      ))}
     </div>
   );
 }
