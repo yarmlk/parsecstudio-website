@@ -205,6 +205,18 @@ declare global {
     __stPrismNoAA?: boolean;
     /** debug: set true to time the next frame's passes (shadow, prism, objects; ms) — it is replaced by the times */
     __stPrismProf?: boolean | number[];
+    /** debug: a manual clock (ms); each new value draws one frame at that time */
+    __stClock?: number;
+    /** debug: when an array, each frame's light state is pushed to it */
+    __stPrismTrace?: Record<string, unknown>[];
+    /** debug: compute the frame's state but draw nothing */
+    __stPrismNoGL?: boolean;
+    /** debug: the live loop draws nothing (a scripted run owns the scene) */
+    __stPrismHold?: boolean;
+    /** debug: the active service, instead of the page's */
+    __stActive?: number;
+    /** debug: run a scripted sequence of frames at once (no drawing) and return each frame's light state */
+    __stPrismRun?: (frames: { t: number; a: number; py?: number }[], gl?: boolean) => Record<string, unknown>[];
     /** debug: the canvas's pixel budget (headless checks run on a software GPU) */
     __stPrismBudget?: number;
     /** debug: what the scene laid out last frame (site px), for checks */
@@ -215,7 +227,19 @@ declare global {
 /** how long the old beam takes to go, and the new one to grow from the letter into the glass (s) */
 const BEAM_OUT = 0.4;
 /** how long the beam's start takes to travel from one name to the next (s) */
-const BEAM_MOVE = 0.62;
+const BEAM_MOVE = 0.85;
+/** how long one switch takes, for everything at once: the prism's turn, where the light leaves the glass, its heading
+ *  and spread, its colour (s); one slow move on --ease-move, never a jump */
+const LIGHT_MOVE = 1.3;
+/** the light leaving the glass: where (o), the headings (rad) and elevations (rad) of its first and last colour */
+interface LightState { o: V3; aE: number; aM: number; eE: number; eM: number }
+const wrapA = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const lerpA = (a: number, b: number, k: number) => a + wrapA(b - a) * k;
+const mixLight = (a: LightState, b: LightState, k: number): LightState => ({
+  o: [a.o[0] + (b.o[0] - a.o[0]) * k, a.o[1] + (b.o[1] - a.o[1]) * k, a.o[2] + (b.o[2] - a.o[2]) * k],
+  aE: lerpA(a.aE, b.aE, k), aM: lerpA(a.aM, b.aM, k), eE: a.eE + (b.eE - a.eE) * k, eM: a.eM + (b.eM - a.eM) * k,
+});
+const dirOf = (az: number, el: number): V3 => [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
 
 
 /* How hard the scene works, kept for the whole visit (it survives remounts): the canvas's pixel budget and whether the
@@ -361,6 +385,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /** each service's aim: where its light heads across the stage, and how far that is turned from where the glass sends it */
     let aim: { az: number; d: number }[] = [];
     /* the beam: where it starts (the active name) and since when; the one before it, going where it was */
+    /** the switch in progress: when it began, what it started from (the light, colour, figures' weight, the turn) */
+    const lt = { svc: -1, t0: 0, from: null as LightState | null, cur: null as LightState | null, spec: 0, k: 0, rot: NaN, swap: null as null | "none" | "from" | "to" };
     const beam = { svc: -1, tSw: -1e9, old: null as null | { o: V3; pin: V3 }, from: null as null | { x: number; y: number }, at: { x: 0, y: 0 } };
     /* each service's working turn of the prism (deg): from where its name's beam comes, every colour of its light gets
        out and heads right. The pointer's height runs through them in order, row by row (cached per layout) */
@@ -430,13 +456,21 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       // the service on show (the last one while none is). The prism never goes: a switch adds the new name's beam at
       // once while the old one fades where it is, the light leaving the glass glides to its new colour and aim, and
       // the things in it change over quickly
-      const asked = activeRef.current;
+      const asked = import.meta.env.DEV && typeof window.__stActive === "number" ? window.__stActive : activeRef.current;
       if (asked >= 0) st.svc = asked;
-      const fk = kk(0.16);
-      st.spec += ((st.svc === 1 ? 1 : 0) - st.spec) * fk;
-      st.k += ((st.svc === 2 ? 1 : 0) - st.k) * fk;
-      for (let i = 0; i < 3; i++) st.show[i] += ((st.svc === i ? 1 : 0) - st.show[i]) * kk(0.3);
       const svc = st.svc;
+      // a switch is one move: everything that changes goes from where it is now to the new service's on the same
+      // curve over the same time (a switch during a switch starts again from wherever things are)
+      const tL = frozen ? 1e6 : now / 1000;
+      if (lt.svc !== svc) {
+        lt.from = lt.svc >= 0 && !frozen && lt.cur ? { ...lt.cur, o: [...lt.cur.o] as V3 } : null;
+        lt.spec = st.spec; lt.k = st.k; lt.rot = st.rot; lt.t0 = tL; lt.svc = svc; lt.swap = null;
+      }
+      const le = lt.from ? easeMove(clamp01((tL - lt.t0) / LIGHT_MOVE)) : 1;
+      st.spec = lt.spec + ((svc === 1 ? 1 : 0) - lt.spec) * le;
+      st.k = lt.k + ((svc === 2 ? 1 : 0) - lt.k) * le;
+      if (!lt.from) { st.spec = svc === 1 ? 1 : 0; st.k = svc === 2 ? 1 : 0; }
+      for (let i = 0; i < 3; i++) st.show[i] += ((st.svc === i ? 1 : 0) - st.show[i]) * kk(0.3);
       st.proj = 1 - st.spec;
 
       if (S.sat !== lutSat) {
@@ -592,8 +626,13 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         return S.edge || b === svc ? f : Math.max(wa.lo, Math.min(wa.hi, f));
       };
       let rotT = rotTarget();
-      if (!Number.isNaN(st.rot)) rotT += Math.round((st.rot - rotT) / 120) * 120;
-      st.rot = Number.isNaN(st.rot) ? rotT : st.rot + (rotT - st.rot) * kk(0.07);
+      // the prism turns the shorter way (its three faces repeat every 120°): during a switch on the move's curve, then
+      // softly after the pointer
+      const rotRef = lt.from && le < 1 && !Number.isNaN(lt.rot) ? lt.rot : st.rot;
+      if (!Number.isNaN(rotRef)) rotT += Math.round((rotRef - rotT) / 120) * 120;
+      if (Number.isNaN(st.rot)) st.rot = rotT;
+      else if (lt.from && le < 1 && !Number.isNaN(lt.rot)) st.rot = lt.rot + (rotT - lt.rot) * le;
+      else st.rot += (rotT - st.rot) * kk(0.07);
       const origin = startAt(an.x, an.y, slope);
       const d0 = norm(sub([0, S.hb, 0], origin));
       const P = makePrism([0, 0, 0], S.R, S.H, st.rot * DEG);
@@ -612,13 +651,25 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const ta = aim[svc]?.d ?? 0, ca = Math.cos(ta), sa = Math.sin(ta);
       const turn = (v: V3): V3 => [v[0] * ca - v[2] * sa, v[1], v[0] * sa + v[2] * ca];
       const pE = turn(ET.dir ?? E.dir ?? d0), pM = turn(MT.dir ?? ET.dir ?? d0);
-      // the bundle's heading glides (the prism turning between services never flings the light across)
-      const mAz = Math.atan2(pE[2] + pM[2], pE[0] + pM[0]);
-      st.az = Number.isNaN(st.az) ? mAz : st.az + Math.atan2(Math.sin(mAz - st.az), Math.cos(mAz - st.az)) * kk(0.14);
-      const g = st.az - mAz, cg = Math.cos(g), sg = Math.sin(g);
-      const glide = (v: V3): V3 => [v[0] * cg - v[2] * sg, v[1], v[0] * sg + v[2] * cg];
-      const dE = glide(pE), dM = glide(pM);
-      const O: V3 = mul(add(E.out, M.out), 0.5);
+      const OT: V3 = mul(add(ET.out, MT.out), 0.5);
+      const el = (v: V3) => Math.atan2(v[1], Math.hypot(v[0], v[2]));
+      const tgt: LightState = { o: OT, aE: Math.atan2(pE[2], pE[0]), aM: Math.atan2(pM[2], pM[0]), eE: el(pE), eM: el(pM) };
+      // where the light leaves the glass, its heading and its spread travel as one from the last service's to this
+      // one's (never through where the turning glass happens to send it on the way, which jumps from face to face). Our
+      // one warm light has no first or last colour, so its edges pair with the spectrum's the way that crosses least
+      // (the swap is made on whichever end is the warm light, where it shows nothing, and kept until the next switch)
+      if (lt.from && le < 1 && lt.swap === null) {
+        const f = lt.from, keep = Math.abs(wrapA(tgt.aE - f.aE)) + Math.abs(wrapA(tgt.aM - f.aM)), cross_ = Math.abs(wrapA(tgt.aE - f.aM)) + Math.abs(wrapA(tgt.aM - f.aE));
+        lt.swap = cross_ < keep && lt.spec > 0.5 ? "to" : cross_ < keep ? "from" : "none";
+        if (lt.swap === "from") lt.from = { ...f, aE: f.aM, aM: f.aE, eE: f.eM, eM: f.eE };
+      }
+      if (lt.swap === "to") { const a = tgt.aE, e = tgt.eE; tgt.aE = tgt.aM; tgt.aM = a; tgt.eE = tgt.eM; tgt.eM = e; }
+      if (lt.from && le < 1) {
+        lt.cur = mixLight(lt.from, tgt, le);
+      } else lt.cur = lt.cur ? mixLight(lt.cur, tgt, kk(0.12)) : tgt;
+      const cur = lt.cur;
+      const dE = dirOf(cur.aE, cur.eE), dM = dirOf(cur.aM, cur.eM);
+      const O: V3 = cur.o;
       let N = norm(cross(dE, dM));
       if (N[1] < 0) N = mul(N, -1);
       const fslope = -dE[1] / Math.hypot(dE[0], dE[2]);
@@ -757,6 +808,10 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const amid = lAE + 0.5 * Math.atan2(Math.sin(lAM - lAE), Math.cos(lAM - lAE));
       const lFov = 1.9;
       const lvp = lightClip(O, [Math.cos(amid) * Math.cos(0.1), Math.sin(0.1), Math.sin(amid) * Math.cos(0.1)], lFov, Math.tan(Math.min(1.2, hw + 0.1)) / Math.tan(lFov / 2), 0.05, L_FAR);
+      if (import.meta.env.DEV && window.__stPrismTrace) {
+        window.__stPrismTrace.push({ t: Math.round(now), svc, rot: +st.rot.toFixed(2), rotT: +rotT.toFixed(2), O: O.map((v) => +v.toFixed(3)), aE: +(lAE / DEG).toFixed(2), aM: +(lAM / DEG).toFixed(2), elE: +(Math.atan2(dE[1], Math.hypot(dE[0], dE[2])) / DEG).toFixed(2), elM: +(Math.atan2(dM[1], Math.hypot(dM[0], dM[2])) / DEG).toFixed(2), land: +land.toFixed(3), kept: +kept.toFixed(3), spec: +st.spec.toFixed(3), nValid: valid.length, an: [Math.round(an.x), Math.round(an.y)] });
+        if (window.__stPrismNoGL) return;
+      }
       const off = (import.meta.env.DEV && (window as unknown as { __stPrismOff?: Record<string, boolean> }).__stPrismOff) || {};
       if (off.objects) items.length = 0;
       const shadowOn = !off.shadow && ob.ok && items.some((it) => it.fade > 0.3 && ob.has(it.mesh));
@@ -800,8 +855,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       v3("uTint", S.tint); f1("uBev", S.bevel);
       f1("uFrost", 1);
       // without dispersion the two paths in the glass are one
-      const poM: V3 = [M.out[0] + (E.out[0] - M.out[0]) * st.proj, M.out[1] + (E.out[1] - M.out[1]) * st.proj, M.out[2] + (E.out[2] - M.out[2]) * st.proj];
-      v3("uBA", origin); v3("uPin", tr.pin); v3("uPoE", E.out); v3("uPoM", poM);
+      // the hot spots where the light leaves the glass go with the light (its first and last colour either side)
+      const hs = (p: V3): V3 => [O[0] + (p[0] - OT[0]), O[1] + (p[1] - OT[1]), O[2] + (p[2] - OT[2])];
+      const poE = hs(ET.out), poM0 = hs(MT.out);
+      const poM: V3 = [poM0[0] + (poE[0] - poM0[0]) * st.proj, poM0[1] + (poE[1] - poM0[1]) * st.proj, poM0[2] + (poE[2] - poM0[2]) * st.proj];
+      v3("uBA", origin); v3("uPin", tr.pin); v3("uPoE", poE); v3("uPoM", poM);
       v3("uBA0", origin); v3("uPin0", tr.pin); f1("uIB0", 0);
       v3("uIrA", tr.inner.a); v3("uIrB", tr.inner.b); f1("uIrI", tr.inner.F * 1.2);
       v3("uFanO", O); v3("uFanN", N);
@@ -861,9 +919,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loop = (now: number) => {
       raf = running ? requestAnimationFrame(loop) : 0;
       if (!poll()) { prev = 0; return; }
+      if (import.meta.env.DEV && window.__stPrismHold) return;
       if (dirty) { dirty = false; resize(); lastKey = ""; }
       // debug clock frozen: draw only when what is shown changes (keeps headless captures responsive)
-      const key = typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
+      const clock = import.meta.env.DEV ? window.__stClock : undefined;
+      if (typeof clock === "number") now = clock;
+      const key = typeof clock === "number" ? `clock${clock}|${activeRef.current}` : typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
       if (!key || key !== lastKey) {
         const tq = performance.now();
         try {
@@ -901,6 +962,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       sync();
     };
     wakeRef.current = wake;
+    if (import.meta.env.DEV) window.__stPrismRun = (frames, withGL) => {
+      const out: Record<string, unknown>[] = [], ng = window.__stPrismNoGL;
+      window.__stPrismTrace = out; window.__stPrismNoGL = !withGL;
+      try { for (const f of frames) { window.__stActive = f.a; if (typeof f.py === "number") window.__stPrismPy = f.py; draw(f.t); } } finally { window.__stPrismNoGL = ng; delete window.__stActive; window.__stPrismTrace = undefined; }
+      return out;
+    };
 
     // the GPU can drop the context (an overloaded or sleeping GPU): build the scene again a step lighter
     let lost = false;
