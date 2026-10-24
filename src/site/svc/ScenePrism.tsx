@@ -54,9 +54,10 @@ const STATUES = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/hercules.bin"] as 
 /** mesh slots: the busts and the group, then the shadow art of Motion and of Vertical */
 const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_PILLOW = 6, M_ART = 14;
 /** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
- *  Motion: the black ceramic cushion, or the voxels' shadow story. Vertical: the two busts in conversation, dust drifting off them in the light; or
+ *  Motion: for now only the light and the dust in it (its object is being chosen), the cushion, or the voxels' shadow
+ *  story. Vertical: the two busts in conversation, dust drifting off them in the light; or
  *  Hercules raising Antaeus in an upright 9:16 frame of light */
-export const VARIANTS = { motion: ["cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
+export const VARIANTS = { motion: ["dust", "cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
 export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
   const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
@@ -737,6 +738,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
       const items: Item[] = [];
       dustN = 0;
+      let dustFade = 0;
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
         const f = dirXZ(pl0.az), r: V3 = [-f[2], 0, f[0]];
@@ -760,7 +762,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
         // the shards turn into the next one (to the right of the stage, where the light lies widest)
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        if (variant("motion") === "voxels") {
+        if (variant("motion") === "dust") {
+          // only our light and the dust hanging in it, until Motion's object is chosen
+          dustN = dustFrame(at(0, sd.d + 0.2 * sc, 0, 0), 0.55 * sc, tSec, O);
+          dustFade = st.show[0];
+        } else if (variant("motion") === "voxels") {
           const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
           showArt(artM, 0, M_ART, slots, 2700, 0.0095 * sc, CERAMIC, "voxel");
         } else {
@@ -812,6 +818,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         items.push({ mesh: M_CAESAR, m: mA, mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: mB, mat: MARBLE, fade: f });
         dustN = dustFrame([(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2], sc, tSec, O);
+        dustFade = st.show[2];
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
@@ -900,7 +907,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       mark();
 
       // the things, mirrored in the floor and then themselves, in the same light
-      if (ob.ok && items.length) {
+      if (ob.ok && (items.length || dustN)) {
         const vp = camClip(cam.pos, cam.f, cam.r, cam.u, cam.focal, cam.shift, A);
         const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
         const shared = (lp: WebGLProgram) => {
@@ -914,7 +921,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           gl.uniform1f(uu("uGain"), S.gain); gl.uniform1f(uu("uGrain"), 0.03); gl.uniform1f(uu("uTime"), tSec);
         };
         ob.draw(items, vp, shared, canvas.width, canvas.height);
-        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, st.show[2], shared, Math.hypot(cam.pos[0] - place[2].o[0], cam.pos[1], cam.pos[2] - place[2].o[2]), 9 * cpx);
+        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, dustFade, shared, Math.hypot(cam.pos[0] - place[svc].o[0], cam.pos[1], cam.pos[2] - place[svc].o[2]), 9 * cpx);
       }
       mark();
       if (prof) window.__stPrismProf = prof.marks;
