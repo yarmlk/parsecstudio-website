@@ -140,7 +140,7 @@ export const SITE_SERVICES: Service[] = [
 ];
 
 /* ── A muted loop that plays only while `on` (hover, or the row in focus on a phone) ── */
-export function LoopVideo({ src, webm, on, warm, className, poster, pos }: { src: string; /** its VP9 copy (else derived from src) */ webm?: string; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
+export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, pos }: { src: string; /** its VP9 copy (else derived from src) */ webm?: string; /** phones: H.264 first, which every phone decodes in hardware (Safari would take the VP9 and decode it in software) */ mp4First?: boolean; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [armed, setArmed] = useState(false);
   const reduced = useReduced();
@@ -166,8 +166,9 @@ export function LoopVideo({ src, webm, on, warm, className, poster, pos }: { src
       aria-hidden
       tabIndex={-1}
     >
+      {armed && mp4First && <source src={src} type="video/mp4" />}
       {armed && <source src={webm ?? src.replace(/\.mp4(\?.*)?$/, ".webm")} type="video/webm" />}
-      {armed && <source src={src} type="video/mp4" />}
+      {armed && !mp4First && <source src={src} type="video/mp4" />}
     </video>
   );
 }

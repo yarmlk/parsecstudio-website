@@ -15,7 +15,7 @@ const SvcStage = lazy(() => import("./svc/SvcStage").then((m) => ({ default: m.S
 import { media } from "../lib/media";
 
 /** the phone's service loops: our Motion reel, our AI films, three of our vertical series side by side */
-const SVC_REEL = ["motion-reel", "ai-reel", "vertical-drama-sm"];
+const SVC_REEL = ["motion-reel-sm", "ai-reel", "vertical-drama-sm"];
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
@@ -357,6 +357,9 @@ export function Site({
   };
 
   const svcOn = svcHover ?? Math.max(0, svc);
+  /** the phone fetches the three service loops (small) once the services are near, so each is ready when it comes up */
+  const [svcNear, setSvcNear] = useState(false);
+  useEffect(() => { if (sec === "services" || sec === "cases" || scrolled) setSvcNear(true); }, [sec, scrolled]);
   /* the pointer anywhere over the services section picks the service whose row it is level with; the choice stays
      when the pointer leaves, so one service is always on */
   const onSvcMove = useCallback((e: RPointerEvent<HTMLElement>) => {
@@ -442,7 +445,7 @@ export function Site({
                   {!desk && (
                     <span className="st-svc__reel grain" aria-hidden>
                       <img src={media(`${SVC_REEL[i]}.webp`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
-                      <LoopVideo src={media(`${SVC_REEL[i]}-loop.mp4`)} webm={media(`${SVC_REEL[i]}-loop.webm`)} on={sec === "services" && i === svcOn} className="st-svc__vid" />
+                      <LoopVideo src={media(`${SVC_REEL[i]}-loop.mp4`)} webm={media(`${SVC_REEL[i]}-loop.webm`)} mp4First on={sec === "services" && i === svcOn} warm={svcNear} className="st-svc__vid" />
                     </span>
                   )}
                 </button>
@@ -478,7 +481,7 @@ export function Site({
               >
                 <span className="st-card__img grain">
                   <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.poster }} />
-                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
+                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} mp4First={!desk} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
                   <span className="st-card__plus" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 15} /></span>
                 </span>
                 <span className="st-card__cap">

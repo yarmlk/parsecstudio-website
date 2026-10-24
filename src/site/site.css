@@ -393,10 +393,10 @@
    glass. A quiet footer closes the page (the lockup, the address, the year). */
 .st-contact { display: flex; flex-direction: column; padding-bottom: 0; }
 .st-contact__plate { position: absolute; inset: 0; z-index: 0; -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 16%); mask-image: linear-gradient(180deg, transparent 0%, #000 16%); }
-.st-contact__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; transition: filter 1400ms var(--ease-enter), transform 1800ms var(--ease-enter); }
+.st-contact__plate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; transform-origin: 50% 100%; transition: filter 1400ms var(--ease-enter), transform 1800ms var(--ease-enter); }
 /* the light answers the visitor: while they write, the horizon brightens a touch and rises a hair */
 /* (it grows from its foot, so its lower edge never lifts off the bottom of the page) */
-.st-contact:focus-within .st-contact__plate img { filter: brightness(1.22) saturate(1.06); transform: scale(1.012); transform-origin: 50% 100%; }
+.st-contact:focus-within .st-contact__plate img { filter: brightness(1.22) saturate(1.06); transform: scale(1.012); }
 @media (prefers-reduced-motion: reduce) { .st-contact__plate img { transition: none; } .st-contact:focus-within .st-contact__plate img { transform: none; } }
 /* the form sits low, over the horizon's arc; the head stays up top, the line drops to meet the form's foot */
 .st-contact__in { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 760px; column-gap: 64px; align-items: stretch; padding-top: 24px; }
