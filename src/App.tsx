@@ -8,9 +8,10 @@ import { Site, type SiteMode } from "./site/Site";
 const DESK = 1440, MOB = 390;
 
 function measure() {
-  const vv = window.visualViewport;
-  const w = Math.round(vv?.width ?? window.innerWidth);
-  const h = Math.round(vv?.height ?? window.innerHeight);
+  // the layout viewport, not the visual one: the phone's keyboard shrinks the visual viewport, and following it would
+  // squeeze the whole site into the space above the keyboard and leave the rest black
+  const w = Math.round(window.innerWidth);
+  const h = Math.round(window.innerHeight);
   const mode: SiteMode = w < 900 ? "mob" : "desk";
   const base = mode === "desk" ? DESK : MOB;
   const maxK = mode === "desk" ? 1.22 : 1.18;
@@ -23,8 +24,7 @@ export function App() {
   useEffect(() => {
     const on = () => setV(measure());
     window.addEventListener("resize", on);
-    window.visualViewport?.addEventListener("resize", on);
-    return () => { window.removeEventListener("resize", on); window.visualViewport?.removeEventListener("resize", on); };
+    return () => window.removeEventListener("resize", on);
   }, []);
   const stage: CSSProperties = {
     width: v.W, height: v.H, transform: `scale(${v.k})`,

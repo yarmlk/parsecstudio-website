@@ -474,8 +474,8 @@ export function CaseView({
   const style = box
     ? { left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: mode === "desk" ? 14 : 12 }
     : fit && vp
-      // phone: the film sits under the back control and the text reads on the black below it
-      ? { left: (vp.w - fit) / 2, top: mode === "mob" ? Math.min((vp.h - fit / ar!) / 2, 112) : (vp.h - fit / ar!) / 2, width: fit, height: fit / ar!, borderRadius: 0 }
+      // phone: the film a little above the middle of the screen, its controls and the text under it
+      ? { left: (vp.w - fit) / 2, top: mode === "mob" ? Math.max(112, (vp.h - fit / ar!) / 2 - 70) : (vp.h - fit / ar!) / 2, width: fit, height: fit / ar!, borderRadius: 0 }
       : { left: 0, top: 0, width: "100%", height: "100%", borderRadius: 0 };
   const meta: [string, string][] = [];
   if (c.client) meta.push(["Client", c.client]);
@@ -491,7 +491,7 @@ export function CaseView({
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
       onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
       // the phone: where the film ends, so its controls and the text follow right under it
-      style={mode === "mob" && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.min((vp.h - fit / ar!) / 2, 112) + fit / ar!)}px` }) : undefined}
+      style={mode === "mob" && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.max(112, (vp.h - fit / ar!) / 2 - 70) + fit / ar!)}px` }) : undefined}
     >
       <div className="st-cv__veil" aria-hidden />
       <div className="st-cv__box" style={style}>
