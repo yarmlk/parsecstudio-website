@@ -65,7 +65,7 @@ function LogoGridBase({ logos, widths }: { logos: ClientLogo[]; widths: Record<s
       {logos.map((l) => (
         <li key={l.id} className="st-logo" onPointerEnter={onEnter}>
           <span className="st-logo__light" aria-hidden />
-          <img src={l.file} alt={l.name} loading="lazy" style={{ ["--w" as string]: widths[l.id] ?? 220 }} />
+          <img src={l.file} alt={l.name} width={475} height={175} loading="lazy" style={{ ["--w" as string]: widths[l.id] ?? 220 }} />
         </li>
       ))}
     </ul>

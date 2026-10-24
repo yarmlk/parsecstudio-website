@@ -460,7 +460,7 @@ export function Site({
                 aria-label={`Open the case: ${c.title}, ${c.type}`}
               >
                 <span className="st-card__img grain">
-                  <img src={c.film?.card ?? c.stills[0].src} alt="" decoding="async" loading="lazy" style={{ objectPosition: c.poster }} />
+                  <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.poster }} />
                   {c.film && <LoopVideo src={c.film.loop} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
                   <span className="st-card__plus" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 15} /></span>
                 </span>
@@ -476,7 +476,7 @@ export function Site({
         {/* 04 clients: 3 rows of 4, white logos in glass over the light (the deck's client slide); the pointer sends a
             pulse of light through each tile it enters (clients.tsx) */}
         <section data-sec="clients" className="st-sec st-clients">
-          <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" loading="lazy" /></div>
+          <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" width={4096} height={2323} loading="lazy" /></div>
           <Head label="100+ happy customers" title="Clients" />
           <LogoGrid logos={LOGOS} widths={LOGO_W} />
         </section>
@@ -489,7 +489,7 @@ export function Site({
 
         {/* 06 contact: the head on the left, the form as one frosted plate over the Horizon light; a quiet footer */}
         <section data-sec="contact" className="st-sec st-contact">
-          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" loading="lazy" /></div>
+          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" width={desk ? 3840 : 752} height={desk ? 2144 : 1344} loading="lazy" /></div>
           <div className="st-contact__in">
             <div className="st-contact__l">
               <Head label="Contact" title="Let’s talk" />
