@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { Site, type SiteMode } from "./site/Site";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { Site, type SecId, type SiteMode } from "./site/Site";
 
 /* The site is drawn at its design width — 1440 on a desktop, 390 on a phone — and scaled to the window, so every line
    sits exactly where it was designed. The scale is capped so very large screens get more room rather than larger type.
@@ -19,8 +19,21 @@ function measure() {
   return { w, h, mode, k, W: w / k, H: h / k };
 }
 
+/* Shown inside the brand book (an iframe): the book's rail scrolls the site to a section ({type: "parsec-jump", id}),
+   the site tells the book which section is in view ({type: "parsec-sec", id}), and ?case=N opens on that case. */
+const EMBED = typeof window !== "undefined" && window.parent !== window;
+const START_CASE = (() => { const n = Number(new URLSearchParams(location.search).get("case")); return Number.isInteger(n) && n >= 0 && location.search.includes("case=") ? n : undefined; })();
+
 export function App() {
   const [v, setV] = useState(measure);
+  const [jump, setJump] = useState<{ id: SecId; n: number } | undefined>(undefined);
+  useEffect(() => {
+    if (!EMBED) return;
+    const on = (e: MessageEvent) => { const d = e.data as { type?: string; id?: SecId } | null; if (d?.type === "parsec-jump" && d.id) setJump((j) => ({ id: d.id!, n: (j?.n ?? 0) + 1 })); };
+    window.addEventListener("message", on);
+    return () => window.removeEventListener("message", on);
+  }, []);
+  const onSection = useCallback((id: SecId) => { if (EMBED) window.parent.postMessage({ type: "parsec-sec", id }, "*"); }, []);
   useEffect(() => {
     const on = () => setV(measure());
     window.addEventListener("resize", on);
@@ -33,7 +46,7 @@ export function App() {
   return (
     <div className="app" style={{ width: v.w, height: v.h }}>
       <div className={`app__stage app__stage--${v.mode}`} style={stage}>
-        <Site key={v.mode} mode={v.mode} />
+        <Site key={v.mode} mode={v.mode} jump={jump} onSection={onSection} startCase={START_CASE} />
       </div>
     </div>
   );
