@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ScenePrism, VARIANTS, type Variants } from "./ScenePrism";
+import { ScenePrism, VARIANTS, VARIANTS_ON, type Variants } from "./ScenePrism";
 
 /* The services stage: one live scene behind the list, the prism at the centre of the section. The active service
    decides what the light does (ScenePrism). The scene is mounted ahead of time, when the section comes within about
@@ -22,15 +22,15 @@ export function SvcStage({ active, mode }: { active: number; mode: "desk" | "mob
         {seen && <ScenePrism active={active} mode={mode} />}
       </div>
       <i className="st-stage__shade" />
-      {import.meta.env.DEV && <VariantSwitch />}
+      {VARIANTS_ON && <VariantSwitch />}
     </div>
   );
 }
 
-/** dev only: which alternative each service shows, to compare on localhost (remembered in this browser) */
+/** localhost and the review preview only: which alternative each service shows (remembered in this browser) */
 function VariantSwitch() {
   const [v, setV] = useState<Variants>(() => {
-    let x: Variants = { motion: VARIANTS.motion[0], vertical: VARIANTS.vertical[0] };
+    let x: Variants = { motion: VARIANTS.motion[0], ai: VARIANTS.ai[0], vertical: VARIANTS.vertical[0] };
     try {
       const saved = JSON.parse(localStorage.getItem("st-variants") || "{}") as Partial<Record<keyof Variants, string>>;
       (Object.keys(VARIANTS) as (keyof Variants)[]).forEach((k) => { const v = saved[k]; if (v && (VARIANTS[k] as readonly string[]).includes(v)) x = { ...x, [k]: v }; });
@@ -47,7 +47,7 @@ function VariantSwitch() {
     <div className="st-dev-switch" aria-hidden>
       {(Object.keys(VARIANTS) as (keyof Variants)[]).map((k) => (
         <span key={k} className="st-dev-switch__row">
-          {k === "motion" ? "Motion" : "Vertical"}
+          {k === "motion" ? "Motion" : k === "ai" ? "AI" : "Vertical"}
           {VARIANTS[k].map((x) => <button key={x} type="button" className={x === v[k] ? "is-on" : undefined} onClick={() => pick(k, x)}>{x}</button>)}
         </span>
       ))}

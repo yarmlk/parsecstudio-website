@@ -3,6 +3,7 @@ import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
 import { CERAMIC, FROST, MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item } from "./ScenePrism.objects";
 import { ShadowArt, type ArtSlot } from "./ScenePrism.art";
+import { AI_LOOPS } from "../cases";
 import { Pillow, pillowPose } from "./ScenePrism.pillow";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
@@ -53,14 +54,16 @@ const N_VIEW: V3 = [1.505, 1.517, 1.532];
 const STATUES = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/hercules.bin"] as const;
 /** mesh slots: the busts and the group, then the shadow art of Motion and of Vertical */
 const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_PILLOW = 6, M_ART = 14;
-/** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
- *  Motion: for now only the light and the dust in it (its object is being chosen), the cushion, or the voxels' shadow
- *  story. Vertical: the two busts in conversation, dust drifting off them in the light; or
- *  Hercules raising Antaeus in an upright 9:16 frame of light */
-export const VARIANTS = { motion: ["projector", "dust", "cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
-export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
+/** the alternatives Vlad compares (a switch under the stage, on localhost and on the review preview); production shows
+ *  the first of each. Motion: our works projected by the light, or only the light and its dust, the cushion, the
+ *  voxels' shadow story. AI: the spectrum carries a faint tone of our AI works, or colour alone. Vertical: our 9:16
+ *  episodes projected as an upright frame, the two busts in conversation, or Hercules raising Antaeus */
+export const VARIANTS = { motion: ["projector", "dust", "cushion", "voxels"], ai: ["tone", "colour"], vertical: ["projector", "busts", "hercules"] } as const;
+export type Variants = { motion: (typeof VARIANTS.motion)[number]; ai: (typeof VARIANTS.ai)[number]; vertical: (typeof VARIANTS.vertical)[number] };
+/** the switch shows on localhost and on the review branch's preview, never in production */
+export const VARIANTS_ON = import.meta.env.DEV || (typeof location !== "undefined" && location.hostname.includes("-git-review-"));
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
-  const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
+  const v = VARIANTS_ON ? window.__stVar?.[k] : undefined;
   return ((VARIANTS[k] as readonly string[]).includes(v ?? "") ? v : VARIANTS[k][0]) as Variants[K];
 };
 const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -309,75 +312,76 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
     const artM = new ShadowArt();
-    /* Motion's projection: our Motion, 3D & CGI works, one loop after another, laid on the floor by the light */
+    /* the projector: our works, one loop after another, laid on the floor by the light; one video at a time, for the
+       service whose light shows (Motion: our 3D and CGI films; AI: our AI films, as a faint tone in the spectrum;
+       Vertical: our 9:16 episodes) */
     let projTex: WebGLTexture | null = null;
-    let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0;
-    const PROJ = ["centil", "fifa", "tefal", "prison", "arch"];
+    let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0, projSvc = -1, projFrame = 0, projUp = -1, projRVFC = false;
+    const PROJ: Record<number, string[]> = {
+      0: ["centil", "fifa", "tefal", "prison", "arch"],
+      1: AI_LOOPS,
+      2: ["vertical"],
+    };
     const projNext = () => {
       if (!projVid) return;
+      const list = PROJ[projSvc] ?? PROJ[0];
       const webm = projVid.canPlayType('video/webm; codecs="vp9"') !== "";
-      projVid.src = `${import.meta.env.BASE_URL}video/site/${PROJ[projK % PROJ.length]}-loop.${webm ? "webm" : "mp4"}`;
+      projVid.src = `${import.meta.env.BASE_URL}video/site/${list[projK % list.length]}-loop.${webm ? "webm" : "mp4"}`;
       projK++;
       projAt = performance.now();
       projVid.play().catch(() => {});
     };
-    const projStart = () => {
-      if (projVid) { if (projVid.paused) projVid.play().catch(() => {}); return; }
-      const v = document.createElement("video");
-      v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-      v.addEventListener("ended", projNext);
-      projVid = v;
-      projNext();
+    const projStart = (i: number) => {
+      if (!projVid) {
+        const v = document.createElement("video");
+        v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
+        v.addEventListener("ended", projNext);
+        projVid = v;
+        // count the video's new frames, so the texture is uploaded only when there is a new one (not on every draw)
+        const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+        if (rv.requestVideoFrameCallback) { projRVFC = true; const tick = () => { projFrame++; if (projVid === v) rv.requestVideoFrameCallback!(tick); }; rv.requestVideoFrameCallback(tick); }
+      }
+      if (projSvc !== i) { projSvc = i; projK = 0; projNext(); return; }
+      if (projVid.paused) projVid.play().catch(() => {});
     };
     /** Motion's cushion: rebuilt on the CPU each frame it shows */
     const pillow = new Pillow();
     let pillowIn = false;
-    /* Vertical's dust: motes hanging in the air of the light, the way dust shows in a projector's beam, giving the frame
-       its depth: most float around the two at their depth, sharp; some hang high between them and the camera, out of
-       focus, as soft discs. They drift slowly and are carried a little downstream; they glow where the light reaches
-       them. The frame's points go to dustData (x, y, z, size, strength, 0) */
-    const DUST_N = 900, DUST_IN = 380;
+    /* The dust: one field of motes hanging in the air over the whole stage, the same for every service, the way dust
+       hangs in a room and shows only where a projector's beam crosses it. It drifts slowly and never switches; our light
+       lights it where it passes, and each mote keeps a faint glow of its own so the room has depth. A few hang between
+       the stage and the camera, out of focus, as soft discs. The frame's points go to dustData (x, y, z, size,
+       strength, own glow) */
+    const DUST_N = 1200;
     const dust = { ph: new Float32Array(DUST_N * 8), init: false };
     const dustData = new Float32Array(DUST_N * 6);
-    let dustN = 0;
-    const dustFrame = (centre: V3, sc: number, t: number, O: V3) => {
+    let dustN = 0, dustFocus = NaN;
+    /** box: the stage's floor area [x0, z0, x1, z1], sc its scale, cam where the camera is */
+    const dustFrame = (box: [number, number, number, number], sc: number, t: number, cam: V3) => {
       if (!dust.init) {
         dust.init = true;
         let sd = 23;
         const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
         for (let j = 0; j < DUST_N; j++) dust.ph.set([r(), r(), r(), r() * 6.283, 0.3 + r(), r(), r(), r()], j * 8);
       }
-      // the light's way across the stage: from the glass to past the two
-      let fx = centre[0] - O[0], fz = centre[2] - O[2];
-      const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
-      const span = fl * 1.6, wide = 1.4 * sc + 0.35 * fl;
+      const [x0, z0, x1, z1] = box, wx = x1 - x0, wz = z1 - z0, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
       let n = 0;
       for (let j = 0; j < DUST_N; j++) {
         const g = j * 8, ra = dust.ph[g], rb = dust.ph[g + 1], rc = dust.ph[g + 2], ph = dust.ph[g + 3], sp = dust.ph[g + 4], rs = dust.ph[g + 5], rt = dust.ph[g + 6], rh = dust.ph[g + 7];
-        let x: number, y: number, z: number, k: number, glow: number;
-        if (j < DUST_IN) {
-          // in the light: a sparse stream, most of it soft
-          const high = j % 4 === 0;
-          const along = ((((ra + t * 0.006 * sp) % 1) + 1) % 1) * span + 0.15 * fl;
-          const across = (rb - 0.5) * wide * (0.35 + along / span);
-          const yb = high ? (0.9 + 2.2 * rh) * sc : (0.04 + 1.1 * rh * rh) * sc;
-          x = O[0] + fx * along - fz * across + 0.05 * sc * Math.sin(0.21 * t * sp + ph);
-          z = O[2] + fz * along + fx * across + 0.05 * sc * Math.cos(0.17 * t * sp + ph * 1.7);
-          y = yb + 0.04 * sc * Math.sin(0.26 * t * sp + ph * 2.3);
-          // a mote turns in the air and catches the light now and then
-          k = (high ? 0.16 : 0.08 + 0.3 * Math.pow(0.5 + 0.5 * Math.sin(0.9 * t * sp + ph * 3), 4)) * (0.6 + 0.4 * rc);
-          glow = 0;
-        } else {
-          // the room's air around it, faint, near and far, so the frame has depth
-          const along = (-0.5 + 2.6 * ra) * fl;
-          const across = (rb - 0.5) * (3.2 * wide + 2.0 * fl);
-          x = O[0] + fx * along - fz * across + 0.08 * sc * Math.sin(0.12 * t * sp + ph);
-          z = O[2] + fz * along + fx * across + 0.08 * sc * Math.cos(0.1 * t * sp + ph * 1.7);
-          y = (0.05 + 3.2 * rh * rh) * sc + 0.06 * sc * Math.sin(0.15 * t * sp + ph * 2.3);
-          k = 0.08 * (0.5 + 0.5 * rc);
-          glow = 0.5 + 0.5 * Math.pow(0.5 + 0.5 * Math.sin(0.4 * t * sp + ph * 3), 2);
+        // carried very slowly across the room (wrapping), wavering a little on its way
+        let x = x0 + ((((ra + t * 0.004 * sp) % 1) + 1) % 1) * wx + 0.06 * sc * Math.sin(0.15 * t * sp + ph);
+        let z = z0 + rb * wz + 0.06 * sc * Math.cos(0.12 * t * sp + ph * 1.7);
+        let y = (0.03 + 1.9 * rh * rh) * sc + 0.05 * sc * Math.sin(0.2 * t * sp + ph * 2.3);
+        const near = j % 16 === 0;
+        if (near) {
+          // between the stage and us: soft discs
+          const u = 0.25 + 0.45 * rc;
+          x = x + (cam[0] - mx) * u; z = z + (cam[2] - mz) * u; y = y * (1 - u) + cam[1] * u * 0.7;
         }
-        dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k * (0.7 + 0.3 * rt), glow], n * 6);
+        // a mote turns in the air and catches the light now and then
+        const tw = Math.pow(0.5 + 0.5 * Math.sin(0.8 * t * sp + ph * 3), 4);
+        const k = (near ? 0.14 : 0.07 + 0.3 * tw) * (0.6 + 0.4 * rc) * (0.7 + 0.3 * rt);
+        dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k, 0.15 + 0.15 * tw], n * 6);
         n++;
       }
       return n;
@@ -437,7 +441,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loadMeshes = () => {
       if (meshes) return;
       meshes = true;
-      const go = () => STATUES.forEach((url, i) => (i < 2 || import.meta.env.DEV) && loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      const go = () => STATUES.forEach((url, i) => (i < 2 || VARIANTS_ON) && loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
     };
@@ -779,8 +783,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       /* the things on the stage this frame: each service's fade in and out with its light */
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
       const items: Item[] = [];
-      dustN = 0;
-      let dustFade = 0, projOn = 0;
+      let projOn = 0, projTone = 0, projA = 2;
       let projC: [number, number] = [0, 0], projU: [number, number] = [1, 0], projV: [number, number] = [0, 1];
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
@@ -807,18 +810,6 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
         if (variant("motion") === "projector" || variant("motion") === "dust") {
           // only our light and the dust hanging in it; as a projector's light it lays our works on the floor
-          dustN = dustFrame(at(0, sd.d + 0.2 * sc, 0, 0), 0.55 * sc, tSec, O);
-          dustFade = st.show[0];
-          if (variant("motion") === "projector") {
-            projStart();
-            projOn = st.show[0];
-            const C0 = at(0, sd.d + 0.16 * sc, 0.04 * sc, 0), c0 = toScreen(C0), e = 0.05;
-            const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
-            const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
-            const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
-            const wpx = 0.6 * W, hpx = wpx / 2;
-            projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
-          }
         } else if (variant("motion") === "voxels") {
           const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
           showArt(artM, 0, M_ART, slots, 2700, 0.0095 * sc, CERAMIC, "voxel");
@@ -870,8 +861,40 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const mB = model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.025 * Math.sin(0.5 * tSec + 2.6), 0, sc);
         items.push({ mesh: M_CAESAR, m: mA, mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: mB, mat: MARBLE, fade: f });
-        dustN = dustFrame([(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2], sc, tSec, O);
-        dustFade = st.show[2];
+      }
+      // the projector: our works laid on the floor by the light of the service that shows most, among those that project
+      {
+        const wants = [variant("motion") === "projector", variant("ai") === "tone", variant("vertical") === "projector"];
+        let pi = -1;
+        for (let i = 0; i < 3; i++) if (wants[i] && st.show[i] > 0.004 && (stand[i]?.s ?? 1) > 0 && (pi < 0 || st.show[i] > st.show[pi])) pi = i;
+        if (pi >= 0) {
+          projStart(pi);
+          projOn = st.show[pi];
+          projTone = pi === 1 ? 1 : 0;
+          const sd = stand[pi] ?? { d: 1.6, s: 1 }, sc = sd.s || 1;
+          const C0 = pi === 2 ? at(2, sd.d + 0.12 * sc, 0.04 * sc, 0) : at(pi, sd.d + 0.16 * sc, 0.04 * sc, 0), c0 = toScreen(C0), e = 0.05;
+          const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
+          const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
+          const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
+          // Motion and AI: a wide 2:1 picture across the light; Vertical: an upright 9:16 frame
+          let wpx = 0.6 * W, hpx = wpx / 2;
+          if (pi === 2) { hpx = Math.min(0.66 * Hs, Hs - ruleY - 60); wpx = (hpx * 9) / 16; }
+          projA = wpx / hpx;
+          projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
+        } else if (projVid && !projVid.paused) projVid.pause();
+      }
+      // the dust over the whole stage: the floor area the three services use, and a margin round it
+      {
+        let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, ssum = 0;
+        for (let i = 0; i < 3; i++) {
+          const sd = stand[i] ?? { d: 1.6, s: 1 };
+          for (const p of [at(i, 0), at(i, sd.d * 1.5 + 0.5)]) { x0 = Math.min(x0, p[0]); z0 = Math.min(z0, p[2]); x1 = Math.max(x1, p[0]); z1 = Math.max(z1, p[2]); }
+          ssum += sd.s || 1;
+        }
+        const m = 0.25 * Math.max(x1 - x0, z1 - z0);
+        dustN = dustFrame([x0 - m, z0 - m, x1 + m, z1 + m], ssum / 3, tSec, cam.pos);
+        const fd = Math.hypot(cam.pos[0] - place[svc].o[0], cam.pos[1], cam.pos[2] - place[svc].o[2]);
+        dustFocus = Number.isNaN(dustFocus) || frozen ? fd : dustFocus + (fd - dustFocus) * kk(0.05);
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
@@ -960,13 +983,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       let pw = 0;
       if (projOn > 0.004 && projVid && projTex && projVid.readyState >= 2 && projVid.videoWidth) {
         gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, projTex);
-        try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, projVid); pw = projOn; } catch { pw = 0; }
-        const ar = projVid.videoWidth / projVid.videoHeight, fa = Math.hypot(projU[0], projU[1]) > 0 ? 2 : 2;
+        if (!projRVFC) projFrame++;
+        pw = projOn;
+        if (projFrame !== projUp) { try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, projVid); projUp = projFrame; } catch { pw = 0; } }
+        const ar = projVid.videoWidth / projVid.videoHeight, fa = projA;
         f2("uProjCrop", ar > fa ? fa / ar : 1, ar > fa ? 1 : ar / fa);
         const sinceCut = (performance.now() - projAt) / 1000, left = projVid.duration ? projVid.duration - projVid.currentTime : 9;
         pw *= Math.min(1, sinceCut / 0.35) * Math.min(1, left / 0.3);
       }
-      f1("uProjW", pw); f1("uProjGain", 2.6);
+      f1("uProjW", pw); f1("uProjTone", projTone);
       f2("uProjC", projC[0], projC[1]); f2("uProjU", projU[0], projU[1]); f2("uProjV", projV[0], projV[1]);
       gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -987,7 +1012,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           gl.uniform1f(uu("uGain"), S.gain); gl.uniform1f(uu("uGrain"), 0.03); gl.uniform1f(uu("uTime"), tSec);
         };
         ob.draw(items, vp, shared, canvas.width, canvas.height);
-        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, dustFade, shared, Math.hypot(cam.pos[0] - place[svc].o[0], cam.pos[1], cam.pos[2] - place[svc].o[2]), 9 * cpx);
+        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, Math.min(1, tSec / 2), shared, dustFocus, 9 * cpx);
       }
       mark();
       if (prof) window.__stPrismProf = prof.marks;
@@ -997,13 +1022,22 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /* frame pacing: the time between frames, smoothed; slow frames drop the quality a step at once, frames with room
        to spare lift it a step after a long while */
     let ema = 16, prev = 0, slowMs = 0, fastMs = 0, holdUntil = 0, errors = 0, drawn = false;
+    /* at rest (no pointer, no switch for a moment) the scene only drifts: it draws every other frame, which halves the
+       GPU's work and leaves the page's own scrolling and video room; any input brings the full rate back at once */
+    let lastInput = performance.now(), lastDraw = 0, idle = false;
+    const onInput = () => { lastInput = performance.now(); };
+    window.addEventListener("pointermove", onInput, { passive: true });
+    window.addEventListener("wheel", onInput, { passive: true });
+    window.addEventListener("touchmove", onInput, { passive: true });
     const pace = (now: number) => {
       const dt = prev ? Math.min(200, now - prev) : 16;
       prev = now;
       ema += (dt - ema) * 0.08;
       if (now < holdUntil || typeof window.__stSceneT === "number" || window.__stPrismBudget) return;
-      slowMs = ema > 30 ? slowMs + dt : 0;
-      fastMs = ema < 18 ? fastMs + dt : 0;
+      // measured against the rate it aims for (half at rest)
+      const per = idle ? 2 : 1;
+      slowMs = ema > 30 * per ? slowMs + dt : 0;
+      fastMs = ema < 18 * per ? fastMs + dt : 0;
       const step = (to: number) => { quality.tier = to; resize(); lastKey = ""; ema = 16; slowMs = fastMs = 0; holdUntil = now + 1500; };
       if (slowMs > 700 && quality.tier < TIERS.length - 1) step(quality.tier + 1);
       else if (fastMs > 6000 && quality.tier > 0) step(quality.tier - 1);
@@ -1017,7 +1051,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const clock = import.meta.env.DEV ? window.__stClock : undefined;
       if (typeof clock === "number") now = clock;
       const key = typeof clock === "number" ? `clock${clock}|${activeRef.current}` : typeof window.__stSceneT === "number" ? `${window.__stSceneT}|${window.__stPrismPx}|${window.__stPrismPy}|${activeRef.current}|${JSON.stringify(window.__stPrismDbg ?? null)}|${canvas.width}x${canvas.height}` : "";
+      const rest = !key && now - lastInput > 1500 && now - tOn > 3000 && now - beam.tSw * 1000 > 2500;
+      if (rest !== idle) { idle = rest; ema = idle ? 33 : 16; prev = 0; }
+      if (idle && now - lastDraw < 25) return;
       if (!key || key !== lastKey) {
+        lastDraw = now;
         const tq = performance.now();
         try {
           draw(now);
@@ -1101,6 +1139,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       ro.disconnect(); io.disconnect();
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("pointermove", onInput); window.removeEventListener("wheel", onInput); window.removeEventListener("touchmove", onInput);
       canvas.removeEventListener("webglcontextlost", onLost);
       alive = false;
       if (!lost) {

@@ -43,7 +43,7 @@ uniform vec3 uS0, uS1, uS2, uS3, uS4;
 uniform sampler2D uSpec;
 /* Motion's projection: the video, its frame on the floor (centre, half-axes), how much of the video the frame shows */
 uniform sampler2D uProj;
-uniform float uProjW, uProjGain;
+uniform float uProjW, uProjTone;
 uniform vec2 uProjC, uProjU, uProjV, uProjCrop;
 uniform float uGrain, uHaze, uFanGain, uLandGain, uEnv, uAirFan, uFanRefl;
 uniform vec2 uBeamFade;
@@ -91,10 +91,10 @@ vec3 coneAir(vec3 ro, vec3 rd, float tmax){
   h = sqrt(h);
   float t0 = max(-b - h, 0.0), t1 = min(-b + h, tmax);
   if (t1 <= t0) return vec3(0.0);
-  float dt = (t1 - t0) / 12.0;
+  float dt = (t1 - t0) / 8.0;
   float j = hash(gl_FragCoord.xy * 1.37 + 5.1);
   vec3 acc = vec3(0.0);
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < 8; i++) {
     vec3 p = ro + rd * (t0 + (float(i) + j) * dt);
     if (p.y < 0.0) break;
     vec3 cl = coneLight(p);
@@ -365,11 +365,14 @@ vec3 floorLight(vec3 p, vec3 rd){
       // how bright the light makes the floor here, on screen
       float Lw = 1.0 - exp(-1.4 * uGain * dot(col, vec3(0.3, 0.5, 0.2)));
       vec2 uv = clamp(vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y), 0.0, 1.0);
-      vec3 d = texture2D(uProj, uv).rgb;
+      vec3 raw = texture2D(uProj, uv).rgb, d = raw;
       // muted, the highlights rolled off so a white frame never burns into a slab
       d = d * (1.0 - 0.35 * d) * 0.95 * smoothstep(0.0, 0.22, Lw);
       vec3 pre = -log(max(vec3(1.0) - d, vec3(0.02))) / (1.4 * max(uGain, 1e-3));
-      col = mix(col, pre, pin * 0.9 * uProjW);
+      // AI: the spectrum keeps its colours and carries the picture as a tone (its light and shade); the others: the picture itself
+      float lum = dot(raw, vec3(0.3, 0.55, 0.15));
+      vec3 tone = col * (0.3 + 1.4 * lum);
+      col = mix(col, mix(pre, tone, uProjTone), pin * mix(0.9, 0.75, uProjTone) * uProjW);
     }
   }
   return col;
