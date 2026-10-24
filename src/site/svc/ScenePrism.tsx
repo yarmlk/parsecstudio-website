@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
-import { CERAMIC, FROST, MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item } from "./ScenePrism.objects";
-import { ShadowArt, type ArtSlot } from "./ScenePrism.art";
-import { AI_LOOPS } from "../cases";
-import { Pillow, pillowPose } from "./ScenePrism.pillow";
+import { MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item, type Screen as Panel } from "./ScenePrism.objects";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
 /* Services: one stage, one real glass prism at the centre of the section, level with the middle of the three names. The
@@ -50,16 +47,14 @@ function exitAz(P: ReturnType<typeof makePrism>, o: V3, d: V3, ns: number[]) {
 const AZ_PREF = [8, -20, -8];
 /** index per channel for what is seen through the glass (a modest, real-looking fringe) */
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
-/** Vertical's marble (packed meshes, public/mesh): the two busts, and (dev only) the Hercules group to compare */
-const STATUES = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/hercules.bin"] as const;
-/** mesh slots: the busts and the group, then the shadow art of Motion and of Vertical */
-const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_PILLOW = 6, M_ART = 14;
+/** Vertical's marble (packed meshes, public/mesh): the two busts, an alternative to compare */
+const STATUES = ["mesh/caesar.bin", "mesh/senator.bin"] as const;
+/** mesh slots: the busts */
+const M_CAESAR = 3, M_SENATOR = 4;
 /** the alternatives Vlad compares (a switch under the stage, on localhost and on the review preview); production shows
- *  the first of each. Motion: our works projected by the light, or only the light and its dust, the cushion, the
- *  voxels' shadow story. AI: the spectrum carries a faint tone of our AI works, or colour alone. Vertical: our 9:16
- *  episodes projected as an upright frame, the two busts in conversation, or Hercules raising Antaeus */
-export const VARIANTS = { motion: ["projector", "dust", "cushion", "voxels"], ai: ["tone", "colour"], vertical: ["projector", "busts", "hercules"] } as const;
-export type Variants = { motion: (typeof VARIANTS.motion)[number]; ai: (typeof VARIANTS.ai)[number]; vertical: (typeof VARIANTS.vertical)[number] };
+ *  the first. Vertical: our 9:16 series standing in the light as doors one behind another, or the two busts */
+export const VARIANTS = { vertical: ["doors", "busts"] } as const;
+export type Variants = { vertical: (typeof VARIANTS.vertical)[number] };
 /** the switch shows on localhost and on the review branch's preview, never in production */
 export const VARIANTS_ON = import.meta.env.DEV || (typeof location !== "undefined" && location.hostname.includes("-git-review-"));
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
@@ -68,13 +63,6 @@ const variant = <K extends keyof Variants>(k: K): Variants[K] => {
 };
 const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const base = import.meta.env.BASE_URL;
-/** Motion's story in the shadow: a city grows out of the floor, folds over onto itself, and the fold becomes a
- *  fighter in a flying kick (modelling, effects, character: what the service makes) */
-const MOTION_SLOT = {
-  pics: ["city1", "city2", "city3", "fold", "kick"].map((n) => `${base}shadow/${n}.png`),
-  hold: [0.12, 0.12, 1.5, 1.9, 2.4],
-  morph: [0.6, 0.7, 1.5, 1.6, 1.7],
-};
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
 const DIMS = [{ h: 1.05, r: 0.85 }, { h: 0.8, r: 0.62 }, { h: 0.95, r: 0.9 }];
@@ -310,28 +298,20 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let lutSat = NaN;
     let objs: Objects | null = null;
     let alive = true, ready = false, failed = false, meshes = false;
-    /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
-    const artM = new ShadowArt();
-    /* the projector: our works, one loop after another, laid on the floor by the light; one video at a time, for the
-       service whose light shows (Motion: our 3D and CGI films; AI: our AI films, as a faint tone in the spectrum;
-       Vertical: our 9:16 episodes) */
+    /* Motion's projector: our 3D and CGI works, one loop after another, laid on the floor by the light */
     let projTex: WebGLTexture | null = null;
-    let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0, projSvc = -1, projFrame = 0, projUp = -1, projRVFC = false;
-    const PROJ: Record<number, string[]> = {
-      0: ["centil", "fifa", "tefal", "prison", "arch"],
-      1: AI_LOOPS,
-      2: ["vertical"],
-    };
+    let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0, projFrame = 0, projUp = -1, projRVFC = false;
+    const PROJ = ["centil", "fifa", "tefal", "prison", "arch"];
     const projNext = () => {
       if (!projVid) return;
-      const list = PROJ[projSvc] ?? PROJ[0];
+      const list = PROJ;
       const webm = projVid.canPlayType('video/webm; codecs="vp9"') !== "";
       projVid.src = `${import.meta.env.BASE_URL}video/site/${list[projK % list.length]}-loop.${webm ? "webm" : "mp4"}`;
       projK++;
       projAt = performance.now();
       projVid.play().catch(() => {});
     };
-    const projStart = (i: number) => {
+    const projStart = () => {
       if (!projVid) {
         const v = document.createElement("video");
         v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
@@ -341,18 +321,29 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
         if (rv.requestVideoFrameCallback) { projRVFC = true; const tick = () => { projFrame++; if (projVid === v) rv.requestVideoFrameCallback!(tick); }; rv.requestVideoFrameCallback(tick); }
       }
-      if (projSvc !== i) { projSvc = i; projK = 0; projNext(); return; }
+      if (!projVid.src) { projNext(); return; }
       if (projVid.paused) projVid.play().catch(() => {});
     };
-    /** Motion's cushion: rebuilt on the CPU each frame it shows */
-    const pillow = new Pillow();
-    let pillowIn = false;
+    /* Vertical's doors: one video holding three 9:16 series side by side (one decode, one upload), shown on three
+       upright screens standing one behind another in the light */
+    let vertTex: WebGLTexture | null = null, vertVid: HTMLVideoElement | null = null, vertFrame = 0, vertUp = -1, vertRVFC = false;
+    const vertStart = () => {
+      if (!vertVid) {
+        const v = document.createElement("video");
+        v.muted = true; v.playsInline = true; v.loop = true; v.preload = "auto"; v.crossOrigin = "anonymous";
+        v.src = `${import.meta.env.BASE_URL}video/site/vertical3-loop.${v.canPlayType('video/webm; codecs="vp9"') !== "" ? "webm" : "mp4"}`;
+        const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+        if (rv.requestVideoFrameCallback) { vertRVFC = true; const tick = () => { vertFrame++; if (vertVid === v) rv.requestVideoFrameCallback!(tick); }; rv.requestVideoFrameCallback(tick); }
+        vertVid = v;
+      }
+      if (vertVid.paused) vertVid.play().catch(() => {});
+    };
     /* The dust: one field of motes hanging in the air over the whole stage, the same for every service, the way dust
        hangs in a room and shows only where a projector's beam crosses it. It drifts slowly and never switches; our light
        lights it where it passes, and each mote keeps a faint glow of its own so the room has depth. A few hang between
        the stage and the camera, out of focus, as soft discs. The frame's points go to dustData (x, y, z, size,
        strength, own glow) */
-    const DUST_N = 1200;
+    const DUST_N = 700;
     const dust = { ph: new Float32Array(DUST_N * 8), init: false };
     const dustData = new Float32Array(DUST_N * 6);
     let dustN = 0, dustFocus = NaN;
@@ -372,7 +363,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         let x = x0 + ((((ra + t * 0.004 * sp) % 1) + 1) % 1) * wx + 0.06 * sc * Math.sin(0.15 * t * sp + ph);
         let z = z0 + rb * wz + 0.06 * sc * Math.cos(0.12 * t * sp + ph * 1.7);
         let y = (0.03 + 1.9 * rh * rh) * sc + 0.05 * sc * Math.sin(0.2 * t * sp + ph * 2.3);
-        const near = j % 16 === 0;
+        const near = j % 20 === 0;
         if (near) {
           // between the stage and us: soft discs
           const u = 0.25 + 0.45 * rc;
@@ -380,7 +371,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         }
         // a mote turns in the air and catches the light now and then
         const tw = Math.pow(0.5 + 0.5 * Math.sin(0.8 * t * sp + ph * 3), 4);
-        const k = (near ? 0.14 : 0.07 + 0.3 * tw) * (0.6 + 0.4 * rc) * (0.7 + 0.3 * rt);
+        const k = (near ? 0.11 : 0.06 + 0.26 * tw) * (0.6 + 0.4 * rc) * (0.7 + 0.3 * rt);
         dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k, 0.15 + 0.15 * tw], n * 6);
         n++;
       }
@@ -417,6 +408,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      vertTex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, vertTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      gl.activeTexture(gl.TEXTURE0);
 
       /* the things the light falls on */
       objs = new Objects(gl);
@@ -441,7 +441,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loadMeshes = () => {
       if (meshes) return;
       meshes = true;
-      const go = () => STATUES.forEach((url, i) => (i < 2 || VARIANTS_ON) && loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
+      // the busts are only an alternative to compare: production never fetches them
+      const go = () => VARIANTS_ON && STATUES.forEach((url, i) => loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
     };
@@ -764,7 +765,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const pin = project(cam, tr.pin, A), pc = project(cam, [0, S.H * 0.5, 0], A), po = project(cam, origin, A);
         window.__stPrismInfo = {
           W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, stand, place, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
-          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos, art: [artM.ready, artM.key.slice(0, 60)],
+          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos, 
         };
       }
 
@@ -783,7 +784,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       /* the things on the stage this frame: each service's fade in and out with its light */
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
       const items: Item[] = [];
-      let projOn = 0, projTone = 0, projA = 2;
+      let projOn = 0;
       let projC: [number, number] = [0, 0], projU: [number, number] = [1, 0], projV: [number, number] = [0, 1];
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
@@ -791,60 +792,36 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         return [pl0.o[0] + f[0] * along + r[0] * side, y, pl0.o[2] + f[2] * along + r[2] * side];
       };
       const facing = (p: V3, q: V3) => Math.atan2(q[0] - p[0], q[2] - p[2]);
-      // shadow art: built for this layout's light while its service is on, then kept; the shards gather in from a
-      // scatter as their service comes on and drift along their own rays (the picture holds) while it shows
       const toScreen = (p: V3): [number, number] => { const q = project(cam, p, A); return [q[0] * W, q[1] * Hs]; };
-      // (built for where its service's light leaves the glass at the middle of its turn: the layout alone decides it)
-      const layoutKey = (slots: ArtSlot[], extra: string, o: V3) => [extra, ...o, W, Hs, ...slots.flatMap((sl) => [...sl.at, sl.px])].map((x) => (typeof x === "number" ? x.toFixed(3) : x)).join();
-      const showArt = (art: ShadowArt, i: number, mesh: number, slots: ArtSlot[], N: number, size: number, mat: Item["mat"], shape: "flake" | "voxel" = "flake") => {
-        const ob0 = place[i]?.o;
-        if (ob0 && svc === i && (frozen || sw > 0.2)) art.build(layoutKey(slots, `${mesh}${shape}`, ob0), { O: ob0, slots, toScreen, size, N, shape }, (m) => { if (alive && objs) objs.set(mesh, m); });
-        if (!art.ready || !ob.has(mesh)) return;
-        const come = svc === i && !frozen ? easeEnter(clamp01((sw - 0.1) / 1.9)) : 1;
-        if (art.frame(tSec, come, stand[i]?.s || 1, O)) ob.update(mesh, art.positions!, art.normals!);
-        items.push({ mesh, m: IDENT, mat, fade: st.show[i] });
-      };
-      if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
-        // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
-        // the shards turn into the next one (to the right of the stage, where the light lies widest)
-        const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        if (variant("motion") === "projector" || variant("motion") === "dust") {
-          // only our light and the dust hanging in it; as a projector's light it lays our works on the floor
-        } else if (variant("motion") === "voxels") {
-          const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
-          showArt(artM, 0, M_ART, slots, 2700, 0.0095 * sc, CERAMIC, "voxel");
-        } else {
-          // the cushion: inflates, drops, squashes, wobbles, settles, lets its air out and floats back up
-          if (!pillowIn) { pillowIn = true; ob.set(M_PILLOW, pillow.mesh()); }
-          const ps = pillowPose(tSec), size = 0.3 * sc;
-          pillow.shape(ps.inflate, ps.squash);
-          ob.update(M_PILLOW, pillow.pos, pillow.nrm);
-          const p0 = at(0, sd.d + 0.05 * sc, 0.05 * sc, 0);
-          items.push({ mesh: M_PILLOW, m: model([p0[0], ps.lift * size * 0.5, p0[2]], ps.yaw, ps.tilt, ps.tilt * 0.6, size), mat: CERAMIC, fade: st.show[0] });
-        }
-      }
       // AI Production plays with colour alone: the spectrum over the floor, no object in it
-      // Vertical Series: the light comes down as an upright 9:16 screen on the floor, and in it a marble drama, one
-      // figure raised over the other (or the voxels that throw that group's shadow)
-      let frameC: [number, number] = [0, 0], frameU: [number, number] = [1, 0], frameV: [number, number] = [0, 1];
-      {
+      // Vertical Series: three of our 9:16 series stand in the light as screens, one behind another like doors in a
+      // corridor; as Vertical comes on they open out from one into three, and the pointer moves them a little in depth
+      const screens: Panel[] = [];
+      if (st.show[2] > 0.004 && variant("vertical") === "doors" && (stand[2]?.s ?? 1) > 0) {
+        vertStart();
         const sd = stand[2] ?? { d: 1.6, s: 1 };
-        const C0 = at(2, sd.d + 0.12, 0.04, 0), c0 = toScreen(C0), e = 0.05;
-        const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
-        const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
-        const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
-        const hpx = Math.min(0.68 * Hs, Hs - ruleY - 60), wpx = (hpx * 9) / 16;
-        frameC = [C0[0], C0[2]]; frameU = inv(wpx / 2, 0); frameV = inv(0, hpx / 2);
-        if (st.show[2] > 0.004 && variant("vertical") === "hercules" && ob.has(M_HERC)) {
-          // the Hercules group stood in the frame a little toward the light, turned mostly to the light (the faces
-          // catch it) and partly to us; the light keys the raised figure and throws the group's long shadow
-          const P0: V3 = [C0[0] - frameU[0] * 0.2 + frameV[0] * 0.25, 0, C0[2] - frameU[1] * 0.2 + frameV[1] * 0.25];
-          const sc = 1.1 * (sd.s || 1);
-          const toCam = facing(P0, [cam.pos[0], 0, cam.pos[2]]), toLight = facing(P0, [O[0], 0, O[2]]);
-          const yaw = toLight + 0.45 * Math.atan2(Math.sin(toCam - toLight), Math.cos(toCam - toLight)) + 0.25 + 0.05 * Math.sin(0.2 * tSec);
-          items.push({ mesh: M_HERC, m: model([P0[0], -ob.lowest(M_HERC, 0) * sc, P0[2]], yaw, 0, 0, sc), mat: MARBLE, fade: st.show[2] });
+        const S = at(2, sd.d * 0.8, 0, 0);
+        // the camera's way into the stage and its right, on the floor
+        let fx = S[0] - cam.pos[0], fz = S[2] - cam.pos[2];
+        const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+        let rx = cam.r[0], rz = cam.r[2];
+        const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+        // each screen stands on the floor and leans back to face us square (the camera looks down on the stage), so it
+        // reads as an upright 9:16 picture; the front one as tall as the frame allows
+        const up = norm(cam.u), rt = norm(cam.r);
+        const p0 = toScreen(S), p1 = toScreen(add(S, mul(up, 0.1)));
+        const perU = Math.max(1, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / 0.1);
+        const hW = Math.min(0.36 * Hs, Hs - ruleY - 120) / perU, wW = (hW * 9) / 16;
+        const open = svc === 2 && !frozen ? easeEnter(clamp01((sw - 0.15) / 1.6)) : 1;
+        for (let k = 2; k >= 0; k--) {
+          // the front one in the light right of the glass; each further one a step deeper and a step along the light,
+          // so all three show
+          const deep = (k * 0.45 * open - 1.5) * wW, side = 0.1 * wW + k * 0.72 * wW * open + px * 0.06 * wW * k;
+          const c: V3 = [S[0] + fx * deep + rx * side, 0, S[2] + fz * deep + rz * side];
+          const f = st.show[2] * clamp01(open * 2.2 - (k === 0 ? 0 : 0.35 * k)) * (1 - 0.12 * k);
+          screens.push({ c, r: mul(rt, wW / 2), u: mul(up, hW), uv: [k / 3, 1, 1 / 3, -1], fade: k === 0 ? st.show[2] : f });
         }
-      }
+      } else if (vertVid && !vertVid.paused) vertVid.pause();
       if (st.show[2] > 0.004 && variant("vertical") === "busts" && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
         // Vertical Series: two busts in conversation, side by side along the light, each cheated out to us and turned to
         // the other; they turn a little, in turn, as if one speaks and the other answers. Fine dust drifts off them
@@ -862,27 +839,19 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         items.push({ mesh: M_CAESAR, m: mA, mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: mB, mat: MARBLE, fade: f });
       }
-      // the projector: our works laid on the floor by the light of the service that shows most, among those that project
-      {
-        const wants = [variant("motion") === "projector", variant("ai") === "tone", variant("vertical") === "projector"];
-        let pi = -1;
-        for (let i = 0; i < 3; i++) if (wants[i] && st.show[i] > 0.004 && (stand[i]?.s ?? 1) > 0 && (pi < 0 || st.show[i] > st.show[pi])) pi = i;
-        if (pi >= 0) {
-          projStart(pi);
-          projOn = st.show[pi];
-          projTone = pi === 1 ? 1 : 0;
-          const sd = stand[pi] ?? { d: 1.6, s: 1 }, sc = sd.s || 1;
-          const C0 = pi === 2 ? at(2, sd.d + 0.12 * sc, 0.04 * sc, 0) : at(pi, sd.d + 0.16 * sc, 0.04 * sc, 0), c0 = toScreen(C0), e = 0.05;
-          const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
-          const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
-          const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
-          // Motion and AI: a wide 2:1 picture across the light; Vertical: an upright 9:16 frame
-          let wpx = 0.6 * W, hpx = wpx / 2;
-          if (pi === 2) { hpx = Math.min(0.66 * Hs, Hs - ruleY - 60); wpx = (hpx * 9) / 16; }
-          projA = wpx / hpx;
-          projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
-        } else if (projVid && !projVid.paused) projVid.pause();
-      }
+      // Motion's projector: our works laid on the floor by its light
+      if (st.show[0] > 0.004 && (stand[0]?.s ?? 1) > 0) {
+        projStart();
+        projOn = st.show[0];
+        const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s || 1;
+        const C0 = at(0, sd.d + 0.16 * sc, 0.04 * sc, 0), c0 = toScreen(C0), e = 0.05;
+        const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
+        const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
+        const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
+        // a wide 2:1 picture across the light
+        const wpx = 0.6 * W, hpx = wpx / 2;
+        projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
+      } else if (projVid && !projVid.paused) projVid.pause();
       // the dust over the whole stage: the floor area the three services use, and a margin round it
       {
         let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9, ssum = 0;
@@ -917,11 +886,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (shadowOn) ob.shadow(items, lvp, O, L_FAR);
       mark();
       const setLight = (uu: (n: string) => WebGLUniformLocation | null, air = 1) => {
-        gl.uniform1f(uu("uGoboAll"), air);
         gl.uniform3f(uu("uLO"), O[0], O[1], O[2]);
         gl.uniform1f(uu("uLSpec"), st.spec);
-        gl.uniform1f(uu("uGobo"), variant("vertical") === "hercules" ? st.k : 0); gl.uniform1f(uu("uGoboR"), 0.14); gl.uniform1f(uu("uGoboSoft"), 0.025); gl.uniform1f(uu("uGoboOut"), 0.07);
-        gl.uniform2f(uu("uGoboC"), frameC[0], frameC[1]); gl.uniform2f(uu("uGoboU"), frameU[0], frameU[1]); gl.uniform2f(uu("uGoboV"), frameV[0], frameV[1]);
         gl.uniform1f(uu("uLAE"), lAE); gl.uniform1f(uu("uLAM"), lAM);
         gl.uniform1f(uu("uLWedge"), wedge); gl.uniform1f(uu("uLGain"), lGain);
         gl.uniformMatrix4fv(uu("uLVP"), false, lvp);
@@ -986,19 +952,19 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         if (!projRVFC) projFrame++;
         pw = projOn;
         if (projFrame !== projUp) { try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, projVid); projUp = projFrame; } catch { pw = 0; } }
-        const ar = projVid.videoWidth / projVid.videoHeight, fa = projA;
+        const ar = projVid.videoWidth / projVid.videoHeight, fa = 2;
         f2("uProjCrop", ar > fa ? fa / ar : 1, ar > fa ? 1 : ar / fa);
         const sinceCut = (performance.now() - projAt) / 1000, left = projVid.duration ? projVid.duration - projVid.currentTime : 9;
         pw *= Math.min(1, sinceCut / 0.35) * Math.min(1, left / 0.3);
       }
-      f1("uProjW", pw); f1("uProjTone", projTone);
+      f1("uProjW", pw);
       f2("uProjC", projC[0], projC[1]); f2("uProjU", projU[0], projU[1]); f2("uProjV", projV[0], projV[1]);
       gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       mark();
 
       // the things, mirrored in the floor and then themselves, in the same light
-      if (ob.ok && (items.length || dustN)) {
+      if (ob.ok && (items.length || dustN || screens.length)) {
         const vp = camClip(cam.pos, cam.f, cam.r, cam.u, cam.focal, cam.shift, A);
         const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
         const shared = (lp: WebGLProgram) => {
@@ -1013,6 +979,16 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         };
         ob.draw(items, vp, shared, canvas.width, canvas.height);
         if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, Math.min(1, tSec / 2), shared, dustFocus, 9 * cpx);
+        // Vertical's screens: the atlas uploaded only when the video has a new frame
+        if (screens.length && vertTex && vertVid && vertVid.readyState >= 2 && vertVid.videoWidth) {
+          if (!vertRVFC) vertFrame++;
+          if (vertFrame !== vertUp) {
+            gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, vertTex);
+            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vertVid); vertUp = vertFrame; } catch { /* not ready */ }
+            gl.activeTexture(gl.TEXTURE0);
+          }
+          ob.screens(screens, vertTex, vp, shared);
+        }
       }
       mark();
       if (prof) window.__stPrismProf = prof.marks;

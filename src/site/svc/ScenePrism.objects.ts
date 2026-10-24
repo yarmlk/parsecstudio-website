@@ -24,26 +24,6 @@ uniform sampler2D uShadow;
 uniform float uShadowOn, uLFar, uShadowTx;
 float unpackD(vec4 c){ return dot(c, vec4(1.0, 1.0 / 255.0, 1.0 / 65025.0, 1.0 / 16581375.0)); }
 float wrapPi(float a){ return mod(a + 3.14159265, 6.2831853) - 3.14159265; }
-/* the light's frame (Vertical): a portrait 9:16 frame in front of the light, like a projector's gate, so the light lands
-   on the floor as an upright screen with rounded corners; a point is lit if its ray from the light lands inside.
-   uGobo: how much of it (0 off); centre, half-axes (floor xz), corner radius and softness in frame units; uGoboOut: the
-   light left outside the frame; uGoboAll: frame the air too (the prism's pass), or the floor alone (the things' pass) */
-uniform float uGobo, uGoboR, uGoboSoft, uGoboOut, uGoboAll;
-uniform vec2 uGoboC, uGoboU, uGoboV;
-float gobo(vec3 p){
-  // the things standing in the frame keep their light (only the floor and the air are framed)
-  if (uGobo < 0.001 || (uGoboAll < 0.5 && p.y > 0.01)) return 1.0;
-  vec3 d = p - uLO;
-  if (d.y > -1e-4) return mix(1.0, uGoboOut, uGobo);
-  vec2 q = uLO.xz + d.xz * (uLO.y / -d.y) - uGoboC;
-  // into the frame's own units: solve q = a U + b V
-  float det = uGoboU.x * uGoboV.y - uGoboU.y * uGoboV.x;
-  vec2 ab = vec2(q.x * uGoboV.y - q.y * uGoboV.x, uGoboU.x * q.y - uGoboU.y * q.x) / det;
-  vec2 e = abs(ab) - vec2(1.0) + uGoboR;
-  float sdf = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - uGoboR;
-  float inside = 1.0 - smoothstep(-uGoboSoft, uGoboSoft, sdf);
-  return mix(1.0, mix(uGoboOut, 1.0, inside), uGobo);
-}
 /* the light that reaches p: its colour across the bundle, the wedge, the cone's height, the distance */
 vec3 coneLight(vec3 p){
   vec3 v = p - uLO;
@@ -59,7 +39,6 @@ vec3 coneLight(vec3 p){
   float near = mix(smoothstep(0.1, 0.5, r), smoothstep(0.12, 1.15, r), uLSpec);
   float fall = 1.0 / (1.0 + r * r * 0.26);
   float s = wrapPi(a - uLAE) / (abs(da) < 1e-3 ? 1e-3 : da);
-  near *= gobo(p);
   // and the further its colours travel apart, the purer each gets
   vec3 c = spectrum(s);
   c = max(mix(vec3(dot(c, vec3(0.3, 0.5, 0.2))), c, 1.0 + 1.3 * uLSpec * smoothstep(0.5, 2.0, r)), 0.0);
@@ -386,6 +365,49 @@ void main(){
   gl_FragColor = vec4(1.0 - exp(-col * 1.4 * uGain), 1.0);
 }`;
 
+/* screens: upright 9:16 panels standing on the floor, each showing a part of one video (an atlas), lit by our light
+   where it reaches them and a little by themselves; soft at the edges (no frame line), mirrored dimly in the satin floor */
+const SCREEN_VERT = `
+attribute vec2 aP;            // corner, -1..1
+uniform mat4 uVP;
+uniform vec3 uC, uR, uU;      // bottom middle, half the width, the full height
+uniform float uMirror;
+varying vec2 vUV;
+varying vec3 vW;
+void main(){
+  vUV = vec2(aP.x * 0.5 + 0.5, aP.y * 0.5 + 0.5);
+  vec3 w = uC + uR * aP.x + uU * vUV.y;
+  vW = w;
+  gl_Position = uVP * vec4(w.x, uMirror > 0.5 ? -w.y : w.y, w.z, 1.0);
+}`;
+const SCREEN_FRAG = (cone: string) => `
+precision highp float;
+uniform vec3 uS0, uS1, uS2, uS3, uS4;
+vec3 spectrum(float s){ return uS0; }
+${cone}
+uniform sampler2D uTex;
+uniform vec4 uUV;             // offset, scale in the atlas
+uniform float uFade, uMirror, uTopY, uTopSoft, uGain;
+varying vec2 vUV;
+varying vec3 vW;
+void main(){
+  // soft edges with rounded corners, no frame line
+  vec2 q = abs(vUV - 0.5) * 2.0;
+  vec2 k = vec2(0.06, 0.034);
+  vec2 d = max(q - (1.0 - 2.5 * k), 0.0) / (2.5 * k);
+  float edge = 1.0 - smoothstep(0.55, 1.0, length(d));
+  vec3 v = texture2D(uTex, uUV.xy + vUV * uUV.zw).rgb;
+  // lit by our light where it passes (the panel and the floor at its foot), a little by itself
+  vec3 Li = max(coneLight(vW), coneLight(vec3(vW.x, 0.0, vW.z)) * 0.85);
+  float lit = clamp(0.32 + 2.4 * dot(Li, vec3(0.3, 0.5, 0.2)), 0.0, 1.0);
+  vec3 col = v * (1.0 - 0.3 * v) * 0.95 * lit;
+  float a = edge * uFade;
+  if (uMirror > 0.5) a *= 0.14 * (1.0 - smoothstep(0.0, 0.45, vUV.y));
+  a *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
+  gl_FragColor = vec4(col, a);
+}`;
+export interface Screen { c: V3; r: V3; u: V3; uv: [number, number, number, number]; fade: number }
+
 export interface Material { alb: V3; rough: number; f0: number; wrap: number; glow: number; rim: number }
 export const MARBLE: Material = { alb: [0.86, 0.84, 0.8], rough: 0.42, f0: 0.04, wrap: 0.28, glow: 0.035, rim: 0.12 };
 /** glossy black ceramic: almost no colour of its own, the light lives in its highlight and along its edges */
@@ -406,6 +428,8 @@ export class Objects {
   private litProg: WebGLProgram;
   private dustProg: WebGLProgram;
   private dustBuf: WebGLBuffer | null = null;
+  private screenProg: WebGLProgram;
+  private quadBuf: WebGLBuffer | null = null;
   private U = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
   readonly shadowTex: WebGLTexture;
   private fbo: WebGLFramebuffer;
@@ -430,6 +454,7 @@ export class Objects {
     this.depthProg = mk(MESH_VERT, DEPTH_FRAG);
     this.litProg = mk(MESH_VERT, LIT_FRAG(CONE_GLSL));
     this.dustProg = mk(DUST_VERT, DUST_FRAG(CONE_GLSL));
+    this.screenProg = mk(SCREEN_VERT, SCREEN_FRAG(CONE_GLSL));
     this.ok = !!gl.getProgramParameter(this.depthProg, gl.LINK_STATUS) && !!gl.getProgramParameter(this.litProg, gl.LINK_STATUS);
     // the shadow map: packed distance, cleared to "nothing in the way"
     this.shadowTex = gl.createTexture()!;
@@ -490,6 +515,36 @@ export class Objects {
     gl.drawArrays(gl.POINTS, 0, n);
     gl.disable(gl.BLEND); gl.depthMask(true); gl.disable(gl.DEPTH_TEST);
     gl.disableVertexAttribArray(1);
+  }
+  /** screens (drawn in the order given: far first), mirrored in the floor and then themselves; tex holds the atlas */
+  screens(list: Screen[], tex: WebGLTexture, vp: M4, setShared: (p: WebGLProgram) => void) {
+    const gl = this.gl, p = this.screenProg;
+    if (!list.length || !gl.getProgramParameter(p, gl.LINK_STATUS)) return;
+    if (!this.quadBuf) { this.quadBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW); }
+    gl.useProgram(p);
+    setShared(p);
+    gl.uniformMatrix4fv(this.u(p, "uVP"), false, vp);
+    gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(this.u(p, "uTex"), 5);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuf);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.disableVertexAttribArray(1);
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    for (const mirror of [1, 0]) {
+      gl.uniform1f(this.u(p, "uMirror"), mirror);
+      for (const s of list) {
+        if (s.fade < 0.004) continue;
+        gl.uniform3f(this.u(p, "uC"), s.c[0], s.c[1], s.c[2]);
+        gl.uniform3f(this.u(p, "uR"), s.r[0], s.r[1], s.r[2]);
+        gl.uniform3f(this.u(p, "uU"), s.u[0], s.u[1], s.u[2]);
+        gl.uniform4f(this.u(p, "uUV"), s.uv[0], s.uv[1], s.uv[2], s.uv[3]);
+        gl.uniform1f(this.u(p, "uFade"), s.fade);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    }
+    gl.disable(gl.BLEND);
   }
   /** the lowest point of mesh i once tilted by pitch (so a tilted thing can still rest on the floor) */
   lowest(i: number, pitch: number) {
@@ -573,7 +628,8 @@ export class Objects {
     const gl = this.gl;
     this.meshes.forEach((g) => { if (g) { gl.deleteBuffer(g.vb); gl.deleteBuffer(g.nb); gl.deleteBuffer(g.ib); } });
     gl.deleteTexture(this.shadowTex); gl.deleteFramebuffer(this.fbo);
-    gl.deleteProgram(this.depthProg); gl.deleteProgram(this.litProg); gl.deleteProgram(this.dustProg);
+    gl.deleteProgram(this.depthProg); gl.deleteProgram(this.litProg); gl.deleteProgram(this.dustProg); gl.deleteProgram(this.screenProg);
+    if (this.quadBuf) gl.deleteBuffer(this.quadBuf);
     if (this.dustBuf) gl.deleteBuffer(this.dustBuf);
   }
 }

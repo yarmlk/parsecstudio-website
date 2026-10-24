@@ -43,7 +43,7 @@ uniform vec3 uS0, uS1, uS2, uS3, uS4;
 uniform sampler2D uSpec;
 /* Motion's projection: the video, its frame on the floor (centre, half-axes), how much of the video the frame shows */
 uniform sampler2D uProj;
-uniform float uProjW, uProjTone;
+uniform float uProjW;
 uniform vec2 uProjC, uProjU, uProjV, uProjCrop;
 uniform float uGrain, uHaze, uFanGain, uLandGain, uEnv, uAirFan, uFanRefl;
 uniform vec2 uBeamFade;
@@ -216,7 +216,7 @@ vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
   float sm = lite > 0.5 ? 0.8 : mix(0.35, 1.35, smokeLite(vec2(r * 2.4, (p.x - p.z) * 3.0 + p.y * 4.0)));
   // the objects cut the sheet of light in the haze: their shadows run through the air
   float vis = lite > 0.5 ? 1.0 : shadowVis1(p);
-  return c * vis * gobo(p) * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
+  return c * vis * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
 }
 
 /* ---------- the beam ---------- */
@@ -335,7 +335,7 @@ vec3 floorLight(vec3 p, vec3 rd){
     vec3 c3 = fanCol(p.xz, uPoolSoft * 4.5, r3);
     float th3 = th * 5.0 + 0.15;
     float bloom = exp(-(ys * ys) / (th3 * th3));
-    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis * gobo(p);
+    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis;
   }
   // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
   // shadows; the satin breaks it up a little
@@ -365,14 +365,11 @@ vec3 floorLight(vec3 p, vec3 rd){
       // how bright the light makes the floor here, on screen
       float Lw = 1.0 - exp(-1.4 * uGain * dot(col, vec3(0.3, 0.5, 0.2)));
       vec2 uv = clamp(vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y), 0.0, 1.0);
-      vec3 raw = texture2D(uProj, uv).rgb, d = raw;
+      vec3 d = texture2D(uProj, uv).rgb;
       // muted, the highlights rolled off so a white frame never burns into a slab
       d = d * (1.0 - 0.35 * d) * 0.95 * smoothstep(0.0, 0.22, Lw);
       vec3 pre = -log(max(vec3(1.0) - d, vec3(0.02))) / (1.4 * max(uGain, 1e-3));
-      // AI: the spectrum keeps its colours and carries the picture as a tone (its light and shade); the others: the picture itself
-      float lum = dot(raw, vec3(0.3, 0.55, 0.15));
-      vec3 tone = col * (0.3 + 1.4 * lum);
-      col = mix(col, mix(pre, tone, uProjTone), pin * mix(0.9, 0.75, uProjTone) * uProjW);
+      col = mix(col, pre, pin * 0.9 * uProjW);
     }
   }
   return col;

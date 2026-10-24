@@ -30,10 +30,10 @@ export function SvcStage({ active, mode }: { active: number; mode: "desk" | "mob
 /** localhost and the review preview only: which alternative each service shows (remembered in this browser) */
 function VariantSwitch() {
   const [v, setV] = useState<Variants>(() => {
-    let x: Variants = { motion: VARIANTS.motion[0], ai: VARIANTS.ai[0], vertical: VARIANTS.vertical[0] };
+    let x: Variants = { vertical: VARIANTS.vertical[0] };
     try {
       const saved = JSON.parse(localStorage.getItem("st-variants") || "{}") as Partial<Record<keyof Variants, string>>;
-      (Object.keys(VARIANTS) as (keyof Variants)[]).forEach((k) => { const v = saved[k]; if (v && (VARIANTS[k] as readonly string[]).includes(v)) x = { ...x, [k]: v }; });
+      (Object.keys(VARIANTS) as (keyof Variants)[]).forEach((k) => { const v = saved[k]; if (v && (VARIANTS[k] as readonly string[]).includes(v)) x = { ...x, [k]: v } as Variants; });
     } catch { /* no storage */ }
     window.__stVar = x;
     return x;
@@ -47,7 +47,7 @@ function VariantSwitch() {
     <div className="st-dev-switch" aria-hidden>
       {(Object.keys(VARIANTS) as (keyof Variants)[]).map((k) => (
         <span key={k} className="st-dev-switch__row">
-          {k === "motion" ? "Motion" : k === "ai" ? "AI" : "Vertical"}
+          Vertical
           {VARIANTS[k].map((x) => <button key={x} type="button" className={x === v[k] ? "is-on" : undefined} onClick={() => pick(k, x)}>{x}</button>)}
         </span>
       ))}
