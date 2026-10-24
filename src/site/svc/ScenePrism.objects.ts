@@ -330,6 +330,46 @@ void main(){
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/* dust: points drifting off the figures and hanging in the light; each glows only where the light reaches it (and
+   not in the figures' shadows), soft round, added over the picture */
+const DUST_VERT = `
+attribute vec3 aP;   // world position
+attribute vec3 aN;   // size (world), strength, unused
+uniform mat4 uVP;
+uniform float uScale;
+varying vec3 vW;
+varying float vA;
+void main(){
+  vW = aP; vA = aN.y;
+  vec4 c = uVP * vec4(aP, 1.0);
+  gl_Position = c;
+  gl_PointSize = clamp(aN.x * uScale / max(c.w, 1e-3), 1.0, 12.0);
+}`;
+const DUST_FRAG = (cone: string) => `
+precision highp float;
+uniform vec3 uS0, uS1, uS2, uS3, uS4;
+vec3 spectrum(float s){
+  float x = clamp(s, 0.0, 1.0) * 4.0;
+  vec3 c = mix(uS0, uS1, smoothstep(0.0, 1.0, x));
+  c = mix(c, uS2, smoothstep(1.0, 2.0, x));
+  c = mix(c, uS3, smoothstep(2.0, 3.0, x));
+  return mix(c, uS4, smoothstep(3.0, 4.0, x));
+}
+${cone}
+uniform float uGain, uFade, uTopY, uTopSoft;
+varying vec3 vW;
+varying float vA;
+void main(){
+  vec2 d = gl_PointCoord - 0.5;
+  float r = dot(d, d) * 4.0;
+  if (r > 1.0) discard;
+  float soft = exp(-r * 2.6);
+  vec3 Li = coneLight(vW) * shadowVis1(vW);
+  vec3 col = (Li * 1.5 + vec3(0.9, 0.85, 0.78) * 0.012) * soft * vA * uFade;
+  col *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
+  gl_FragColor = vec4(1.0 - exp(-col * 1.4 * uGain), 1.0);
+}`;
+
 export interface Material { alb: V3; rough: number; f0: number; wrap: number; glow: number; rim: number }
 export const MARBLE: Material = { alb: [0.86, 0.84, 0.8], rough: 0.42, f0: 0.04, wrap: 0.28, glow: 0.035, rim: 0.12 };
 /** glossy black ceramic: almost no colour of its own, the light lives in its highlight and along its edges */
@@ -348,6 +388,8 @@ export class Objects {
   private cpu: (Mesh | null)[] = [];
   private depthProg: WebGLProgram;
   private litProg: WebGLProgram;
+  private dustProg: WebGLProgram;
+  private dustBuf: WebGLBuffer | null = null;
   private U = new Map<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
   readonly shadowTex: WebGLTexture;
   private fbo: WebGLFramebuffer;
@@ -371,6 +413,7 @@ export class Objects {
     };
     this.depthProg = mk(MESH_VERT, DEPTH_FRAG);
     this.litProg = mk(MESH_VERT, LIT_FRAG(CONE_GLSL));
+    this.dustProg = mk(DUST_VERT, DUST_FRAG(CONE_GLSL));
     this.ok = !!gl.getProgramParameter(this.depthProg, gl.LINK_STATUS) && !!gl.getProgramParameter(this.litProg, gl.LINK_STATUS);
     // the shadow map: packed distance, cleared to "nothing in the way"
     this.shadowTex = gl.createTexture()!;
@@ -409,6 +452,27 @@ export class Objects {
     gl.bindBuffer(gl.ARRAY_BUFFER, g.vb);
     gl.bufferData(gl.ARRAY_BUFFER, pos, gl.DYNAMIC_DRAW);
     if (nrm) { gl.bindBuffer(gl.ARRAY_BUFFER, g.nb); gl.bufferData(gl.ARRAY_BUFFER, nrm, gl.DYNAMIC_DRAW); }
+  }
+  /** mesh i's own vertices (positions, in its frame), for things that follow its surface */
+  points(i: number) { return this.cpu[i]?.pos ?? null; }
+  /** dust: n points, interleaved [x, y, z, size, strength, 0], over what is drawn (depth tested, not written) */
+  dust(data: Float32Array, n: number, vp: M4, scale: number, fade: number, setShared: (p: WebGLProgram) => void) {
+    const gl = this.gl, p = this.dustProg;
+    if (!n || !gl.getProgramParameter(p, gl.LINK_STATUS)) return;
+    if (!this.dustBuf) this.dustBuf = gl.createBuffer();
+    gl.useProgram(p);
+    setShared(p);
+    gl.uniformMatrix4fv(this.u(p, "uVP"), false, vp);
+    gl.uniform1f(this.u(p, "uScale"), scale); gl.uniform1f(this.u(p, "uFade"), fade);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.dustBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, n * 6), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(false);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.drawArrays(gl.POINTS, 0, n);
+    gl.disable(gl.BLEND); gl.depthMask(true); gl.disable(gl.DEPTH_TEST);
+    gl.disableVertexAttribArray(1);
   }
   /** the lowest point of mesh i once tilted by pitch (so a tilted thing can still rest on the floor) */
   lowest(i: number, pitch: number) {
@@ -492,7 +556,8 @@ export class Objects {
     const gl = this.gl;
     this.meshes.forEach((g) => { if (g) { gl.deleteBuffer(g.vb); gl.deleteBuffer(g.nb); gl.deleteBuffer(g.ib); } });
     gl.deleteTexture(this.shadowTex); gl.deleteFramebuffer(this.fbo);
-    gl.deleteProgram(this.depthProg); gl.deleteProgram(this.litProg);
+    gl.deleteProgram(this.depthProg); gl.deleteProgram(this.litProg); gl.deleteProgram(this.dustProg);
+    if (this.dustBuf) gl.deleteBuffer(this.dustBuf);
   }
 }
 

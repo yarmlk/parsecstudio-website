@@ -48,14 +48,14 @@ function exitAz(P: ReturnType<typeof makePrism>, o: V3, d: V3, ns: number[]) {
 const AZ_PREF = [8, -20, -8];
 /** index per channel for what is seen through the glass (a modest, real-looking fringe) */
 const N_VIEW: V3 = [1.505, 1.517, 1.532];
-/** Vertical's marble groups (packed meshes, public/mesh): fetched after the first frame */
-const STATUES = ["mesh/hercules.bin", "mesh/warrior.bin"] as const;
-/** mesh slots: the marble groups, then the shadow art of Motion and of Vertical */
-const M_HERC = 3, M_WARRIOR = 4, M_ART = 14, M_ART_V = 15;
+/** Vertical's marble (packed meshes, public/mesh): the two busts, and (dev only) the Hercules group to compare */
+const STATUES = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/hercules.bin"] as const;
+/** mesh slots: the busts and the group, then the shadow art of Motion and of Vertical */
+const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_ART = 14;
 /** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
- *  Motion: voxels or glass flakes. Vertical: Hercules raising Antaeus over himself, a warrior over the fallen, or
- *  voxels that throw the Hercules group's shadow; each in the light's upright 9:16 frame */
-export const VARIANTS = { motion: ["voxels", "glass"], vertical: ["hercules", "warrior", "voxels"] } as const;
+ *  Motion: voxels or glass flakes. Vertical: the two busts in conversation, dust drifting off them in the light; or
+ *  Hercules raising Antaeus in an upright 9:16 frame of light */
+export const VARIANTS = { motion: ["voxels", "glass"], vertical: ["busts", "hercules"] } as const;
 export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
   const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
@@ -70,8 +70,6 @@ const MOTION_SLOT = {
   hold: [0.12, 0.12, 1.5, 1.9, 2.4],
   morph: [0.6, 0.7, 1.5, 1.6, 1.7],
 };
-/** the shadow the voxels of Vertical throw */
-const STATUE_PIC = `${base}shadow/hercules.png`;
 /** each service's things, as the frame sees them: their height and their reach around their base (world units at
  *  scale 1); they stand in their service's light as far out as the frame lets them, never past STAND_MAX */
 const DIMS = [{ h: 1.05, r: 0.85 }, { h: 0.8, r: 0.62 }, { h: 0.95, r: 0.9 }];
@@ -308,7 +306,66 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let objs: Objects | null = null;
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
-    const artM = new ShadowArt(), artV = new ShadowArt();
+    const artM = new ShadowArt();
+    /* dust off the busts: per point, which bust (or none: a mote hanging in the light), which vertex it leaves from,
+       its life, phase, swirl and size; the frame's points go to dustData (x, y, z, size, strength, 0) */
+    const DUST_N = 2600, DUST_FREE = 520;
+    const dust = { src: new Int32Array(DUST_N), who: new Int8Array(DUST_N), ph: new Float32Array(DUST_N * 6), init: false };
+    const dustData = new Float32Array(DUST_N * 6);
+    let dustN = 0;
+    const dustFrame = (ms: Float32Array[], pts: (Float32Array | null)[], centre: V3, sc: number, t: number, O: V3) => {
+      if (!pts[0] || !pts[1]) return 0;
+      if (!dust.init) {
+        dust.init = true;
+        let sd = 23;
+        const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+        for (let j = 0; j < DUST_N; j++) {
+          const free = j < DUST_FREE, who = free ? -1 : j % 2, P = pts[Math.max(0, who)]!;
+          // leaving from the head and shoulders more than the base
+          // (and from the side away from the light: the figure comes apart where the light has passed it)
+          let v = 0;
+          const m0 = ms[Math.max(0, who)], cx0 = m0[12], cz0 = m0[14];
+          let dx0 = cx0 - O[0], dz0 = cz0 - O[2];
+          const d0 = Math.hypot(dx0, dz0) || 1; dx0 /= d0; dz0 /= d0;
+          for (let k = 0; k < 24; k++) {
+            v = Math.floor(r() * (P.length / 3));
+            const lx = P[v * 3], ly = P[v * 3 + 1], lz = P[v * 3 + 2];
+            const wx = m0[0] * lx + m0[4] * ly + m0[8] * lz, wz = m0[2] * lx + m0[6] * ly + m0[10] * lz;
+            if (ly > 0.45 && wx * dx0 + wz * dz0 > 0) break;
+          }
+          dust.who[j] = who; dust.src[j] = v;
+          dust.ph.set([2.6 + 3.2 * r(), r(), r() * 6.283, 0.5 + r(), r(), r()], j * 6);
+        }
+      }
+      let n = 0;
+      for (let j = 0; j < DUST_N; j++) {
+        const g = j * 6, life = dust.ph[g], age = ((t / life + dust.ph[g + 1]) % 1 + 1) % 1, sw = dust.ph[g + 2], sp = dust.ph[g + 3], rs = dust.ph[g + 4], rr = dust.ph[g + 5];
+        let x: number, y: number, z: number, size: number, k: number;
+        if (dust.who[j] < 0) {
+          // a mote: hangs in a loose cloud around the two, drifting slowly, catching the light now and then
+          x = centre[0] + (rs - 0.5) * 2.4 * sc + 0.06 * sc * Math.sin(0.23 * t + sw);
+          z = centre[2] + (rr - 0.5) * 1.6 * sc + 0.05 * sc * Math.cos(0.19 * t + sw * 1.3);
+          y = (0.05 + 1.3 * ((rs * 7.3 + rr * 3.1) % 1)) * sc + 0.08 * sc * Math.sin(0.3 * t + sw);
+          size = sc * (0.006 + 0.008 * rr);
+          k = 0.18 + 0.3 * (0.5 + 0.5 * Math.sin(0.8 * t * sp + sw));
+        } else {
+          // off the surface, carried downstream by the light, swirling a little, rising, thinning out
+          const m = ms[dust.who[j]], P = pts[dust.who[j]]!, v = dust.src[j] * 3, lx = P[v], ly = P[v + 1], lz = P[v + 2];
+          const sx = m[0] * lx + m[4] * ly + m[8] * lz + m[12], sy = m[1] * lx + m[5] * ly + m[9] * lz + m[13], sz = m[2] * lx + m[6] * ly + m[10] * lz + m[14];
+          let dx = sx - O[0], dz = sz - O[2];
+          const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+          const run = Math.pow(age, 1.25) * (0.7 + 0.5 * sp) * sc, curl = Math.sin(6.283 * age * 1.4 + sw) * 0.07 * sc * age;
+          x = sx + dx * run - dz * curl; z = sz + dz * run + dx * curl;
+          y = sy + (0.06 + 0.1 * rs) * sc * age + 0.02 * sc * Math.sin(9 * age + sw);
+          size = sc * (0.009 + 0.011 * rr) * (1 - 0.45 * age);
+          k = Math.min(1, age / 0.08) * Math.pow(1 - age, 1.4) * 1.25;
+        }
+        if (y < 0.002 || k < 0.01) continue;
+        dustData.set([x, y, z, size, k, 0], n * 6);
+        n++;
+      }
+      return n;
+    };
     const init = () => {
       gl.useProgram(prog);
       buf = gl.createBuffer();
@@ -355,7 +412,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const loadMeshes = () => {
       if (meshes) return;
       meshes = true;
-      const go = () => STATUES.forEach((url, i) => loadMesh(url).then((m) => { if (alive && objs) objs.set(M_HERC + i, m); }).catch(() => {}));
+      const go = () => STATUES.forEach((url, i) => (i < 2 || import.meta.env.DEV) && loadMesh(url).then((m) => { if (alive && objs) objs.set(M_CAESAR + i, m); }).catch(() => {}));
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (ric) ric(go, { timeout: 1500 }); else setTimeout(go, 200);
     };
@@ -678,7 +735,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const pin = project(cam, tr.pin, A), pc = project(cam, [0, S.H * 0.5, 0], A), po = project(cam, origin, A);
         window.__stPrismInfo = {
           W, Hs, list, ruleY, anchor: an, anchors: ans, rows, wins: wins.w, stand, place, rot: st.rot, exitAz: Math.atan2(O[2] - tr.pin[2], O[0] - tr.pin[0]) / DEG, dirAz: [Math.atan2(dE[2], dE[0]) / DEG, Math.atan2(dM[2], dM[0]) / DEG], kept,
-          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos, art: [artM.ready, artM.key.slice(0, 60), artV.ready],
+          prism: [pc[0] * W, pc[1] * Hs], origin: [po[0] * W, po[1] * Hs], pin: [pin[0] * W, pin[1] * Hs], cpx, O, cam: cam.pos, art: [artM.ready, artM.key.slice(0, 60)],
         };
       }
 
@@ -697,6 +754,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       /* the things on the stage this frame: each service's fade in and out with its light */
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
       const items: Item[] = [];
+      dustN = 0;
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
         const f = dirXZ(pl0.az), r: V3 = [-f[2], 0, f[0]];
@@ -736,24 +794,33 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
         const hpx = Math.min(0.68 * Hs, Hs - ruleY - 60), wpx = (hpx * 9) / 16;
         frameC = [C0[0], C0[2]]; frameU = inv(wpx / 2, 0); frameV = inv(0, hpx / 2);
-        if (st.show[2] > 0.004) {
-          const vv = variant("vertical");
-          if (vv === "voxels") {
-            const slots: ArtSlot[] = [{ pics: [STATUE_PIC], at: C0, px: hpx * 0.78, ball: 0.4 }];
-            showArt(artV, 2, M_ART_V, slots, 2600, 0.016, CERAMIC, "voxel");
-          } else {
-            const mesh = vv === "warrior" ? M_WARRIOR : M_HERC;
-            if (ob.has(mesh)) {
-              // stood in the frame a little toward the light, turned mostly to the light (the faces catch it) and
-              // partly to us; the light keys the raised figure and throws the group's long shadow across the frame
-              const P0: V3 = [C0[0] - frameU[0] * 0.2 + frameV[0] * 0.25, 0, C0[2] - frameU[1] * 0.2 + frameV[1] * 0.25];
-              const sc = 1.1 * (sd.s || 1);
-              const toCam = facing(P0, [cam.pos[0], 0, cam.pos[2]]), toLight = facing(P0, [O[0], 0, O[2]]);
-              const yaw = toLight + 0.45 * Math.atan2(Math.sin(toCam - toLight), Math.cos(toCam - toLight)) + (vv === "warrior" ? -0.3 : 0.25) + 0.05 * Math.sin(0.2 * tSec);
-              items.push({ mesh, m: model([P0[0], -ob.lowest(mesh, 0) * sc, P0[2]], yaw, 0, 0, sc), mat: MARBLE, fade: st.show[2] });
-            }
-          }
+        if (st.show[2] > 0.004 && variant("vertical") === "hercules" && ob.has(M_HERC)) {
+          // the Hercules group stood in the frame a little toward the light, turned mostly to the light (the faces
+          // catch it) and partly to us; the light keys the raised figure and throws the group's long shadow
+          const P0: V3 = [C0[0] - frameU[0] * 0.2 + frameV[0] * 0.25, 0, C0[2] - frameU[1] * 0.2 + frameV[1] * 0.25];
+          const sc = 1.1 * (sd.s || 1);
+          const toCam = facing(P0, [cam.pos[0], 0, cam.pos[2]]), toLight = facing(P0, [O[0], 0, O[2]]);
+          const yaw = toLight + 0.45 * Math.atan2(Math.sin(toCam - toLight), Math.cos(toCam - toLight)) + 0.25 + 0.05 * Math.sin(0.2 * tSec);
+          items.push({ mesh: M_HERC, m: model([P0[0], -ob.lowest(M_HERC, 0) * sc, P0[2]], yaw, 0, 0, sc), mat: MARBLE, fade: st.show[2] });
         }
+      }
+      if (st.show[2] > 0.004 && variant("vertical") === "busts" && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
+        // Vertical Series: two busts in conversation, side by side along the light, each cheated out to us and turned to
+        // the other; they turn a little, in turn, as if one speaks and the other answers. Fine dust drifts off them
+        // downstream in the light and hangs around them, lit only where the light reaches
+        const sd = stand[2] ?? { d: 1.6, s: 1 }, sc = sd.s * 0.55;
+        const a = at(2, sd.d - 0.5 * sc, -0.24 * sc, 0), b = at(2, sd.d + 0.5 * sc, 0.06 * sc, 0), f = st.show[2];
+        const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
+        const lean = -0.24;
+        const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
+        const talk = Math.sin(0.55 * tSec), talk2 = Math.sin(0.55 * tSec + 2.4);
+        const ya = blend(toCam(a), facing(a, b), 0.5) + 0.13 * talk;
+        const yb = blend(toCam(b), facing(b, [O[0], 0, O[2]]), 0.55) + 0.11 * talk2;
+        const mA = model([a[0], -ob.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.035 * Math.sin(0.9 * tSec + 1), 0, sc);
+        const mB = model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.035 * Math.sin(0.9 * tSec + 2.6), 0, sc);
+        items.push({ mesh: M_CAESAR, m: mA, mat: MARBLE, fade: f });
+        items.push({ mesh: M_SENATOR, m: mB, mat: MARBLE, fade: f });
+        dustN = dustFrame([mA, mB], [ob.points(M_CAESAR), ob.points(M_SENATOR)], [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2], sc, tSec, O);
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
@@ -779,7 +846,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         gl.uniform1f(uu("uGoboAll"), air);
         gl.uniform3f(uu("uLO"), O[0], O[1], O[2]);
         gl.uniform1f(uu("uLSpec"), st.spec);
-        gl.uniform1f(uu("uGobo"), st.k); gl.uniform1f(uu("uGoboR"), 0.14); gl.uniform1f(uu("uGoboSoft"), 0.025); gl.uniform1f(uu("uGoboOut"), 0.07);
+        gl.uniform1f(uu("uGobo"), variant("vertical") === "hercules" ? st.k : 0); gl.uniform1f(uu("uGoboR"), 0.14); gl.uniform1f(uu("uGoboSoft"), 0.025); gl.uniform1f(uu("uGoboOut"), 0.07);
         gl.uniform2f(uu("uGoboC"), frameC[0], frameC[1]); gl.uniform2f(uu("uGoboU"), frameU[0], frameU[1]); gl.uniform2f(uu("uGoboV"), frameV[0], frameV[1]);
         gl.uniform1f(uu("uLAE"), lAE); gl.uniform1f(uu("uLAM"), lAM);
         gl.uniform1f(uu("uLWedge"), wedge); gl.uniform1f(uu("uLGain"), lGain);
@@ -845,7 +912,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (ob.ok && items.length) {
         const vp = camClip(cam.pos, cam.f, cam.r, cam.u, cam.focal, cam.shift, A);
         const cols = stops.map((c) => [c[0] + (stops[0][0] - c[0]) * st.proj, c[1] + (stops[0][1] - c[1]) * st.proj, c[2] + (stops[0][2] - c[2]) * st.proj]);
-        ob.draw(items, vp, (lp) => {
+        const shared = (lp: WebGLProgram) => {
           const uu = (n: string) => ob.u(lp, n);
           setLight(uu, 0);
           cols.forEach((c, i) => gl.uniform3f(uu(`uS${i}`), c[0], c[1], c[2]));
@@ -854,7 +921,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           gl.uniform1f(uu("uTopY"), ruleY > 0 ? (Hs - ruleY - 28) * cpx : 1e5);
           gl.uniform1f(uu("uTopSoft"), 70 * cpx);
           gl.uniform1f(uu("uGain"), S.gain); gl.uniform1f(uu("uGrain"), 0.03); gl.uniform1f(uu("uTime"), tSec);
-        }, canvas.width, canvas.height);
+        };
+        ob.draw(items, vp, shared, canvas.width, canvas.height);
+        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, st.show[2], shared);
       }
       mark();
       if (prof) window.__stPrismProf = prof.marks;
