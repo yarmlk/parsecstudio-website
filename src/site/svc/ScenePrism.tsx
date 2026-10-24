@@ -799,11 +799,11 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           if (variant("motion") === "projector") {
             projStart();
             projOn = st.show[0];
-            const C0 = at(0, sd.d + 0.18 * sc, 0.06 * sc, 0), c0 = toScreen(C0), e = 0.05;
+            const C0 = at(0, sd.d + 0.16 * sc, 0.04 * sc, 0), c0 = toScreen(C0), e = 0.05;
             const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
             const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
             const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
-            const wpx = Math.min(0.44 * W, 2 * (W - c0[0] - 40)), hpx = wpx / 2;
+            const wpx = 0.66 * W, hpx = wpx / 2;
             projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
           }
         } else if (variant("motion") === "voxels") {

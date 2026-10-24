@@ -339,27 +339,28 @@ vec3 floorLight(vec3 p, vec3 rd){
   }
   // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
   // shadows; the satin breaks it up a little
-  // Motion: the light is a projector's; in a frame on the floor it lays the work itself, out of the dark
+  // Motion: the light is a projector's: our work lies on the floor where the light falls, true to its own colours (a
+  // touch held back), shaped by the light itself (no frame edge anywhere), the floor showing through by about a tenth
   float pin = 0.0;
   if (uProjW > 0.001 && cl.r + cl.g + cl.b > 1e-5) {
     vec2 q = p.xz - uProjC;
     float det = uProjU.x * uProjV.y - uProjU.y * uProjV.x;
     vec2 ab = vec2(q.x * uProjV.y - q.y * uProjV.x, uProjU.x * q.y - uProjU.y * q.x) / det;
-    vec2 e = abs(ab) - vec2(1.0) + 0.03;
-    float sdf = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - 0.03;
-    pin = 1.0 - smoothstep(-0.012, 0.012, sdf);
+    // inside the picture, feathered wide at its border, and only as far as the light reaches (its own soft edge)
+    vec2 fe = smoothstep(vec2(1.0), vec2(0.72), abs(ab));
+    float lit = smoothstep(0.008, 0.12, length(cl) / max(uLGain, 1e-3));
+    pin = fe.x * fe.y * lit;
     if (pin > 0.001) {
-      vec2 uv = vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y);
-      vec3 v = texture2D(uProj, uv).rgb;
-      v = pow(v, vec3(1.5));
-      float Lm = dot(v, vec3(0.3, 0.59, 0.11));
-      v = mix(vec3(Lm), v, 0.4) * vec3(1.0, 0.9, 0.76);
-      col += v * pin * vis * uProjW * uProjGain * length(cl) * 2.2 * uIP;
+      vec2 uv = clamp(vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y), 0.0, 1.0);
+      vec3 d = texture2D(uProj, uv).rgb * 0.86;
+      // what the floor must hold so the screen shows the video as it is (the inverse of the final filmic curve)
+      vec3 pre = -log(max(vec3(1.0) - d, vec3(0.02))) / (1.4 * max(uGain, 1e-3));
+      col += pre * pin * 0.9 * uProjW * vis;
     }
   }
   if (cl.r + cl.g + cl.b > 1e-5) {
     float sm = smokeLite(vec2(length(p.xz - uLO.xz) * 2.0, atan(p.z - uLO.z, p.x - uLO.x) * 3.0));
-    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.34, uSpecW) * uIP * mix(1.0, mix(0.5, 0.12, pin), uProjW);
+    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.34, uSpecW) * uIP * mix(1.0, 1.0 - 0.9 * pin, uProjW);
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);
