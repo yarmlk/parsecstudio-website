@@ -336,14 +336,21 @@ const DUST_VERT = `
 attribute vec3 aP;   // world position
 attribute vec3 aN;   // size (world), strength, unused
 uniform mat4 uVP;
-uniform float uScale;
+uniform float uScale, uFocus, uCoC;
 varying vec3 vW;
 varying float vA;
+varying float vB;   // how out of focus (0 sharp … 1 a soft disc)
 void main(){
-  vW = aP; vA = aN.y;
+  vW = aP;
   vec4 c = uVP * vec4(aP, 1.0);
   gl_Position = c;
-  gl_PointSize = clamp(aN.x * uScale / max(c.w, 1e-3), 1.0, 12.0);
+  // depth of field: focused at the figures; nearer motes open into soft discs, their light spread thin over them
+  float sharp = aN.x * uScale / max(c.w, 1e-3);
+  float coc = uCoC * abs(c.w - uFocus) / max(uFocus, 1e-3) * 6.0;
+  float size = clamp(sqrt(sharp * sharp + coc * coc), 1.0, 56.0);
+  gl_PointSize = size;
+  vB = clamp(coc / max(size, 1.0), 0.0, 1.0);
+  vA = aN.y * min(1.0, (sharp * sharp + 1.0) / (size * size)) * mix(1.0, 3.5, vB);
 }`;
 const DUST_FRAG = (cone: string) => `
 precision highp float;
@@ -359,14 +366,16 @@ ${cone}
 uniform float uGain, uFade, uTopY, uTopSoft;
 varying vec3 vW;
 varying float vA;
+varying float vB;
 void main(){
   vec2 d = gl_PointCoord - 0.5;
   float r = dot(d, d) * 4.0;
   if (r > 1.0) discard;
-  float soft = exp(-r * 2.6);
+  // sharp: a soft point; out of focus: an even disc with a slightly brighter rim, like a lens's bokeh
+  float soft = mix(exp(-r * 2.6), (0.75 + 0.35 * smoothstep(0.55, 0.95, r)) * (1.0 - smoothstep(0.85, 1.0, r)), vB);
   vec3 Li = coneLight(vW) * shadowVis1(vW);
   // lit by our light, and a faint glow of its own so a stream or a shape of dust still reads where the light is weak
-  vec3 col = (Li * 1.3 + vec3(1.0, 0.84, 0.62) * 0.16) * soft * vA * uFade;
+  vec3 col = (Li * 1.3 + vec3(1.0, 0.84, 0.62) * 0.05) * soft * vA * uFade;
   col *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
   gl_FragColor = vec4(1.0 - exp(-col * 1.4 * uGain), 1.0);
 }`;
@@ -457,7 +466,7 @@ export class Objects {
   /** mesh i's own vertices (positions, in its frame), for things that follow its surface */
   points(i: number) { return this.cpu[i]?.pos ?? null; }
   /** dust: n points, interleaved [x, y, z, size, strength, 0], over what is drawn (depth tested, not written) */
-  dust(data: Float32Array, n: number, vp: M4, scale: number, fade: number, setShared: (p: WebGLProgram) => void) {
+  dust(data: Float32Array, n: number, vp: M4, scale: number, fade: number, setShared: (p: WebGLProgram) => void, focus = 7, coc = 8) {
     const gl = this.gl, p = this.dustProg;
     if (!n || !gl.getProgramParameter(p, gl.LINK_STATUS)) return;
     if (!this.dustBuf) this.dustBuf = gl.createBuffer();
@@ -465,6 +474,7 @@ export class Objects {
     setShared(p);
     gl.uniformMatrix4fv(this.u(p, "uVP"), false, vp);
     gl.uniform1f(this.u(p, "uScale"), scale); gl.uniform1f(this.u(p, "uFade"), fade);
+    gl.uniform1f(this.u(p, "uFocus"), focus); gl.uniform1f(this.u(p, "uCoC"), coc);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.dustBuf);
     gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, n * 6), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);

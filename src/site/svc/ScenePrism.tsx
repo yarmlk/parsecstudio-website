@@ -307,97 +307,39 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
     const artM = new ShadowArt();
-    /* Vertical's dust tells the conversation. One speaks: a stream of light-dust leaves his mouth and arcs into the
-       other's head; then the other answers along the same arc back; then the dust of both gathers above them into an
-       upright 9:16 screen, holds there a moment, and lets go. 12 s, looping; the busts turn with who is speaking.
-       Per point: where it rides on the arc, its place in the tube around it, its place on the screen, its own delay;
-       the frame's points go to dustData (x, y, z, size, strength, 0) */
-    const DUST_N = 2200, TALK = 12;
-    const dust = { ph: new Float32Array(DUST_N * 8), init: false, mouth: [[0, 0, 0], [0, 0, 0]] as V3[], head: [[0, 0, 0], [0, 0, 0]] as V3[], rect: new Float32Array(0) };
+    /* Vertical's dust: motes hanging in the air of the light, the way dust shows in a projector's beam, giving the frame
+       its depth: most float around the two at their depth, sharp; some hang high between them and the camera, out of
+       focus, as soft discs. They drift slowly and are carried a little downstream; they glow where the light reaches
+       them. The frame's points go to dustData (x, y, z, size, strength, 0) */
+    const DUST_N = 900;
+    const dust = { ph: new Float32Array(DUST_N * 8), init: false };
     const dustData = new Float32Array(DUST_N * 6);
     let dustN = 0;
-    const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-    /** who speaks, and the screen, at time t (s): weights 0..1 (soft in and out) */
-    const talkAt = (t: number) => {
-      const s = ((t % TALK) + TALK) % TALK, w = (a: number, b: number) => sstep(a - 0.6, a + 0.6, s) * (1 - sstep(b - 0.6, b + 0.6, s));
-      return { a: w(0.4, 3.9), b: w(3.9, 7.4), f: w(7.4, 10.9) };
-    };
-    const dustFrame = (ms: Float32Array[], pts: (Float32Array | null)[], sc: number, t: number, camR: V3, camU: V3) => {
-      if (!pts[0] || !pts[1]) return 0;
+    const dustFrame = (centre: V3, sc: number, t: number, O: V3) => {
       if (!dust.init) {
         dust.init = true;
         let sd = 23;
         const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-        for (let j = 0; j < DUST_N; j++) dust.ph.set([r(), r() * 6.283, r(), r(), r(), r(), (r() - 0.5) * 0.9, r()], j * 8);
-        // each bust's mouth (the front-most point at mouth height) and the middle of its head, in its own frame
-        for (let i = 0; i < 2; i++) {
-          const P = pts[i]!;
-          let best = -1e9, mo: V3 = [0, 0.66, 0.15], hx = 0, hy = 0, hz = 0, hn = 0;
-          for (let v = 0; v < P.length; v += 3) {
-            const x = P[v], y = P[v + 1], z = P[v + 2];
-            if (y > 0.6 && y < 0.72 && Math.abs(x) < 0.08 && z > best) { best = z; mo = [x, y, z]; }
-            if (y > 0.72) { hx += x; hy += y; hz += z; hn++; }
-          }
-          dust.mouth[i] = mo; dust.head[i] = hn ? [hx / hn, hy / hn, hz / hn] : [0, 0.8, 0];
-        }
-        // the screen's outline: a rounded 9:16 rectangle, 256 points around it (unit height)
-        const R = 0.07, Wd = 9 / 32, Hh = 0.5, pts2: number[] = [];
-        const seg: [number, number][] = [];
-        for (let k = 0; k <= 64; k++) { const a = (k / 64) * Math.PI * 2; const qx = Math.cos(a), qy = Math.sin(a); seg.push([Math.sign(qx) * (Wd - R) + R * qx, Math.sign(qy) * (Hh - R) + R * qy]); }
-        // walk the corners' arcs joined by straight sides: resample evenly by length
-        const poly: [number, number][] = [];
-        for (const [cx, cy] of [[Wd - R, Hh - R], [-(Wd - R), Hh - R], [-(Wd - R), -(Hh - R)], [Wd - R, -(Hh - R)]] as [number, number][]) {
-          const a0 = Math.atan2(cy, cx) - Math.PI / 4;
-          for (let k = 0; k <= 8; k++) { const a = a0 + (k / 8) * (Math.PI / 2); poly.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
-        }
-        poly.push(poly[0]);
-        const len: number[] = [0];
-        for (let k = 1; k < poly.length; k++) len.push(len[k - 1] + Math.hypot(poly[k][0] - poly[k - 1][0], poly[k][1] - poly[k - 1][1]));
-        for (let q = 0; q < 256; q++) {
-          const L = (q / 256) * len[len.length - 1];
-          let k = 1; while (k < len.length - 1 && len[k] < L) k++;
-          const f = (L - len[k - 1]) / (len[k] - len[k - 1] || 1);
-          pts2.push(poly[k - 1][0] + (poly[k][0] - poly[k - 1][0]) * f, poly[k - 1][1] + (poly[k][1] - poly[k - 1][1]) * f);
-        }
-        void seg;
-        dust.rect = new Float32Array(pts2);
+        for (let j = 0; j < DUST_N; j++) dust.ph.set([r(), r(), r(), r() * 6.283, 0.3 + r(), r(), r(), r()], j * 8);
       }
-      const W = (m: Float32Array, l: V3): V3 => [m[0] * l[0] + m[4] * l[1] + m[8] * l[2] + m[12], m[1] * l[0] + m[5] * l[1] + m[9] * l[2] + m[13], m[2] * l[0] + m[6] * l[1] + m[10] * l[2] + m[14]];
-      const mouth = [W(ms[0], dust.mouth[0]), W(ms[1], dust.mouth[1])], head = [W(ms[0], dust.head[0]), W(ms[1], dust.head[1])];
-      // the screen hangs between and above the two, facing us
-      const C: V3 = [(head[0][0] + head[1][0]) / 2 + camU[0] * 0.3 * sc, (head[0][1] + head[1][1]) / 2 + 0.25 * sc + camU[1] * 0.3 * sc, (head[0][2] + head[1][2]) / 2 + camU[2] * 0.3 * sc];
-      const FH = 0.8 * sc;
-      // a point on the arc from i's mouth to the other's head (u 0..1), its tube around it
-      const arc = (i: number, u: number, a: number, rr: number): V3 => {
-        const p0 = mouth[i], p2 = head[1 - i];
-        const p1: V3 = [(p0[0] + p2[0]) / 2 + camU[0] * 0.25 * sc, Math.max(p0[1], p2[1]) + 0.45 * sc, (p0[2] + p2[2]) / 2 + camU[2] * 0.25 * sc];
-        const v = 1 - u, rad = (0.015 + 0.08 * Math.sin(Math.PI * u)) * sc * Math.sqrt(rr);
-        return [v * v * p0[0] + 2 * v * u * p1[0] + u * u * p2[0] + rad * Math.cos(a), v * v * p0[1] + 2 * v * u * p1[1] + u * u * p2[1] + rad * Math.sin(a), v * v * p0[2] + 2 * v * u * p1[2] + u * u * p2[2] + rad * Math.cos(a * 1.7)];
-      };
+      // the light's way across the stage: from the glass to past the two
+      let fx = centre[0] - O[0], fz = centre[2] - O[2];
+      const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+      const span = fl * 1.6, wide = 1.4 * sc + 0.35 * fl;
       let n = 0;
       for (let j = 0; j < DUST_N; j++) {
-        const g = j * 8, u0 = dust.ph[g], ang = dust.ph[g + 1], rr = dust.ph[g + 2], fq = dust.ph[g + 3], inner = dust.ph[g + 4], sz = dust.ph[g + 5], delay = dust.ph[g + 6], tw = dust.ph[g + 7];
-        const w = talkAt(t + delay), wi = Math.max(0, 1 - w.a - w.b - w.f);
-        const u = ((u0 + t * 0.3) % 1 + 1) % 1, glow = Math.pow(Math.sin(Math.PI * u), 0.6);
-        let x = 0, y = 0, z = 0, k = 0;
-        const add = (p: V3, wt: number, kk: number) => { x += p[0] * wt; y += p[1] * wt; z += p[2] * wt; k += kk * wt; };
-        if (w.a > 0) add(arc(0, u, ang + t * 0.8, rr), w.a, glow);
-        if (w.b > 0) add(arc(1, u, ang + t * 0.8, rr), w.b, glow);
-        if (w.f > 0) {
-          // on the screen: most on its outline, slowly running round it, a few glowing faintly inside
-          let px: number, py: number;
-          if (inner < 0.78) { const q = Math.floor((((fq + t * 0.015) % 1) + 1) % 1 * 256) * 2; px = dust.rect[q]; py = dust.rect[q + 1]; }
-          else { px = (fq - 0.5) * (9 / 16) * 0.9; py = (rr - 0.5) * 0.92; }
-          const jx = (tw - 0.5) * 0.012, jy = (sz - 0.5) * 0.012;
-          add([C[0] + (camR[0] * (px + jx) + camU[0] * (py + jy)) * FH, C[1] + (camR[1] * (px + jx) + camU[1] * (py + jy)) * FH, C[2] + (camR[2] * (px + jx) + camU[2] * (py + jy)) * FH], w.f, inner < 0.78 ? 1 : 0.35);
-        }
-        if (wi > 0) {
-          // between: a loose cloud round the two heads, drifting
-          const hc: V3 = [(head[0][0] + head[1][0]) / 2, (head[0][1] + head[1][1]) / 2, (head[0][2] + head[1][2]) / 2];
-          add([hc[0] + (fq - 0.5) * 1.6 * sc + 0.04 * sc * Math.sin(0.4 * t + ang), hc[1] + (rr - 0.3) * 0.7 * sc + 0.04 * sc * Math.sin(0.5 * t + ang * 2), hc[2] + (inner - 0.5) * 1.1 * sc], wi, 0.22 + 0.25 * Math.sin(1.3 * t + ang * 3) ** 2);
-        }
-        if (y < 0.002 || k < 0.02) continue;
-        dustData.set([x, y, z, sc * (0.007 + 0.01 * sz), k * (0.85 + 0.3 * tw), 0], n * 6);
+        const g = j * 8, ra = dust.ph[g], rb = dust.ph[g + 1], rc = dust.ph[g + 2], ph = dust.ph[g + 3], sp = dust.ph[g + 4], rs = dust.ph[g + 5], rt = dust.ph[g + 6], rh = dust.ph[g + 7];
+        const high = j % 9 === 0;
+        // along the light, slowly carried downstream (wrapping), across it, and up
+        const along = ((((ra + t * 0.006 * sp) % 1) + 1) % 1) * span + 0.15 * fl;
+        const across = (rb - 0.5) * wide * (0.35 + along / span);
+        const yb = high ? (0.9 + 2.2 * rh) * sc : (0.04 + 1.1 * rh * rh) * sc;
+        const x = O[0] + fx * along - fz * across + 0.05 * sc * Math.sin(0.21 * t * sp + ph);
+        const z = O[2] + fz * along + fx * across + 0.05 * sc * Math.cos(0.17 * t * sp + ph * 1.7);
+        const y = yb + 0.04 * sc * Math.sin(0.26 * t * sp + ph * 2.3);
+        // a mote turns in the air and catches the light now and then
+        const k = (high ? 0.3 : 0.15 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(0.9 * t * sp + ph * 3), 4)) * (0.6 + 0.4 * rc);
+        dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k * (0.7 + 0.3 * rt), 0], n * 6);
         n++;
       }
       return n;
@@ -849,15 +791,14 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const toCam = (p: V3) => facing(p, [cam.pos[0], 0, cam.pos[2]]);
         const lean = -0.24;
         const blend = (x: number, y: number, k: number) => x + k * Math.atan2(Math.sin(y - x), Math.cos(y - x));
-        // who speaks turns a little more to the other and lifts his head; the listener settles
-        const tk = talkAt(tSec);
-        const ya = blend(toCam(a), facing(a, b), 0.45 + 0.25 * tk.a - 0.1 * tk.b) + 0.03 * Math.sin(0.4 * tSec);
-        const yb = blend(toCam(b), facing(b, [O[0], 0, O[2]]), 0.55) + 0.2 * tk.b - 0.08 * tk.a + 0.03 * Math.sin(0.4 * tSec + 2);
-        const mA = model([a[0], -ob.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.06 * tk.a + 0.02 * Math.sin(0.9 * tSec + 1), 0, sc);
-        const mB = model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.06 * tk.b + 0.02 * Math.sin(0.9 * tSec + 2.6), 0, sc);
+        // turned well to each other; the far one also to the light, so its face is lit; both move a little, slowly
+        const ya = blend(toCam(a), facing(a, b), 0.62) + 0.07 * Math.sin(0.35 * tSec);
+        const yb = blend(blend(toCam(b), facing(b, a), 0.5), facing(b, [O[0], 0, O[2]]), 0.55) + 0.07 * Math.sin(0.35 * tSec + 2.4);
+        const mA = model([a[0], -ob.lowest(M_CAESAR, lean) * sc, a[2]], ya, lean + 0.025 * Math.sin(0.5 * tSec + 1), 0, sc);
+        const mB = model([b[0], -ob.lowest(M_SENATOR, lean) * sc, b[2]], yb, lean + 0.025 * Math.sin(0.5 * tSec + 2.6), 0, sc);
         items.push({ mesh: M_CAESAR, m: mA, mat: MARBLE, fade: f });
         items.push({ mesh: M_SENATOR, m: mB, mat: MARBLE, fade: f });
-        dustN = dustFrame([mA, mB], [ob.points(M_CAESAR), ob.points(M_SENATOR)], sc, tSec, cam.r, cam.u);
+        dustN = dustFrame([(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2], sc, tSec, O);
       }
       // the light: where it leaves the glass, the bundle's edges, how wide it spreads, its strength
       const lAE = Math.atan2(dE[2], dE[0]), lAM = Math.atan2(dM[2], dM[0]);
@@ -960,7 +901,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
           gl.uniform1f(uu("uGain"), S.gain); gl.uniform1f(uu("uGrain"), 0.03); gl.uniform1f(uu("uTime"), tSec);
         };
         ob.draw(items, vp, shared, canvas.width, canvas.height);
-        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, st.show[2], shared);
+        if (dustN) ob.dust(dustData, dustN, vp, (cam.focal * canvas.height) / 2, st.show[2], shared, Math.hypot(cam.pos[0] - place[2].o[0], cam.pos[1], cam.pos[2] - place[2].o[2]), 9 * cpx);
       }
       mark();
       if (prof) window.__stPrismProf = prof.marks;
