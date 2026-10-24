@@ -41,6 +41,10 @@ uniform float uSpecW;
 uniform float uTopY, uTopSoft;   // the hairline under the head: the scene fades out before it (canvas px from the bottom)
 uniform vec3 uS0, uS1, uS2, uS3, uS4;
 uniform sampler2D uSpec;
+/* Motion's projection: the video, its frame on the floor (centre, half-axes), how much of the video the frame shows */
+uniform sampler2D uProj;
+uniform float uProjW, uProjGain;
+uniform vec2 uProjC, uProjU, uProjV, uProjCrop;
 uniform float uGrain, uHaze, uFanGain, uLandGain, uEnv, uAirFan, uFanRefl;
 uniform vec2 uBeamFade;
 uniform float uFanBlur, uPoolSoft, uPoolTh, uGain;
@@ -335,9 +339,27 @@ vec3 floorLight(vec3 p, vec3 rd){
   }
   // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
   // shadows; the satin breaks it up a little
+  // Motion: the light is a projector's; in a frame on the floor it lays the work itself, out of the dark
+  float pin = 0.0;
+  if (uProjW > 0.001 && cl.r + cl.g + cl.b > 1e-5) {
+    vec2 q = p.xz - uProjC;
+    float det = uProjU.x * uProjV.y - uProjU.y * uProjV.x;
+    vec2 ab = vec2(q.x * uProjV.y - q.y * uProjV.x, uProjU.x * q.y - uProjU.y * q.x) / det;
+    vec2 e = abs(ab) - vec2(1.0) + 0.03;
+    float sdf = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - 0.03;
+    pin = 1.0 - smoothstep(-0.012, 0.012, sdf);
+    if (pin > 0.001) {
+      vec2 uv = vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y);
+      vec3 v = texture2D(uProj, uv).rgb;
+      v = pow(v, vec3(1.5));
+      float Lm = dot(v, vec3(0.3, 0.59, 0.11));
+      v = mix(vec3(Lm), v, 0.4) * vec3(1.0, 0.9, 0.76);
+      col += v * pin * vis * uProjW * uProjGain * length(cl) * 2.2 * uIP;
+    }
+  }
   if (cl.r + cl.g + cl.b > 1e-5) {
     float sm = smokeLite(vec2(length(p.xz - uLO.xz) * 2.0, atan(p.z - uLO.z, p.x - uLO.x) * 3.0));
-    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.34, uSpecW) * uIP;
+    col += cl * vis * mix(0.8, 1.15, sm) * mix(0.32, 0.34, uSpecW) * uIP * mix(1.0, mix(0.5, 0.12, pin), uProjW);
   }
   // a soft warm sheen under the beam, and the glass's own glow around its foot
   vec3 a = vec3(uBA.x, 0.0, uBA.z), b = vec3(uPin.x, 0.0, uPin.z);

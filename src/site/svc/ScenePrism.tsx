@@ -57,7 +57,7 @@ const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_PILLOW = 6, M_ART = 14;
  *  Motion: for now only the light and the dust in it (its object is being chosen), the cushion, or the voxels' shadow
  *  story. Vertical: the two busts in conversation, dust drifting off them in the light; or
  *  Hercules raising Antaeus in an upright 9:16 frame of light */
-export const VARIANTS = { motion: ["dust", "cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
+export const VARIANTS = { motion: ["projector", "dust", "cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
 export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
   const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
@@ -309,6 +309,26 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
     const artM = new ShadowArt();
+    /* Motion's projection: our Motion, 3D & CGI works, one loop after another, laid on the floor by the light */
+    let projTex: WebGLTexture | null = null;
+    let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0;
+    const PROJ = ["centil", "fifa", "tefal", "prison", "arch"];
+    const projNext = () => {
+      if (!projVid) return;
+      const webm = projVid.canPlayType('video/webm; codecs="vp9"') !== "";
+      projVid.src = `${import.meta.env.BASE_URL}video/site/${PROJ[projK % PROJ.length]}-loop.${webm ? "webm" : "mp4"}`;
+      projK++;
+      projAt = performance.now();
+      projVid.play().catch(() => {});
+    };
+    const projStart = () => {
+      if (projVid) { if (projVid.paused) projVid.play().catch(() => {}); return; }
+      const v = document.createElement("video");
+      v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
+      v.addEventListener("ended", projNext);
+      projVid = v;
+      projNext();
+    };
     /** Motion's cushion: rebuilt on the CPU each frame it shows */
     const pillow = new Pillow();
     let pillowIn = false;
@@ -371,6 +391,15 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.uniform1i(u("uSpec"), 0);
       gl.uniform1i(u("uShadow"), 3);
+      gl.uniform1i(u("uProj"), 4);
+      projTex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, projTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
 
       /* the things the light falls on */
       objs = new Objects(gl);
@@ -738,7 +767,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       const tSec = frozen ? 20 + (dbgT as number) : (now - t0) / 1000;
       const items: Item[] = [];
       dustN = 0;
-      let dustFade = 0;
+      let dustFade = 0, projOn = 0;
+      let projC: [number, number] = [0, 0], projU: [number, number] = [1, 0], projV: [number, number] = [0, 1];
       const at = (i: number, along: number, side = 0, y = 0): V3 => {
         const pl0 = place[i] ?? { o: [0, S.hb, 0] as V3, az: 0 };
         const f = dirXZ(pl0.az), r: V3 = [-f[2], 0, f[0]];
@@ -762,10 +792,20 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
         // the shards turn into the next one (to the right of the stage, where the light lies widest)
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        if (variant("motion") === "dust") {
-          // only our light and the dust hanging in it, until Motion's object is chosen
+        if (variant("motion") === "projector" || variant("motion") === "dust") {
+          // only our light and the dust hanging in it; as a projector's light it lays our works on the floor
           dustN = dustFrame(at(0, sd.d + 0.2 * sc, 0, 0), 0.55 * sc, tSec, O);
           dustFade = st.show[0];
+          if (variant("motion") === "projector") {
+            projStart();
+            projOn = st.show[0];
+            const C0 = at(0, sd.d + 0.18 * sc, 0.06 * sc, 0), c0 = toScreen(C0), e = 0.05;
+            const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
+            const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
+            const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
+            const wpx = Math.min(0.44 * W, 2 * (W - c0[0] - 40)), hpx = wpx / 2;
+            projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
+          }
         } else if (variant("motion") === "voxels") {
           const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
           showArt(artM, 0, M_ART, slots, 2700, 0.0095 * sc, CERAMIC, "voxel");
@@ -903,6 +943,19 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       f1("uSpecW", st.spec);
       // the haze our light lights in the air (fainter for the spectrum, whose fan already draws itself)
       f1("uAirCone", off.air || !TIERS[quality.tier].air ? 0 : (0.055 - 0.01 * st.spec) * S.haze);
+      // the projection: the current frame of the video, cropped to the frame's shape; it dips at each cut
+      let pw = 0;
+      if (projOn > 0.004 && projVid && projTex && projVid.readyState >= 2 && projVid.videoWidth) {
+        gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, projTex);
+        try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, projVid); pw = projOn; } catch { pw = 0; }
+        const ar = projVid.videoWidth / projVid.videoHeight, fa = Math.hypot(projU[0], projU[1]) > 0 ? 2 : 2;
+        f2("uProjCrop", ar > fa ? fa / ar : 1, ar > fa ? 1 : ar / fa);
+        const sinceCut = (performance.now() - projAt) / 1000, left = projVid.duration ? projVid.duration - projVid.currentTime : 9;
+        pw *= Math.min(1, sinceCut / 0.35) * Math.min(1, left / 0.3);
+      }
+      f1("uProjW", pw); f1("uProjGain", 2.6);
+      f2("uProjC", projC[0], projC[1]); f2("uProjU", projU[0], projU[1]); f2("uProjV", projV[0], projV[1]);
+      gl.activeTexture(gl.TEXTURE0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       mark();
 
@@ -1040,10 +1093,12 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (!lost) {
         objs?.dispose();
         if (tex) gl.deleteTexture(tex);
+        if (projTex) gl.deleteTexture(projTex);
         if (buf) gl.deleteBuffer(buf);
         gl.deleteProgram(prog);
         gl.getExtension("WEBGL_lose_context")?.loseContext();
       }
+      if (projVid) { projVid.pause(); projVid.removeAttribute("src"); projVid.load(); }
       canvas.remove();
     };
   }, [mode, gen]);
