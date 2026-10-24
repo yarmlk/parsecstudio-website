@@ -216,7 +216,8 @@ vec3 fanAir(vec3 ro, vec3 rd, float t0, float t1, float soft, float lite){
   float sm = lite > 0.5 ? 0.8 : mix(0.35, 1.35, smokeLite(vec2(r * 2.4, (p.x - p.z) * 3.0 + p.y * 4.0)));
   // the objects cut the sheet of light in the haze: their shadows run through the air
   float vis = lite > 0.5 ? 1.0 : shadowVis1(p);
-  return c * vis * gobo(p) * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain;
+  // (Motion's projector: the hard-edged sheet gives way to the soft haze of the cone, so the beam opens into the picture)
+  return c * vis * gobo(p) * smoothstep(-0.02, 0.06, p.y) * exp(-r / uAirFan) * sm / max(abs(den), 0.22) * uIF * uFanGain * (1.0 - uProjW);
 }
 
 /* ---------- the beam ---------- */
@@ -335,7 +336,8 @@ vec3 floorLight(vec3 p, vec3 rd){
     vec3 c3 = fanCol(p.xz, uPoolSoft * 4.5, r3);
     float th3 = th * 5.0 + 0.15;
     float bloom = exp(-(ys * ys) / (th3 * th3));
-    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis * gobo(p);
+    // (Motion's projector: the picture is the light there, so the plain landing gives way to it)
+    col += (c * (land * (0.6 + 1.4 * lobe) + under * 0.05) + c2 * halo * 0.26 + c3 * bloom * 0.1) * mix(0.75, 1.15, sm) * uIP * uLandGain * vis * gobo(p) * (1.0 - uProjW);
   }
   // the light spreading over the floor beyond the glass (our light wide, the spectrum faintly), cut by the objects'
   // shadows; the satin breaks it up a little
@@ -346,16 +348,17 @@ vec3 floorLight(vec3 p, vec3 rd){
     vec2 q = p.xz - uProjC;
     float det = uProjU.x * uProjV.y - uProjU.y * uProjV.x;
     vec2 ab = vec2(q.x * uProjV.y - q.y * uProjV.x, uProjU.x * q.y - uProjU.y * q.x) / det;
-    // inside the picture, feathered wide at its border, and only as far as the light reaches (its own soft edge)
-    vec2 fe = smoothstep(vec2(1.0), vec2(0.72), abs(ab));
-    float lit = smoothstep(0.008, 0.12, length(cl) / max(uLGain, 1e-3));
+    // the picture is carried by the light itself, like a slide in a projector: as bright as the light is there (full
+    // where the beam opens, thinning out with it), softened at the sides and dying away toward the far end
+    vec2 fe = vec2(smoothstep(1.0, 0.25, ab.x) * smoothstep(-1.0, -0.6, ab.x), smoothstep(1.0, 0.45, abs(ab.y)));
+    float lit = smoothstep(0.0, 0.42, length(cl) / max(uLGain, 1e-3));
     pin = fe.x * fe.y * lit;
     if (pin > 0.001) {
       vec2 uv = clamp(vec2(0.5 + ab.x * 0.5 * uProjCrop.x, 0.5 + ab.y * 0.5 * uProjCrop.y), 0.0, 1.0);
-      vec3 d = texture2D(uProj, uv).rgb * 0.86;
+      vec3 d = texture2D(uProj, uv).rgb * 0.86 * pin;
       // what the floor must hold so the screen shows the video as it is (the inverse of the final filmic curve)
       vec3 pre = -log(max(vec3(1.0) - d, vec3(0.02))) / (1.4 * max(uGain, 1e-3));
-      col += pre * pin * 0.9 * uProjW * vis;
+      col += pre * 0.9 * uProjW * vis;
     }
   }
   if (cl.r + cl.g + cl.b > 1e-5) {
