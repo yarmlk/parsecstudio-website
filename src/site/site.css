@@ -576,7 +576,7 @@
 .st-site--mob .wp__go { width: 32px; height: 32px; }
 .st-site--mob .st-hero__acts { flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .st-site--mob .st-pill--lg { height: 46px; padding: 0 20px; font-size: 14px; }
-.st-site--mob .st-sec { min-height: 0; padding: 136px 20px 80px; }
+.st-site--mob .st-sec { min-height: 0; padding: 108px 20px 64px; }
 .st-site--mob .st-head { margin-bottom: 28px; gap: 16px; }
 .st-site--mob .st-head__rule { width: 96px; margin-bottom: 22px; }
 .st-site--mob .st-h2 { font-size: 46px; }
@@ -595,6 +595,9 @@
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .22), inset 0 0 0 1px rgba(255, 255, 255, .06);
   opacity: .32; transform: scale(.97); transform-origin: 50% 0; transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
 .st-svc__item.is-on .st-svc__reel { opacity: 1; transform: none; }
+/* the phone keeps the services to one screen: only the one in focus opens its loop, the others fold to their name */
+.st-site--mob .st-svc__reel { max-height: 0; margin-top: 0; transition: max-height 700ms var(--ease-move), margin-top 700ms var(--ease-move), opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
+.st-site--mob .st-svc__item.is-on .st-svc__reel { max-height: 260px; margin-top: 12px; }
 .st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .st-svc__vid { opacity: 0; transition: opacity 600ms var(--ease-enter); }
 .st-svc__vid.is-on { opacity: 1; }
@@ -609,11 +612,11 @@
 .st-site--mob .st-card { width: 262px; height: 452px; padding: 12px 12px 24px; gap: 14px; }
 .st-site--mob .st-card__t { font-size: 19px; }
 .st-site--mob .st-card__plus { opacity: 1; transform: none; }
-.st-site--mob .st-clients { padding-bottom: 110px; }
+.st-site--mob .st-clients { padding-bottom: 64px; }
 .st-site--mob .st-clients__plate { top: 200px; bottom: 0; }
-.st-site--mob .st-logos { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 84px; gap: 8px; --k: .3; }
+.st-site--mob .st-logos { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 82px; gap: 10px; --k: .44; }
 .st-site--mob .st-logo { border-radius: 16px; }
-.st-site--mob .st-reviews { display: block; padding-bottom: 24px; }
+.st-site--mob .st-reviews { display: block; padding-bottom: 0; }
 .st-site--mob .st-reviews .st-head { margin-bottom: 14px; }
 .st-site--mob .st-rev { height: 620px; margin: 0 -20px; padding: 0 20px; grid-template-columns: minmax(0, 1fr); --st-rev-fade: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, .08) 5%, rgba(0, 0, 0, .34) 10%, rgba(0, 0, 0, .74) 15%, #000 19%, #000 80%, rgba(0, 0, 0, .6) 86%, rgba(0, 0, 0, .2) 93%, transparent 100%); }
 .st-site--mob .st-rev.is-still { height: auto; margin: 14px 0 0; padding: 0; }
@@ -623,19 +626,21 @@
 .st-site--mob .st-quote figcaption img { height: 34px; }
 .st-site--mob .st-contact { padding-bottom: 0; }
 .st-site--mob .st-contact__plate img { object-position: 50% 100%; }
-.st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 32px; }
-.st-site--mob .st-contact__p { margin-top: 12px; font-size: 15px; }
-.st-site--mob .st-contact__tag { margin-top: 0; padding-top: 28px; font-size: 28px; }
+.st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 22px; padding-top: 0; }
+.st-site--mob .st-contact__p { display: none; }
+.st-site--mob .st-contact__tag { margin-top: 0; padding-top: 20px; font-size: 24px; }
 .st-site--mob .st-contact__in > .st-cf { align-self: stretch; margin: 0; }
-.st-site--mob .st-cf { padding: 24px 18px 20px; border-radius: 24px; }
-.st-site--mob .st-cf__form { gap: 24px; }
-.st-site--mob .st-cf__grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.st-site--mob .st-cf__field { height: 62px; border-radius: 14px; }
-.st-site--mob .st-cf__field--area { height: 150px; }
+.st-site--mob .st-cf { padding: 16px 14px 16px; border-radius: 22px; }
+.st-site--mob .st-cf__form { gap: 14px; }
+.st-site--mob .st-cf__grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+/* the phone keeps to one screen: the optional field stays on the desk */
+.st-site--mob .st-cf__field:has(input[name="company"]) { display: none; }
+.st-site--mob .st-cf__field { height: 54px; border-radius: 13px; }
+.st-site--mob .st-cf__field--area { height: 104px; }
 .st-site--mob .st-cf__top { left: 16px; right: 16px; }
 .st-site--mob .st-cf__field input, .st-site--mob .st-cf__field textarea { padding-left: 16px; padding-right: 16px; font-size: 16px; }
-.st-site--mob .st-cf__acts { flex-direction: column; align-items: stretch; gap: 18px; }
-.st-site--mob .st-cf__send { height: 52px; }
+.st-site--mob .st-cf__acts { flex-direction: column; align-items: stretch; gap: 12px; }
+.st-site--mob .st-cf__send { height: 48px; }
 .st-site--mob .st-cf__alt { text-align: center; font-size: 13.5px; }
 .st-site--mob .st-cf.is-sent { min-height: 460px; }
 .st-site--mob .st-cf__msg { padding-top: 24px; }
@@ -644,9 +649,10 @@
 .st-site--mob .st-cf__note { flex-direction: column; align-items: flex-start; gap: 14px; }
 .st-site--mob .st-cf__links { gap: 20px; }
 .st-site--mob .st-cf__link { min-height: 44px; }
-.st-site--mob .st-foot { height: auto; margin: 0; padding: 64px 0 48px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
-.st-site--mob .st-foot__logo { height: 15px; margin-bottom: 6px; }
-.st-site--mob .st-foot__mail { font-size: 15px; }
+.st-site--mob .st-foot { height: auto; margin: 0; padding: 26px 0 26px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.st-site--mob .st-foot__logo { height: 14px; margin-bottom: 0; }
+.st-site--mob .st-foot__mail { font-size: 14px; }
+.st-site--mob .st-foot__c { flex-basis: 100%; }
 .st-site--mob .st-foot__c { justify-self: auto; }
 .st-site--mob .st-sv__scroll { padding: 128px 20px 56px; }
 .st-site--mob .st-sv__head { flex-direction: column; align-items: flex-start; gap: 22px; margin-bottom: 26px; }

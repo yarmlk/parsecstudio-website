@@ -165,7 +165,9 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
         const t = rimTop(c, Math.max(0, Math.min(W, X)), s.y, r, kx, ky);
         if (t != null) top = Math.min(top, t);
       }
-      memo = { sx: s.x, sy: s.y, w, left, top: top - P.gap - h };
+      // the phone: a plain button on the black under the disc (nothing to hover there, so it sits clear of the film);
+      // the desk keeps it on the light, just above the rim
+      memo = { sx: s.x, sy: s.y, w, left, top: mode === "mob" ? s.y + P.gap * 2 : top - P.gap - h };
       return memo;
     };
     /* on the pointer: the play circle where the pointer is, the pill kept inside the frame */
