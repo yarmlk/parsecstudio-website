@@ -793,7 +793,9 @@
 
 /* ── the phone's hero (HeroMob): the film's first seconds behind a still horizon; the film in its own player ── */
 .hm { position: absolute; inset: 0; z-index: 0; overflow: hidden; background: var(--void); }
-.hm__film { position: absolute; left: 0; top: 0; width: 100%; height: 70%; object-fit: cover; }
+.hm__film { position: absolute; left: 0; top: 0; width: 100%; height: 70%; object-fit: cover; pointer-events: none; }
+/* (should the phone refuse to play it, e.g. in low power mode, the still stays: no play button of the phone's own) */
+.hm__film::-webkit-media-controls, .hm__film::-webkit-media-controls-start-playback-button, .hm__film::-webkit-media-controls-overlay-play-button { display: none !important; -webkit-appearance: none; }
 .hm__fade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 11, 13, .35) 0%, rgba(11, 11, 13, 0) 18%, rgba(11, 11, 13, 0) 46%, var(--void) 68%); }
 /* the horizon: the satin plane's far rim, lit from behind by our one warm light */
 .hm__horizon { position: absolute; left: -42%; right: -42%; top: 63%; height: 90%; border-radius: 50%; background: var(--void);

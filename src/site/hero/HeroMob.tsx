@@ -3,7 +3,7 @@ import { Icon } from "../../ui/Icons";
 import { REELS, REEL_SRC, connHint } from "./reel";
 
 /**
- * The phone's hero, kept plain: the showreel's first seconds loop muted behind a still horizon (one small H.264
+ * The phone's hero, kept plain: a few calm seconds of the showreel loop muted behind a still horizon (one small H.264
  * file, no WebGL, no per-frame work), and "Play showreel" opens the film in a player of its own over the whole
  * screen, with the phone's own controls. The page under it is locked while it is open.
  */
@@ -12,16 +12,25 @@ export function HeroMob() {
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
+    // iOS plays a muted video by itself only if it is muted before it loads (React sets the property, not the
+    // attribute) and inline; and the phone's own big play button never shows over it
+    v.muted = true; v.defaultMuted = true; v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", "");
+    // the source only once it is muted, so the phone sees a muted inline video from the start
+    v.src = REEL_SRC.glass;
+    v.load();
     let seen = true;
     const sync = () => { if (seen && !document.hidden) v.play().catch(() => {}); else v.pause(); };
+    // a phone that would not start it on its own (low power mode) starts it on the first touch anywhere
+    const nudge = () => { if (v.paused && seen) v.play().catch(() => {}); };
+    document.addEventListener("touchstart", nudge, { passive: true });
     const io = new IntersectionObserver(([e]) => { seen = e.isIntersecting; sync(); });
     io.observe(v);
     document.addEventListener("visibilitychange", sync);
-    return () => { io.disconnect(); document.removeEventListener("visibilitychange", sync); };
+    return () => { io.disconnect(); document.removeEventListener("visibilitychange", sync); document.removeEventListener("touchstart", nudge); };
   }, []);
   return (
     <div className="hm" aria-hidden>
-      <video ref={ref} className="hm__film" src={REEL_SRC.glass} poster={REEL_SRC.first} muted loop playsInline autoPlay preload="auto" />
+      <video ref={ref} className="hm__film" poster={REEL_SRC.glassPoster} muted loop playsInline autoPlay preload="auto" disablePictureInPicture disableRemotePlayback />
       <i className="hm__fade" />
       <i className="hm__horizon" />
     </div>
