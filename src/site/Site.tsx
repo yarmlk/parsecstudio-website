@@ -17,6 +17,7 @@ import { media } from "../lib/media";
 /** the phone's service loops: our Motion reel, our AI films, three of our vertical series side by side */
 const SVC_REEL = ["motion-reel-sm", "ai-reel", "vertical-drama-sm"];
 import { HeroLightB } from "./hero/HeroLightB";
+import { HeroMob, ReelMob } from "./hero/HeroMob";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
 import { WorksPill } from "./hero/WorksPill";
@@ -172,6 +173,8 @@ export function Site({
   const reelDock = noLight || !desk;
   const dockReel = useCallback(() => setReelDock(true), []);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
+  const [mobReel, setMobReel] = useState(false);
+  const openMobReel = useCallback(() => setMobReel(true), []);
   /** focus goes back to the Showreel control once it is interactive again (it leaves `inert` with the idle render) */
   const focusReelBtn = useCallback(() => {
     let n = 0;
@@ -378,7 +381,8 @@ export function Site({
       <div className="st-site__scroll" ref={scroller}>
         {/* 01 hero */}
         <section ref={heroRef} data-sec="hero" className={`st-hero${reelPh !== "idle" ? " is-reeling" : ""}${reelPh === "open" ? " is-watching" : ""}`}>
-          <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} />
+          {/* the phone: a plain looping cut behind a still horizon, the film in a player of its own (HeroMob) */}
+          {desk ? <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} /> : <HeroMob />}
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
@@ -386,10 +390,10 @@ export function Site({
             <div className="st-hero__acts" data-rim="">
               {/* the phone keeps one control on the first screen: Play showreel */}
               {desk && <WorksPill onGo={() => goTo("cases")} />}
-              {reelDock && <ReelButton btnRef={reelBtn} onOpen={openReel} tease={tease} />}
+              {reelDock && <ReelButton btnRef={reelBtn} onOpen={desk ? openReel : openMobReel} tease={tease} />}
             </div>
           </div>
-          <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />
+          {desk && <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />}
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
@@ -529,6 +533,7 @@ export function Site({
       {svOpen != null && (
         <ServiceView key={svOpen} index={svOpen} mode={mode} onClose={closeSv} onWork={openWork} openId={open?.src === "sv" ? open.list[open.i].id : undefined} />
       )}
+      {mobReel && <ReelMob onClose={() => { setMobReel(false); focusReelBtn(); }} />}
       <Nav mode={mode} active={navOn} onGo={goTo} onMenu={() => setMenu(true)} solid={scrolled || svOpen != null} away={reelPh !== "idle"} />
       {menu && !desk && <MobileMenu active={navOn} onGo={goTo} onClose={() => setMenu(false)} />}
       {open && (
