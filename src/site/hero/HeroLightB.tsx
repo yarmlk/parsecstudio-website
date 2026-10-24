@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, type MutableRefObject } from "react";
 import { OPEN } from "../../lib/assets";
 import { easeEnter, easeMove } from "../../lib/ease";
-import { REELS, REEL_SRC, connHint, pickReel, reelOf, type HeroCtl, type ReelPhase } from "./reel";
+import { REELS, REEL_SRC, connHint, lighter, pickReel, reelOf, type HeroCtl, type Reel, type ReelPhase } from "./reel";
 import "./hero-b.css";
 
 /**
@@ -514,6 +514,9 @@ const REST: Record<Mode, number> = { desk: -0.06, mob: -0.02 };
 /* ── the reveal ── */
 /** the film behind the glass comes up this long after the light's first frame (its ignition is under way) */
 const FILM_AFTER = 1100;
+/** watching, a film that waits this long (or stalls a third time within STALL_WIN) steps down a rendition */
+const STALL_MS = 1200;
+const STALL_WIN = 20000;
 const FLARE_MS = 520;                                    // the rim flares (and holds while the film buffers)
 const WAIT_MS = 1500;                                    // … at most this long, then it goes down on the last good frame
 /** the light and its haze are out of the frame here: the <video> takes over (the rest of the descent is unseen) */
@@ -676,17 +679,56 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       return (mode === "desk" ? Math.max(W, (H * 16) / 9) : W) * d;
     };
     /** the rendition to watch, by the screen: on a connection that says it is slow, the 540p. The desk takes the
-        sharpest the screen needs; the phone is careful, it already plays the 540p behind the glass: a sharper one
-        only on what that cut's own download has shown (or else the connection's estimate) the network can carry */
+        sharpest the screen needs (a film that cannot keep up steps down by itself, see stepDown); the phone is
+        careful, it already plays the 540p behind the glass: a sharper one only on what that cut's own download has
+        shown (or else the connection's estimate) the network can carry */
     const filmPick = () => {
       const c = connHint();
       if (c.slow) return REELS[0].src;
-      if (mode === "desk") return pickReel(needPx(), Infinity).src;
+      if (mode === "desk") return pickReel(needPx(), cap).src;
       const m = measured();
-      return pickReel(needPx(), m ? m * 0.8 : c.mbps || REELS[0].mbps).src;
+      return pickReel(needPx(), Math.min(cap, m ? m * 0.8 : c.mbps || REELS[0].mbps)).src;
     };
     /** the film to watch, once chosen (the one the reveal waits for) */
     let filmSrc = "";
+    /** Mbps: once a rendition has stalled, nothing heavier than the one below it is picked again */
+    let cap = Infinity;
+    /* A film that keeps stalling steps down a rendition, from where it is, and plays on. Watching: after STALL_MS of
+       waiting, or the third stall in STALL_WIN; behind the glass only after a longer wait (nobody waits on it), and
+       only on the evidence of its own download rate. */
+    let stallT = 0;
+    const stalls: number[] = [];
+    let stepDown = () => {};
+    const onWaiting = () => {
+      window.clearTimeout(stallT);
+      if (!src || lighter(src).src === src) return;
+      const now = performance.now(), watching = R.phase !== "idle";
+      if (watching && v.currentTime > 0.2) {
+        while (stalls.length && now - stalls[0] > STALL_WIN) stalls.shift();
+        stalls.push(now);
+        if (stalls.length >= 3) { stepDown(); return; }
+      }
+      stallT = window.setTimeout(watching ? () => stepDown() : idleCheck, watching ? STALL_MS : STALL_MS * 2.5);
+    };
+    // behind the glass a long first load can be a busy page as well as a slow network: it steps down only once its
+    // own download shows it cannot keep up, and looks again a little later otherwise
+    const idleCheck = () => {
+      if (v.readyState >= 3 || v.paused || R.phase !== "idle") return;
+      const m = measured();
+      if (m && m < (reelOf(src)?.mbps ?? 0) * 1.2) stepDown();
+      else stallT = window.setTimeout(idleCheck, 1500);
+    };
+    const onPlaying = () => window.clearTimeout(stallT);
+    v.addEventListener("waiting", onWaiting);
+    v.addEventListener("playing", onPlaying);
+    v.poster = REEL_SRC.first;
+    /** play() refused with sound (no gesture to vouch for it): play muted. A play() cut short by a new source (a
+        step down) is no refusal: the sound stays. */
+    const soundless = (e: unknown) => {
+      if ((e as { name?: string } | null)?.name !== "NotAllowedError") return;
+      v.muted = true;
+      v.play().catch(() => {});
+    };
     let volOk = false;
     try { v.volume = 0.5; volOk = Math.abs(v.volume - 0.5) < 0.01; v.volume = 1; } catch { volOk = false; }
 
@@ -784,6 +826,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     const rest = () => {
       R.phase = "idle"; R.k = 0; R.flare = 0; R.down = false;
       delete box.dataset.down;
+      v.poster = REEL_SRC.first;
       R.kTw = tw(0, 0, 0, easeMove, 0); R.fTw = tw(0, 0, 0, easeEnter, 0);
       unwipe();
       v.muted = true;
@@ -827,7 +870,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       }
       v.muted = false;
       if (volOk && !fade && !back) { try { v.volume = 0; } catch { /* fixed */ } }
-      v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+      v.play().catch(soundless);
       if (fade) {
         box.dataset.fade = "1";
         box.dataset.down = "1";
@@ -868,6 +911,28 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       R.kTw = tw(k0, 0, UP_MS[mode] * (k0 / K_OUT[mode]), easeEnter, now);
       R.fTw = tw(R.flare, 0, UP_MS[mode] * Math.max(0.35, R.k), easeMove, now);
       kick();
+    };
+    stepDown = () => {
+      window.clearTimeout(stallT);
+      stalls.length = 0;
+      if ((v.paused && !v.seeking) || v.readyState >= 3) return;
+      // one rendition down, or straight to what the fetch so far can carry (nothing at all in 2 s: the lightest)
+      let lo: Reel = lighter(src);
+      const m = measured() || (!net.at && performance.now() - net.t0 > 2000 ? 0.01 : 0);
+      if (m) { const fit = [...REELS].reverse().find((r) => r.mbps <= m * 0.8) ?? REELS[0]; if (fit.mbps < lo.mbps) lo = fit; }
+      if (lo.src === src) return;
+      cap = lo.mbps;
+      if (R.phase === "open") {
+        // the <video> is what is seen: the canvas takes this very frame underneath, and the element shows nothing
+        // (no poster) until the lighter film has its frame, so the picture holds instead of flashing
+        uploadFilm(true);
+        draw(performance.now());
+        v.removeAttribute("poster");
+      }
+      const wasFilm = src === filmSrc;
+      setSrc(lo.src, v.currentTime);
+      if (wasFilm) filmSrc = lo.src;
+      v.play().catch(soundless);
     };
     const onEnded = () => { if (R.phase === "open" || R.phase === "opening") close(); };
     v.addEventListener("ended", onEnded);
@@ -1246,6 +1311,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       document.removeEventListener("visibilitychange", onVis);
       v.removeEventListener("ended", onEnded);
       v.removeEventListener("progress", onProgress);
+      v.removeEventListener("waiting", onWaiting);
+      v.removeEventListener("playing", onPlaying);
+      window.clearTimeout(stallT);
       stopGl();
       unwipe();
       if (section) delete section.dataset.fade;
@@ -1260,7 +1328,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
   return (
     <div ref={boxRef} className="st-hero__plate hlb grain" data-mode={mode}>
       <img className="hlb__fallback" alt="" />
-      <video ref={reelRef} className="hlb__reel" muted playsInline preload="auto" poster={REEL_SRC.first} aria-hidden tabIndex={-1} disablePictureInPicture />
+      <video ref={reelRef} className="hlb__reel" muted playsInline preload="auto" aria-hidden tabIndex={-1} disablePictureInPicture />
     </div>
   );
 });
