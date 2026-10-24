@@ -165,7 +165,10 @@ export function Site({
   /* the showreel's one control (hero/ReelCta): the glass plays the film; "Play showreel" is the pointer over it, and
      stands on the light for touch and the keyboard. With no light a plain button docks under the headline. */
   const tease = useTease(heroCtl);
-  const [reelDock, setReelDock] = useState(false);
+  const [noLight, setReelDock] = useState(false);
+  /* the phone: a plain, still button under the line (nothing to hover there, and a button riding the light moves as
+     you scroll); the desk: on the pointer over the glass, or docked here when there is no light */
+  const reelDock = noLight || !desk;
   const dockReel = useCallback(() => setReelDock(true), []);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
   /** focus goes back to the Showreel control once it is interactive again (it leaves `inert` with the idle render) */
@@ -375,6 +378,7 @@ export function Site({
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
+            {!desk && <p className="st-hero__sub" data-rim="">Full-cycle video production.<br />500+ projects for 100+ brands.</p>}
             <div className="st-hero__acts" data-rim="">
               {/* the phone keeps one control on the first screen: Play showreel */}
               {desk && <WorksPill onGo={() => goTo("cases")} />}

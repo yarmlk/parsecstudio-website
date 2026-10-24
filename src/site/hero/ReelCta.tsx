@@ -70,7 +70,7 @@ export function ReelButton({ btnRef, onOpen, tease }: { btnRef: Btn; onOpen: () 
       onBlur={() => tease("btn", 0)}
     >
       <span className="rc-orb" aria-hidden><Play size={8} /></span>
-      <span className="rc-pill__l">Showreel</span>
+      <span className="rc-pill__l">Play showreel</span>
       <Length id={dur} />
     </button>
   );

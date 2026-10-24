@@ -570,9 +570,11 @@
 .st-site--mob .st-watch__bar.st-pl { left: 16px; right: 16px; bottom: auto; top: calc(50% + 28.125cqw + 12px); }
 .st-site--mob .st-hero__plate img { object-position: 50% 74%; }
 /* phone: the film takes most of the screen, the horizon low; under it the one button, then the line, centred */
-.st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 96px; width: auto; gap: 16px; align-items: center; text-align: center; }
+.st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 48px; width: auto; gap: 16px; align-items: center; text-align: center; }
 .st-site--mob .st-hero__h { font-size: 31px; line-height: 1.1; }
 .st-site--mob .st-hero__acts:empty { display: none; }
+.st-site--mob .st-hero__sub { margin: -4px 0 0; font-size: 14px; line-height: 1.5; color: var(--fog); }
+.st-site--mob .st-hero__acts { justify-content: center; margin-top: 6px; }
 .st-site--mob .wp { height: 54px; gap: 12px; font-size: 14px; }
 .st-site--mob .wp__win { width: 72px; height: 42px; }
 .st-site--mob .wp__go { width: 32px; height: 32px; }

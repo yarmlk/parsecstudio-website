@@ -37,7 +37,7 @@ export const lighter = (src: string): Reel => REELS[Math.max(0, REELS.findIndex(
 export const reelOf = (src: string): Reel | undefined => REELS.find((r) => r.src === src);
 
 export const REEL_SRC = {
-  /** behind the glass on the phone: its first 12 s, small and silent (~0.3 MB), looping; "Play showreel" switches to
+  /** behind the glass on the phone: its first 12 s at 480p, silent (~0.75 MB), looping; "Play showreel" switches to
       the film itself */
   glass: media("showreel-glass.mp4"),
   /** reduced motion, save-data */
