@@ -7,8 +7,7 @@ import { useReduced } from "./ui";
 /* Services and cases for the parsec.studio mock (site copy, English).
    Cases are the live site's own projects (parsec.studio, __NEXT_DATA__): titles, types and tools from its texts and
    the films' own credits, the films from its own media, re-encoded and hosted here (video/site), each poster the
-   strongest frame of its film. AI works come from the Vimeo list and have no film file yet, so they open on their
-   still.
+   strongest frame of its film. AI works come from our Vimeo showcase, hosted here the same way.
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
@@ -92,12 +91,27 @@ export const CASES: Case[] = [
   },
 ];
 
-/** AI works: on Vimeo for now, so they open on their still until the film files are added. */
+/** AI works, in the order of our Vimeo showcase "AI Video Production" (titles and running times from it), the films
+ *  re-encoded and hosted here like the cases; each poster a strong frame of its film */
+const ai = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur), stills: [still(id, title)] });
 export const AI_CASES: Case[] = [
-  { id: "zenegy", title: "Zenegy", type: "AI Production", year: "2026", dur: "1:12", poster: "50% 50%", stills: [{ src: "img/work/1159162078.jpg", pos: "50% 50%", alt: "A team laughing together" }] },
-  { id: "golfone", title: "GolfOne", type: "AI Production", year: "2026", dur: "1:00", poster: "50% 50%", stills: [{ src: "img/work/1165428574.jpg", pos: "50% 50%", alt: "The GolfOne booking screen" }] },
-  { id: "snappy", title: "Snappy", type: "AI Production", year: "2026", dur: "0:50", poster: "50% 50%", stills: [{ src: "img/work/1154003955.jpg", pos: "50% 50%", alt: "The Snappy mark" }] },
+  ai("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
+  ai("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
+  ai("golfone", "GolfOne", "Golf club booking software promo", "1:00"),
+  ai("zenegy", "Zenegy", "Payroll & HR software brand video (Danish)", "1:12"),
+  ai("snappy", "Snappy", "Birthday reminder app promo", "0:50"),
+  ai("openclaw", "OpenClaw", "AI agent teaser spot", "0:39"),
+  ai("myclaw", "MyClaw", "AI agent product promo", "0:55"),
+  ai("kraken", "Kraken", "Trading platform product video", "1:14"),
+  ai("tavrix", "Tavrix", "Cinematic whisky cask brand spot", "0:30"),
+  ai("prism-air", "Prism", "Airline content platform demo", "2:42"),
+  ai("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
+  ai("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
+  ai("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
+  ai("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
+/** the AI films' loops, for the projector */
+export const AI_LOOPS = AI_CASES.map((c) => c.id);
 
 /* ── Services ─────────────────────────────────────────────── */
 export type Service = {
