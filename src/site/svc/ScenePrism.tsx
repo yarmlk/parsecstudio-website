@@ -336,7 +336,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
        its depth: most float around the two at their depth, sharp; some hang high between them and the camera, out of
        focus, as soft discs. They drift slowly and are carried a little downstream; they glow where the light reaches
        them. The frame's points go to dustData (x, y, z, size, strength, 0) */
-    const DUST_N = 900;
+    const DUST_N = 900, DUST_IN = 380;
     const dust = { ph: new Float32Array(DUST_N * 8), init: false };
     const dustData = new Float32Array(DUST_N * 6);
     let dustN = 0;
@@ -354,17 +354,30 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       let n = 0;
       for (let j = 0; j < DUST_N; j++) {
         const g = j * 8, ra = dust.ph[g], rb = dust.ph[g + 1], rc = dust.ph[g + 2], ph = dust.ph[g + 3], sp = dust.ph[g + 4], rs = dust.ph[g + 5], rt = dust.ph[g + 6], rh = dust.ph[g + 7];
-        const high = j % 9 === 0;
-        // along the light, slowly carried downstream (wrapping), across it, and up
-        const along = ((((ra + t * 0.006 * sp) % 1) + 1) % 1) * span + 0.15 * fl;
-        const across = (rb - 0.5) * wide * (0.35 + along / span);
-        const yb = high ? (0.9 + 2.2 * rh) * sc : (0.04 + 1.1 * rh * rh) * sc;
-        const x = O[0] + fx * along - fz * across + 0.05 * sc * Math.sin(0.21 * t * sp + ph);
-        const z = O[2] + fz * along + fx * across + 0.05 * sc * Math.cos(0.17 * t * sp + ph * 1.7);
-        const y = yb + 0.04 * sc * Math.sin(0.26 * t * sp + ph * 2.3);
-        // a mote turns in the air and catches the light now and then
-        const k = (high ? 0.3 : 0.15 + 0.55 * Math.pow(0.5 + 0.5 * Math.sin(0.9 * t * sp + ph * 3), 4)) * (0.6 + 0.4 * rc);
-        dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k * (0.7 + 0.3 * rt), 0], n * 6);
+        let x: number, y: number, z: number, k: number, glow: number;
+        if (j < DUST_IN) {
+          // in the light: a sparse stream, most of it soft
+          const high = j % 4 === 0;
+          const along = ((((ra + t * 0.006 * sp) % 1) + 1) % 1) * span + 0.15 * fl;
+          const across = (rb - 0.5) * wide * (0.35 + along / span);
+          const yb = high ? (0.9 + 2.2 * rh) * sc : (0.04 + 1.1 * rh * rh) * sc;
+          x = O[0] + fx * along - fz * across + 0.05 * sc * Math.sin(0.21 * t * sp + ph);
+          z = O[2] + fz * along + fx * across + 0.05 * sc * Math.cos(0.17 * t * sp + ph * 1.7);
+          y = yb + 0.04 * sc * Math.sin(0.26 * t * sp + ph * 2.3);
+          // a mote turns in the air and catches the light now and then
+          k = (high ? 0.16 : 0.08 + 0.3 * Math.pow(0.5 + 0.5 * Math.sin(0.9 * t * sp + ph * 3), 4)) * (0.6 + 0.4 * rc);
+          glow = 0;
+        } else {
+          // the room's air around it, faint, near and far, so the frame has depth
+          const along = (-0.5 + 2.6 * ra) * fl;
+          const across = (rb - 0.5) * (3.2 * wide + 2.0 * fl);
+          x = O[0] + fx * along - fz * across + 0.08 * sc * Math.sin(0.12 * t * sp + ph);
+          z = O[2] + fz * along + fx * across + 0.08 * sc * Math.cos(0.1 * t * sp + ph * 1.7);
+          y = (0.05 + 3.2 * rh * rh) * sc + 0.06 * sc * Math.sin(0.15 * t * sp + ph * 2.3);
+          k = 0.08 * (0.5 + 0.5 * rc);
+          glow = 0.5 + 0.5 * Math.pow(0.5 + 0.5 * Math.sin(0.4 * t * sp + ph * 3), 2);
+        }
+        dustData.set([x, y, z, sc * (0.0045 + 0.006 * rs), k * (0.7 + 0.3 * rt), glow], n * 6);
         n++;
       }
       return n;
@@ -803,7 +816,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
             const jx = toScreen([C0[0] + e, 0, C0[2]]), jz = toScreen([C0[0], 0, C0[2] + e]);
             const a11 = (jx[0] - c0[0]) / e, a21 = (jx[1] - c0[1]) / e, a12 = (jz[0] - c0[0]) / e, a22 = (jz[1] - c0[1]) / e, det = a11 * a22 - a12 * a21 || 1;
             const inv = (x: number, y: number): [number, number] => [(a22 * x - a12 * y) / det, (-a21 * x + a11 * y) / det];
-            const wpx = 0.66 * W, hpx = wpx / 2;
+            const wpx = 0.6 * W, hpx = wpx / 2;
             projC = [C0[0], C0[2]]; projU = inv(wpx / 2, 0); projV = inv(0, hpx / 2);
           }
         } else if (variant("motion") === "voxels") {

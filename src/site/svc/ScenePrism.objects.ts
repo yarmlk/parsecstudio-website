@@ -337,13 +337,15 @@ void main(){
    not in the figures' shadows), soft round, added over the picture */
 const DUST_VERT = `
 attribute vec3 aP;   // world position
-attribute vec3 aN;   // size (world), strength, unused
+attribute vec3 aN;   // size (world), strength, glow of its own (0..1: a mote of the room's air, away from the light)
 uniform mat4 uVP;
 uniform float uScale, uFocus, uCoC;
 varying vec3 vW;
 varying float vA;
 varying float vB;   // how out of focus (0 sharp … 1 a soft disc)
+varying float vG;
 void main(){
+  vG = aN.z;
   vW = aP;
   vec4 c = uVP * vec4(aP, 1.0);
   gl_Position = c;
@@ -370,6 +372,7 @@ uniform float uGain, uFade, uTopY, uTopSoft;
 varying vec3 vW;
 varying float vA;
 varying float vB;
+varying float vG;
 void main(){
   vec2 d = gl_PointCoord - 0.5;
   float r = dot(d, d) * 4.0;
@@ -378,7 +381,7 @@ void main(){
   float soft = mix(exp(-r * 2.6), (0.75 + 0.35 * smoothstep(0.55, 0.95, r)) * (1.0 - smoothstep(0.85, 1.0, r)), vB);
   vec3 Li = coneLight(vW) * shadowVis1(vW);
   // lit by our light, and a faint glow of its own so a stream or a shape of dust still reads where the light is weak
-  vec3 col = (Li * 1.3 + vec3(1.0, 0.84, 0.62) * 0.05) * soft * vA * uFade;
+  vec3 col = (Li * 1.3 + vec3(1.0, 0.84, 0.62) * (0.05 + 1.3 * vG)) * soft * vA * uFade;
   col *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
   gl_FragColor = vec4(1.0 - exp(-col * 1.4 * uGain), 1.0);
 }`;
