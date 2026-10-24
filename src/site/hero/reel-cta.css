@@ -19,11 +19,15 @@
   background: rgba(18, 18, 21, .34);
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .3), inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -1px 0 rgba(246, 200, 140, .26), 0 12px 30px -16px rgba(0, 0, 0, .7);
   -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
-  opacity: 0; transform: scale(.88); transform-origin: 19px 50%; pointer-events: none;
-  transition: opacity var(--t-button) var(--ease-enter), transform var(--t-button) var(--ease-enter), background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter);
+  opacity: 0; transform: scale(.94); transform-origin: 19px 50%; pointer-events: none;
+  /* away: a short fade, so it never trails the pointer that has already left */
+  transition: opacity 110ms ease-out, transform 110ms ease-out, background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter);
 }
 .rc-ride__btn .rc-orb { width: 26px; height: 26px; }
-.rc-ride[data-show="follow"] .rc-ride__btn, .rc-ride[data-show="rest"] .rc-ride__btn { opacity: 1; transform: none; transition-duration: var(--t-panel); }
+/* up: quick and calm, from the play circle; only opacity and scale move here (the place is set by ReelCta, untimed),
+   and a fade cut short turns back from where it is */
+.rc-ride[data-show="follow"] .rc-ride__btn, .rc-ride[data-show="rest"] .rc-ride__btn { opacity: 1; transform: none;
+  transition: opacity 150ms var(--ease-enter), transform 150ms var(--ease-enter), background-color var(--t-button) var(--ease-enter), box-shadow var(--t-button) var(--ease-enter); }
 /* on the light it is a button to tap or press; on the pointer it is the pointer, the glass under it takes the click */
 .rc-ride[data-show="rest"] .rc-ride__btn { pointer-events: auto; }
 .rc-ride.is-press .rc-ride__btn { transform: scale(.95); transition-duration: var(--t-chip); }

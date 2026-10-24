@@ -7,8 +7,8 @@ import "./reel-cta.css";
  * The showreel's control. The disc itself plays the film: a click (or a tap) anywhere on its glass opens it.
  *
  * With a mouse, "Play showreel" is the pointer while it is over the glass: a small frosted pill held on the pointer
- * (its play circle where the pointer is) with a slight eased lag; it comes up where the pointer enters the glass and
- * fades where it leaves. Without hover (touch) the same pill stands still on the light, just above the rim. For the
+ * (its play circle where the pointer is), written straight from the pointer event, no easing; it comes up where the
+ * pointer enters the glass and fades where it leaves, a short opacity and a breath of scale, nothing that replays. Without hover (touch) the same pill stands still on the light, just above the rim. For the
  * keyboard it is a real button in the hero's tab order, unseen until it is focused, then it shows on the light.
  * With no light at all (no WebGL) a plain button docks under the headline instead (ReelButton).
  */
@@ -81,8 +81,6 @@ export function ReelButton({ btnRef, onOpen, tease }: { btnRef: Btn; onOpen: () 
 const REST = { desk: { gap: 16, at: 20, edge: 28 }, mob: { gap: 18, at: 0.5, edge: 16 } } as const;
 /** on the pointer: the play circle's centre from the pill's top left, and the pill's margin to the frame (hero px) */
 const HOLD = { x: 19, y: 19, edge: 12 } as const;
-/** how much of the way to the pointer the pill closes per 60 fps frame: held, with a slight eased lag */
-const LAG = 0.3;
 
 type Show = "off" | "follow" | "rest";
 
@@ -126,7 +124,7 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     const st = {
       show: "off" as Show, canHover: !!mq?.matches,
       /** the pointer (client px; NaN off the hero) and whether it is on the glass */
-      cx: NaN, cy: NaN, on: false, focus: false,
+      cx: NaN, cy: NaN, on: false, over: null as Element | null, focus: false,
       /** the light: found (ready), or given up on */
       ready: false, lightAt: 0, gaveUp: false,
       x: 0, y: 0, snap: true, raf: 0, last: t0, vis: true,
@@ -176,6 +174,12 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     };
 
     const paint = () => { el.style.transform = `translate3d(${st.x.toFixed(1)}px, ${st.y.toFixed(1)}px, 0)`; };
+    /* on the pointer it is the pointer: placed in the same frame as the event, never eased */
+    const follow = () => {
+      const to = followAt();
+      st.x = to.left; st.y = to.top; st.snap = false;
+      paint();
+    };
     const loop = (now: number) => {
       st.raf = 0;
       const dt = Math.min(0.05, Math.max(0, (now - st.last) / 1000));
@@ -185,12 +189,14 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
       if (!st.ready && c?.spot()) { if (!st.lightAt) st.lightAt = now; else if (now - st.lightAt > 1300) { st.ready = true; update(); } }
       if (!st.ready && !st.gaveUp && !c?.spot() && now - t0 > 3000) { st.gaveUp = true; live.current.noLight(); }
       let to: { left: number; top: number } | null = null;
-      if (st.show === "follow") to = followAt();
+      // on the pointer: the glass under a still pointer can change (the camera eases), so ask again each frame
+      if (st.show === "follow") test();
       else if (c && (st.show === "rest" || (!st.canHover && !st.ready))) to = restAt(c);
       if (to) {
+        // at rest it rides the light, which eases on its own
         if (st.snap || reduced) { st.x = to.left; st.y = to.top; st.snap = false; }
         else {
-          const k = 1 - Math.pow(1 - (st.show === "follow" ? LAG : 0.22), dt * 60);
+          const k = 1 - Math.pow(1 - 0.22, dt * 60);
           st.x += (to.left - st.x) * k;
           st.y += (to.top - st.y) * k;
         }
@@ -198,7 +204,7 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
       }
       // it rides on while it is shown (the light moves with the scroll on the phone), sleeps once it is gone
       const moving = to != null && (Math.abs(to.left - st.x) + Math.abs(to.top - st.y) > 0.2);
-      if (st.vis && !document.hidden && live.current.idle && (st.show !== "off" || !st.ready || moving)) st.raf = requestAnimationFrame(loop);
+      if (!st.raf && st.vis && !document.hidden && live.current.idle && (st.show !== "off" || !st.ready || moving)) st.raf = requestAnimationFrame(loop);
     };
     const kick = () => { if (!st.raf && st.vis && !document.hidden) { st.last = performance.now(); st.raf = requestAnimationFrame(loop); } };
 
@@ -215,7 +221,8 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
       const prev = st.show;
       st.show = next;
       // it comes up where it is going to be, it never flies in from where it was last seen
-      if (next === "follow" || prev === "off") st.snap = true;
+      if (next === "follow") follow();
+      else if (prev === "off") st.snap = true;
       el.dataset.show = next;
       if (next === "follow") sec.dataset.glass = "follow"; else delete sec.dataset.glass;
       tease("glass", next === "follow" ? 0.6 : 0);
@@ -224,25 +231,27 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     };
     live.current.update = update;
 
-    const test = (target: Element | null) => {
+    /* is the pointer on the glass (and not on a control)? On it, the pill is placed at once */
+    const test = () => {
       const c = ctl.current;
-      st.on = !!c && !Number.isNaN(st.cx) && !target?.closest("button, a") && c.onGlass(st.cx, st.cy);
+      st.on = !!c && !Number.isNaN(st.cx) && !st.over?.closest("button, a") && c.onGlass(st.cx, st.cy);
+      if (st.on && st.show === "follow") follow();
       update();
     };
     const onMove = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
-      st.cx = e.clientX; st.cy = e.clientY;
-      test(e.target as Element | null);
-      if (st.show === "follow") kick();
+      st.cx = e.clientX; st.cy = e.clientY; st.over = e.target as Element | null;
+      test();
     };
-    const onLeave = (e: PointerEvent) => { if (e.pointerType !== "touch") { st.cx = NaN; st.on = false; update(); } };
-    // the page moves under a still pointer: ask again what is under it
+    const onLeave = (e: PointerEvent) => { if (e.pointerType !== "touch") { st.cx = NaN; st.over = null; st.on = false; update(); } };
+    // the page moves under a still pointer: ask again what is under it, and keep the pill on it
     const onScroll = () => {
       if (Number.isNaN(st.cx)) { kick(); return; }
       const t = document.elementFromPoint(st.cx, st.cy);
-      if (!t || !sec.contains(t)) { st.on = false; update(); return; }
-      test(t);
-      kick();
+      st.over = t;
+      if (!t || !sec.contains(t)) st.on = false;
+      else { test(); return; }
+      update();
     };
     const onDown = (e: PointerEvent) => { if (st.show === "follow" && e.pointerType !== "touch" && !reduced) el.classList.add("is-press"); };
     const onUp = () => el.classList.remove("is-press");
