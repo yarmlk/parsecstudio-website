@@ -83,7 +83,7 @@ export const AI_CASES: Case[] = [
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
 /** the Cases row: the strongest, best-known names first, then the rest of the AI works, then the rest of motion */
-const LEAD = ["vodafone", "buldak", "banxe", "google-meet", "microsoft-elearning", "centil"];
+const LEAD = ["buldak", "banxe", "google-meet", "snappy", "vodafone", "contentstack", "microsoft-elearning", "centil"];
 const ALL = [...AI_CASES, ...CRAFT_CASES];
 export const CASES: Case[] = [...LEAD.map((id) => ALL.find((c) => c.id === id)!), ...ALL.filter((c) => !LEAD.includes(c.id))];
 

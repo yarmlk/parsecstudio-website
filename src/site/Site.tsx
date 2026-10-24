@@ -493,7 +493,8 @@ export function Site({
           <div className="st-contact__in">
             <div className="st-contact__l">
               <Head label="Contact" title="Let’s talk" />
-              <p className="st-contact__p">Bring the idea, we’ll bring the light.<br />A few lines are enough to start.</p>
+              <p className="st-contact__tag">Bring the idea.<br /><em>We’ll bring the light.</em></p>
+              <p className="st-contact__p">A few lines are enough to start.</p>
             </div>
             <ContactForm />
           </div>

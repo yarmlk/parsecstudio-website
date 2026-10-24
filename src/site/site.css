@@ -397,10 +397,15 @@
 /* the light answers the visitor: while they write, the horizon brightens a touch and rises a hair */
 .st-contact:focus-within .st-contact__plate img { filter: brightness(1.22) saturate(1.06); transform: translateY(-6px); }
 @media (prefers-reduced-motion: reduce) { .st-contact__plate img { transition: none; } .st-contact:focus-within .st-contact__plate img { transform: none; } }
-.st-contact__in { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 760px; column-gap: 64px; align-items: start; }
+/* the form sits low, over the horizon's arc; the head stays up top, the line drops to meet the form's foot */
+.st-contact__in { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 760px; column-gap: 64px; align-items: stretch; padding-top: 24px; }
+.st-contact__in > .st-cf { align-self: end; margin-top: 120px; }
 .st-contact__l { display: flex; flex-direction: column; align-items: flex-start; }
 .st-contact__l .st-head { margin-bottom: 0; }
-.st-contact__p { margin: 40px 0 0; font-size: 16px; line-height: 1.6; color: var(--fog); text-wrap: pretty; }
+/* the line, set large: the light in the serif of our quotes */
+.st-contact__tag { margin: auto 0 0; padding-top: 56px; font-family: var(--font-display); font-size: clamp(30px, 2.6vw, 42px); line-height: 1.12; letter-spacing: -.01em; color: var(--paper); text-wrap: balance; }
+.st-contact__tag em { display: inline-block; margin-top: 4px; font-family: var(--font-quote); font-style: italic; font-size: 1.14em; letter-spacing: 0; color: var(--light-core, #f6c88c); }
+.st-contact__p { margin: 18px 0 6px; font-size: 15px; line-height: 1.6; color: var(--fog); text-wrap: pretty; }
 
 /* the plate: brand glass, a little brighter at the top; it warms from below while you write, and lights up once sent */
 .st-cf {
@@ -610,7 +615,9 @@
 .st-site--mob .st-contact { padding-bottom: 0; }
 .st-site--mob .st-contact__plate img { object-position: 50% 100%; }
 .st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 32px; }
-.st-site--mob .st-contact__p { margin-top: 20px; font-size: 15px; }
+.st-site--mob .st-contact__p { margin-top: 12px; font-size: 15px; }
+.st-site--mob .st-contact__tag { margin-top: 0; padding-top: 28px; font-size: 28px; }
+.st-site--mob .st-contact__in > .st-cf { margin-top: 0; }
 .st-site--mob .st-cf { padding: 24px 18px 20px; border-radius: 24px; }
 .st-site--mob .st-cf__form { gap: 24px; }
 .st-site--mob .st-cf__grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
