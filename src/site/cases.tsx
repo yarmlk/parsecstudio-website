@@ -489,6 +489,8 @@ export function CaseView({
       className={`st-cv st-cv--${phase}${ready ? " is-ready" : ""}${rest ? " is-idle" : ""}${c.film ? " st-cv--film" : ""}`}
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
       onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
+      // the phone: where the film ends, so its controls and the text follow right under it
+      style={mode === "mob" && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.min((vp.h - fit / ar!) / 2, 112) + fit / ar!)}px` }) : undefined}
     >
       <div className="st-cv__veil" aria-hidden />
       <div className="st-cv__box" style={style}>

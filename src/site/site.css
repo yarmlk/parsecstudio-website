@@ -399,12 +399,12 @@
 @media (prefers-reduced-motion: reduce) { .st-contact__plate img { transition: none; } .st-contact:focus-within .st-contact__plate img { transform: none; } }
 /* the form sits low, over the horizon's arc; the head stays up top, the line drops to meet the form's foot */
 .st-contact__in { position: relative; z-index: 2; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 760px; column-gap: 64px; align-items: stretch; padding-top: 24px; }
-.st-contact__in > .st-cf { align-self: end; margin-top: 120px; }
+.st-contact__in > .st-cf { align-self: center; margin: 72px 0 40px; }
 .st-contact__l { display: flex; flex-direction: column; align-items: flex-start; }
 .st-contact__l .st-head { margin-bottom: 0; }
-/* the line, set large: the light in the serif of our quotes */
-.st-contact__tag { margin: auto 0 0; padding-top: 56px; font-family: var(--font-display); font-size: clamp(30px, 2.6vw, 42px); line-height: 1.12; letter-spacing: -.01em; color: var(--paper); text-wrap: balance; }
-.st-contact__tag em { display: inline-block; margin-top: 4px; font-family: var(--font-quote); font-style: italic; font-size: 1.14em; letter-spacing: 0; color: var(--light-core, #f6c88c); }
+/* the line, set large in one face: the second half carries the light's warmth */
+.st-contact__tag { margin: auto 0 0; padding-top: 56px; font-family: var(--font-display); font-size: clamp(28px, 2.3vw, 38px); line-height: 1.16; letter-spacing: -.005em; color: var(--paper); text-wrap: balance; }
+.st-contact__tag em { font-style: normal; color: #f3d2a2; }
 .st-contact__p { margin: 18px 0 6px; font-size: 15px; line-height: 1.6; color: var(--fog); text-wrap: pretty; }
 
 /* the plate: brand glass, a little brighter at the top; it warms from below while you write, and lights up once sent */
@@ -588,9 +588,18 @@
 .st-site--mob .st-rule { margin: 0 -20px; }
 /* phone: the list first, compact, one line per name and one per text; the stage (the prism and its projection)
    gets the open floor under it */
-.st-site--mob .st-svc { padding-bottom: 320px; }
+.st-site--mob .st-svc { padding-bottom: 48px; }
+/* the phone: under each service, its own loop in a frosted frame; the one in focus plays and comes up to full,
+   the others rest as a dim still (no stage, no WebGL) */
+.st-svc__reel { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; margin-top: 12px; border-radius: 14px; overflow: hidden; background: var(--graphite);
+  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .22), inset 0 0 0 1px rgba(255, 255, 255, .06);
+  opacity: .32; transform: scale(.97); transform-origin: 50% 0; transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
+.st-svc__item.is-on .st-svc__reel { opacity: 1; transform: none; }
+.st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.st-svc__vid { opacity: 0; transition: opacity 600ms var(--ease-enter); }
+.st-svc__vid.is-on { opacity: 1; }
 .st-site--mob .st-svc__list { flex: none; padding-top: 14px; }
-.st-site--mob .st-svc__item { gap: 7px; padding: 10px 0 12px; }
+.st-site--mob .st-svc__item { gap: 7px; padding: 14px 0 18px; }
 .st-site--mob .st-svc__name { font-size: 30px; white-space: normal; }
 .st-site--mob .st-svc__line { font-size: 13.5px; }
 .st-site--mob .st-svc__go { width: 24px; height: 24px; margin-left: 8px; }
@@ -617,7 +626,7 @@
 .st-site--mob .st-contact__in { display: flex; flex-direction: column; gap: 32px; }
 .st-site--mob .st-contact__p { margin-top: 12px; font-size: 15px; }
 .st-site--mob .st-contact__tag { margin-top: 0; padding-top: 28px; font-size: 28px; }
-.st-site--mob .st-contact__in > .st-cf { margin-top: 0; }
+.st-site--mob .st-contact__in > .st-cf { align-self: stretch; margin: 0; }
 .st-site--mob .st-cf { padding: 24px 18px 20px; border-radius: 24px; }
 .st-site--mob .st-cf__form { gap: 24px; }
 .st-site--mob .st-cf__grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
@@ -662,6 +671,11 @@
 .st-site--mob .st-pl .st-round { width: 40px; height: 40px; }
 .st-site--mob .st-pl__time { min-width: 28px; font-size: 10px; }
 .st-site--mob .st-cv__bottom { flex-direction: column; align-items: stretch; gap: 12px; }
+/* the phone: the film, its controls right under it, then the text; nothing left floating at the foot of the screen */
+.st-site--mob .st-cv--film .st-cv__ui { justify-content: flex-start; }
+.st-site--mob .st-cv--film .st-cv__top { order: 0; }
+.st-site--mob .st-cv--film .st-cv__ui > .st-pl { order: 1; margin-top: calc(var(--fb, 340px) - 104px + 10px); }
+.st-site--mob .st-cv--film .st-cv__bottom { order: 2; margin-top: 28px; }
 .st-site--mob .st-cv__panel { width: auto; gap: 10px; }
 .st-site--mob .st-cv__title { font-size: 32px; }
 .st-site--mob .st-cv__line { font-size: 14px; }

@@ -11,6 +11,10 @@ import { ReviewColumns } from "./reviews";
 import { CutLine, useCutTrack, useReduced } from "./ui";
 import { ContactForm } from "./contact";
 import { SvcStage } from "./svc/SvcStage";
+import { media } from "../lib/media";
+
+/** the phone's service loops: our Motion reel, our AI films, three of our vertical series side by side */
+const SVC_REEL = ["motion-reel", "ai-reel", "vertical-drama-sm"];
 import { HeroLightB } from "./hero/HeroLightB";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
@@ -406,7 +410,8 @@ export function Site({
             right. Each name ends well left of the centre so the light can leave it for the prism. The open arrow
             follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
         <section data-sec="services" className="st-sec st-svc" onPointerMove={desk ? onSvcMove : undefined}>
-          <SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} />
+          {/* the phone has no stage: each service carries its own quiet loop instead (light, no WebGL) */}
+          {desk && <SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} />}
           <Head label="From treatment to master" title="Services" />
           <span className="st-rule" aria-hidden />
           <ol className="st-svc__list">
@@ -428,6 +433,12 @@ export function Site({
                       <span className="st-svc__go" aria-hidden><Icon name="arrow-up-right" size={13} /></span>
                     </span>
                   </span>
+                  {!desk && (
+                    <span className="st-svc__reel grain" aria-hidden>
+                      <img src={media(`${SVC_REEL[i]}.jpg`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
+                      <LoopVideo src={media(`${SVC_REEL[i]}-loop.mp4`)} webm={media(`${SVC_REEL[i]}-loop.webm`)} on={sec === "services" && i === svcOn} className="st-svc__vid" />
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
