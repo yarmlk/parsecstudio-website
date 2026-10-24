@@ -124,7 +124,12 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     const st = {
       show: "off" as Show, canHover: !!mq?.matches,
       /** the pointer (client px; NaN off the hero) and whether it is on the glass */
-      cx: NaN, cy: NaN, on: false, over: null as Element | null, focus: false,
+      cx: NaN, cy: NaN, on: false, over: null as Element | null,
+      /** focused from the keyboard (Tab), and whether the focus given back after the film may show it (the film was
+          opened from the keyboard) */
+      focus: false, kbd: false, back: false,
+      /** the last update saw the glass idle (no film) */
+      wasIdle: true,
       /** the light: found (ready), or given up on */
       ready: false, lightAt: 0, gaveUp: false,
       x: 0, y: 0, snap: true, raf: 0, last: t0, vis: true,
@@ -212,8 +217,15 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     const update = () => {
       const L = live.current;
       const ph = ctl.current?.phase() ?? "idle";
+      const idleNow = L.idle && ph === "idle";
+      if (st.wasIdle && !idleNow) {
+        // the film takes over: whatever the pill was doing is over. It comes back only once the pointer is on the
+        // glass again; the focus given back when the film closes shows it only if the film was opened from the keyboard
+        st.on = false; st.cx = NaN; st.over = null; st.focus = false;
+      }
+      st.wasIdle = idleNow;
       let next: Show = "off";
-      if (L.idle && ph === "idle" && !L.docked) {
+      if (idleNow && !L.docked && st.vis && !document.hidden) {
         if (st.canHover && st.on) next = "follow";
         else if ((!st.canHover && st.ready) || st.focus) next = "rest";
       }
@@ -264,12 +276,32 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
       if (!c || c.phase() !== "idle" || !c.onGlass(e.clientX, e.clientY)) return;
       c.open();
     };
-    // keyboard focus (not the focus given back after a click) brings it onto the light, and warms the light
-    const onFocusIn = () => { st.focus = btn.matches(":focus-visible"); if (st.focus) tease("btn", 1); update(); };
+    // keyboard focus brings it onto the light, and warms the light: focus that came with Tab, or given back after a
+    // film that was opened from the keyboard. Not the focus given back after a film opened with the pointer, which the
+    // browser may still mark :focus-visible (Escape is a key): that left the pill standing on the rim.
+    const onKey = (e: KeyboardEvent) => { st.kbd = e.key === "Tab"; };
+    const onAnyDown = () => { st.kbd = false; st.back = false; };
+    const onBtnClick = () => { st.back = st.focus; };
+    const onFocusIn = () => {
+      st.focus = btn.matches(":focus-visible") && (st.kbd || st.back);
+      st.back = false;
+      if (st.focus) tease("btn", 1);
+      update();
+    };
     const onFocusOut = () => { st.focus = false; tease("btn", 0); update(); };
     const onHoverChange = () => { st.canHover = !!mq?.matches; update(); };
-    const io = new IntersectionObserver((es) => { st.vis = es[es.length - 1].isIntersecting; kick(); });
-    const onVis = () => kick();
+    // the hero out of view, or the page hidden: the pill goes, and waits for the pointer to come back
+    const io = new IntersectionObserver((es) => {
+      st.vis = es[es.length - 1].isIntersecting;
+      if (!st.vis) st.on = false;
+      update();
+      kick();
+    });
+    const onVis = () => {
+      if (document.hidden) { st.on = false; st.cx = NaN; st.over = null; }
+      update();
+      kick();
+    };
 
     el.dataset.show = "off";
     sec.addEventListener("pointermove", onMove);
@@ -278,6 +310,9 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     sec.addEventListener("click", onClick);
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onAnyDown, true);
+    btn.addEventListener("click", onBtnClick);
     btn.addEventListener("focus", onFocusIn);
     btn.addEventListener("blur", onFocusOut);
     mq?.addEventListener?.("change", onHoverChange);
@@ -293,6 +328,9 @@ export function ReelCursor({ hero, ctl, mode, phase, btnRef, docked, onOpen, tea
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       sec.removeEventListener("click", onClick);
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onAnyDown, true);
+      btn.removeEventListener("click", onBtnClick);
       btn.removeEventListener("focus", onFocusIn);
       btn.removeEventListener("blur", onFocusOut);
       mq?.removeEventListener?.("change", onHoverChange);
