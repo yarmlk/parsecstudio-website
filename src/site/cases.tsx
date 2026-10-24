@@ -11,7 +11,7 @@ import { useReduced } from "./ui";
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
-export type Film = { src: string; loop: string; poster: string; /** the poster made small, for cards */ card: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
+export type Film = { src: string; loop: string; poster: string; /** the poster made small, for cards */ card: string; /** and tiny, for the works pill */ thumb: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
 
 /* ── Cases ────────────────────────────────────────────────── */
 export type Case = {
@@ -34,7 +34,7 @@ export type Case = {
  *  serving the same paths with CORS open, since the stage draws loops into WebGL) */
 export const MEDIA = (import.meta.env.VITE_MEDIA_BASE as string | undefined) ?? "";
 const V = `${MEDIA}video/site/`;
-const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, card: `${V}${id}-sm.jpg`, dur, ar });
+const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, card: `${V}${id}-sm.jpg`, thumb: `${V}${id}-xs.jpg`, dur, ar });
 const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}${id}.jpg`, pos, alt });
 
 /** our 3D, CGI and filmed works (older than the AI ones), Centil first */

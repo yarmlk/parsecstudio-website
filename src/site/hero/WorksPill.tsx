@@ -6,8 +6,8 @@ import { useReduced } from "../ui";
    one still after another, slowly. On hover the window opens wider and the capsule's edge catches the warm light.
    A click goes down to the cases. Reduced motion: one still, no passing. */
 
-/** the stills that pass in the window: each case's own poster, in the row's order */
-const STILLS = CASES.map((c) => ({ src: c.film?.poster ?? c.stills[0].src, pos: c.poster }));
+/** the stills that pass in the window: each case's own poster (a tiny copy: the window is small), in the row's order */
+const STILLS = CASES.map((c) => ({ src: c.film?.thumb ?? c.stills[0].src, pos: c.poster }));
 const HOLD = 2600; // ms each still stays
 
 export function WorksPill({ onGo }: { onGo: () => void }) {
