@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode, type Ref } from "react";
 import { REEL } from "../lib/assets";
+import { media } from "../lib/media";
 import { AiFlux } from "../ui/AiFlux";
 import { Icon } from "../ui/Icons";
 import { useReduced } from "./ui";
@@ -11,7 +12,7 @@ import { useReduced } from "./ui";
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
-export type Film = { src: string; loop: string; poster: string; /** the poster made small, for cards */ card: string; /** and tiny, for the works pill */ thumb: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
+export type Film = { src: string; loop: string; loopWebm: string; poster: string; /** the poster made small, for cards */ card: string; /** and tiny, for the works pill */ thumb: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
 
 /* ── Cases ────────────────────────────────────────────────── */
 export type Case = {
@@ -30,12 +31,8 @@ export type Case = {
   stills: Still[];
 };
 
-/** where the films live: on the site by default, or on a media host (VITE_MEDIA_BASE, e.g. a CDN in front of a bucket,
- *  serving the same paths with CORS open, since the stage draws loops into WebGL) */
-export const MEDIA = (import.meta.env.VITE_MEDIA_BASE as string | undefined) ?? "";
-const V = `${MEDIA}video/site/`;
-const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, card: `${V}${id}-sm.jpg`, thumb: `${V}${id}-xs.jpg`, dur, ar });
-const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}${id}.jpg`, pos, alt });
+const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: media(`${id}.mp4`), loop: media(`${id}-loop.mp4`), loopWebm: media(`${id}-loop.webm`), poster: media(`${id}.jpg`), card: media(`${id}-sm.jpg`), thumb: media(`${id}-xs.jpg`), dur, ar });
+const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: media(`${id}.jpg`), pos, alt });
 
 /** a work from one of our Vimeo showcases (title and running time from it), its film hosted here like the others */
 const work = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur), stills: [still(id, title)] });
@@ -85,8 +82,10 @@ export const AI_CASES: Case[] = [
   work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
-/** the Cases row: the AI works first (the newest), then the 3D, CGI and filmed ones */
-export const CASES: Case[] = [...AI_CASES, ...CRAFT_CASES];
+/** the Cases row: the strongest, best-known names first, then the rest of the AI works, then the rest of motion */
+const LEAD = ["vodafone", "buldak", "banxe", "google-meet", "microsoft-elearning", "centil"];
+const ALL = [...AI_CASES, ...CRAFT_CASES];
+export const CASES: Case[] = [...LEAD.map((id) => ALL.find((c) => c.id === id)!), ...ALL.filter((c) => !LEAD.includes(c.id))];
 
 /* ── Services ─────────────────────────────────────────────── */
 export type Service = {
@@ -141,7 +140,7 @@ export const SITE_SERVICES: Service[] = [
 ];
 
 /* ── A muted loop that plays only while `on` (hover, or the row in focus on a phone) ── */
-export function LoopVideo({ src, on, warm, className, poster, pos }: { src: string; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
+export function LoopVideo({ src, webm, on, warm, className, poster, pos }: { src: string; /** its VP9 copy (else derived from src) */ webm?: string; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [armed, setArmed] = useState(false);
   const reduced = useReduced();
@@ -167,7 +166,7 @@ export function LoopVideo({ src, on, warm, className, poster, pos }: { src: stri
       aria-hidden
       tabIndex={-1}
     >
-      {armed && <source src={src.replace(/\.mp4$/, ".webm")} type="video/webm" />}
+      {armed && <source src={webm ?? src.replace(/\.mp4(\?.*)?$/, ".webm")} type="video/webm" />}
       {armed && <source src={src} type="video/mp4" />}
     </video>
   );
@@ -224,7 +223,7 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
               >
                 <span className="st-wk__img grain">
                   <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
-                  {c.film && <LoopVideo src={c.film.loop} on={hover === k} className="st-wk__vid" />}
+                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} on={hover === k} className="st-wk__vid" />}
                   <span className="st-wk__play" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 14} /></span>
                 </span>
                 <span className="st-wk__cap">
@@ -301,8 +300,11 @@ export function usePlayer(src: string | undefined, live: boolean, startMuted = t
     const v = ref.current;
     if (!v || !src || !live) return;
     v.muted = muted;
-    v.play().catch(() => {
-      // no sound without a gesture: start muted instead
+    // with sound, but not at full volume: the visitor turns it up if they want
+    try { v.volume = 0.75; } catch { /* fixed volume (iOS) */ }
+    v.play().catch((e: unknown) => {
+      // no sound without a gesture: start muted instead (any other failure is not about sound)
+      if ((e as { name?: string } | null)?.name !== "NotAllowedError") return;
       if (!v.muted) { v.muted = true; setMuted(true); v.play().catch(() => setPlaying(false)); } else setPlaying(false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -407,7 +409,8 @@ export function CaseView({
   const back = useRef<HTMLButtonElement | null>(null);
   const root = useRef<HTMLDivElement | null>(null);
   const [vp, setVp] = useState<{ w: number; h: number } | null>(null);
-  const pl = usePlayer(c.film?.src, phase === "open");
+  // opened by a click, so the film may start with its sound
+  const pl = usePlayer(c.film?.src, phase === "open", false);
 
   // the window in site px: a film opens to its own frame inside it (no bars of its own), so the card grows into the
   // picture without a jump; the black around it is the veil
@@ -464,7 +467,9 @@ export function CaseView({
   const st = c.stills[Math.min(shot, c.stills.length - 1)];
   const pos = phase !== "open" || (mode === "mob" && shot === 0) ? c.poster : st.pos;
   const ar = c.film?.ar;
-  const fit = ar && vp ? Math.min(vp.w, vp.h * ar) : 0;
+  // a film that nearly fills the window fills it (a few px of black at the top and bottom read as a bar)
+  const fill = !!(ar && vp && mode === "desk" && Math.abs(vp.w / vp.h - ar) / ar < 0.06);
+  const fit = ar && vp && !fill ? Math.min(vp.w, vp.h * ar) : 0;
   const style = box
     ? { left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: mode === "desk" ? 14 : 12 }
     : fit && vp

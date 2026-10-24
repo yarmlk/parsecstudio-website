@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
+import { media } from "../../lib/media";
 
 /**
  * The showreel lives behind the disc of the hero. On the desk the glass shows the film itself, muted and looping
@@ -9,9 +10,9 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
  */
 /** the film in three renditions, all with sound (H.264 + AAC, the index up front, a keyframe at least every 2 s) */
 export const REELS = [
-  { src: "video/site/showreel-540a.mp4", w: 960, mbps: 0.84 },   // ~5.8 MB
-  { src: "video/site/showreel-720.mp4", w: 1280, mbps: 2.05 },   // ~14 MB
-  { src: "video/site/showreel-1080.mp4", w: 1920, mbps: 4.52 },  // ~31 MB
+  { src: media("showreel-540a.mp4"), w: 960, mbps: 0.84 },   // ~5.8 MB
+  { src: media("showreel-720.mp4"), w: 1280, mbps: 2.05 },   // ~14 MB
+  { src: media("showreel-1080.mp4"), w: 1920, mbps: 4.52 },  // ~31 MB
 ] as const;
 export type Reel = (typeof REELS)[number];
 
@@ -39,10 +40,10 @@ export const REEL_SRC = {
   /** behind the glass on the phone: the 540p, with its sound so "Showreel" can simply unmute it */
   glass: REELS[0].src,
   /** reduced motion, save-data */
-  poster: "video/site/showreel.jpg",
+  poster: media("showreel.jpg"),
   /** the film's own first frame (960×540, ~24 KB): on the glass at once, until the film's frames arrive, so the film
       starts from exactly this picture; also the <video>'s poster while a source loads */
-  first: "video/site/showreel-first.jpg",
+  first: media("showreel-first.jpg"),
   dur: "0:55",
 } as const;
 

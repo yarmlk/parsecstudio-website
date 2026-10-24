@@ -1,7 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState, type FormEvent, memo } from "react";
 import { CONTACT } from "../lib/facts";
 import { Icon } from "../ui/Icons";
-import { SITE_SERVICES } from "./cases";
 
 /* 06 contact: the form, one frosted plate over the Horizon light. Still a mock: nothing is sent. The thank-you says
    so quietly and offers the same note by email, so a real visitor never loses it. */
@@ -25,9 +24,8 @@ function check(f: FormData): Errors {
 /** the same note, ready in the visitor's own mail app */
 function mailto(f: FormData) {
   const v = (k: string) => String(f.get(k) ?? "").trim();
-  const about = f.getAll("about").map(String);
   const from = v("company") ? `${v("name")}, ${v("company")}` : v("name");
-  const body = [v("msg"), about.length ? `About: ${about.join(", ")}` : "", `${from}\n${v("email")}`].filter(Boolean).join("\n\n");
+  const body = [v("msg"), `${from}\n${v("email")}`].filter(Boolean).join("\n\n");
   return `mailto:${CONTACT.email}?subject=${encodeURIComponent(`Project: ${from}`)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -107,17 +105,6 @@ function ContactFormBase() {
         </div>
       ) : (
         <form className="st-cf__form" onSubmit={onSubmit} noValidate aria-label="Write to Parsec Studio">
-          <fieldset className="st-cf__about">
-            <legend className="st-cf__legend">What are we making</legend>
-            <div className="st-cf__chips">
-              {SITE_SERVICES.map((s) => (
-                <label key={s.id} className="st-cf__chip">
-                  <input type="checkbox" name="about" value={s.name} />
-                  <span>{s.name}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
           <div className="st-cf__grid">
             <Field name="name" label="Name" auto="name" required error={errors.name} onEdit={clear("name")} />
             <Field name="email" label="Email" type="email" auto="email" required error={errors.email} onEdit={clear("email")} />

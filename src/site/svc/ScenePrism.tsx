@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { kelvinRGB } from "../../ui/LightField";
+import { media } from "../../lib/media";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
 import { MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item, type Screen as Panel } from "./ScenePrism.objects";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
@@ -307,7 +308,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (!projVid) return;
       const list = PROJ;
       const webm = projVid.canPlayType('video/webm; codecs="vp9"') !== "";
-      projVid.src = `${import.meta.env.BASE_URL}video/site/${list[projK % list.length]}-loop.${webm ? "webm" : "mp4"}`;
+      projVid.src = media(`${list[projK % list.length]}-loop.${webm ? "webm" : "mp4"}`);
       projK++;
       projAt = performance.now();
       projVid.play().catch(() => {});
@@ -331,7 +332,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (!vertVid) {
         const v = document.createElement("video");
         v.muted = true; v.playsInline = true; v.loop = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-        v.src = `${import.meta.env.BASE_URL}video/site/vertical-drama-loop.${v.canPlayType('video/webm; codecs="vp9"') !== "" ? "webm" : "mp4"}`;
+        v.src = media(`vertical-drama-loop.${v.canPlayType('video/webm; codecs="vp9"') !== "" ? "webm" : "mp4"}`);
         const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
         if (rv.requestVideoFrameCallback) { vertRVFC = true; const tick = () => { vertFrame++; if (vertVid === v) rv.requestVideoFrameCallback!(tick); }; rv.requestVideoFrameCallback(tick); }
         vertVid = v;

@@ -461,7 +461,7 @@ export function Site({
               >
                 <span className="st-card__img grain">
                   <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.poster }} />
-                  {c.film && <LoopVideo src={c.film.loop} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
+                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
                   <span className="st-card__plus" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 15} /></span>
                 </span>
                 <span className="st-card__cap">
@@ -493,7 +493,7 @@ export function Site({
           <div className="st-contact__in">
             <div className="st-contact__l">
               <Head label="Contact" title="Let’s talk" />
-              <p className="st-contact__p">Tell us about the project.<br />A few lines are enough.</p>
+              <p className="st-contact__p">Bring the idea, we’ll bring the light.<br />A few lines are enough to start.</p>
             </div>
             <ContactForm />
           </div>
