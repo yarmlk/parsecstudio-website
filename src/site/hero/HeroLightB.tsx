@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, type MutableRefObject } from "react";
 import { OPEN } from "../../lib/assets";
 import { easeEnter, easeMove } from "../../lib/ease";
-import { REEL_SRC, type HeroCtl, type ReelPhase } from "./reel";
+import { REELS, REEL_SRC, connHint, pickReel, reelOf, type HeroCtl, type ReelPhase } from "./reel";
 import "./hero-b.css";
 
 /**
@@ -648,12 +648,45 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true;
     v.setAttribute("muted", ""); v.setAttribute("playsinline", "");
     let src = "";
+    /** what the source behind the glass has shown the network can carry: how much of the film it fetched, how fast */
+    const net = { t0: 0, from: 0, at: 0, end: 0, mbps: 0 };
     const setSrc = (s: string, at = 0) => {
       if (src === s) return;
       src = s;
       v.src = s;
+      net.t0 = performance.now(); net.from = at; net.at = 0; net.end = 0; net.mbps = reelOf(s)?.mbps ?? 0;
       if (at > 0) { try { v.currentTime = at; } catch { /* set once it loads */ } }
     };
+    const onProgress = () => {
+      // the seconds of film fetched since the source was set (from where it started)
+      const b = v.buffered;
+      for (let i = 0; i < b.length; i++) {
+        if (b.start(i) > net.from + 0.5 || b.end(i) <= net.from) continue;
+        const got = b.end(i) - net.from;
+        if (got > net.end + 0.01) { net.end = got; net.at = performance.now(); }
+        return;
+      }
+    };
+    v.addEventListener("progress", onProgress);
+    /** Mbps, a lower bound (the browser may pause between bursts); 0 until it has fetched for over a second */
+    const measured = () => (net.mbps && net.at - net.t0 > 1000 ? (net.end * net.mbps) / ((net.at - net.t0) / 1000) : 0);
+    /** device px the film has to fill: desk, the frame (cover); phone, its width (watching, the whole film fits it) */
+    const needPx = () => {
+      const W = box.offsetWidth, H = box.offsetHeight, d = window.devicePixelRatio || 1;
+      return (mode === "desk" ? Math.max(W, (H * 16) / 9) : W) * d;
+    };
+    /** the rendition to watch, by the screen: on a connection that says it is slow, the 540p. The desk takes the
+        sharpest the screen needs; the phone is careful, it already plays the 540p behind the glass: a sharper one
+        only on what that cut's own download has shown (or else the connection's estimate) the network can carry */
+    const filmPick = () => {
+      const c = connHint();
+      if (c.slow) return REELS[0].src;
+      if (mode === "desk") return pickReel(needPx(), Infinity).src;
+      const m = measured();
+      return pickReel(needPx(), m ? m * 0.8 : c.mbps || REELS[0].mbps).src;
+    };
+    /** the film to watch, once chosen (the one the reveal waits for) */
+    let filmSrc = "";
     let volOk = false;
     try { v.volume = 0.5; volOk = Math.abs(v.volume - 0.5) < 0.01; v.volume = 1; } catch { volOk = false; }
 
@@ -692,9 +725,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     if (fade && section) section.dataset.fade = "1"; else if (section) delete section.dataset.fade;
     /** the muted film runs behind the glass (otherwise the poster sits there) */
     const glassFilm = !fade && !saveData;
-    /** what plays behind the glass: desk, the film itself (sharp, and "Showreel" only restarts it with sound);
-        the phone, the light cut */
-    const glassSrc = mode === "desk" ? REEL_SRC.film : REEL_SRC.glass;
+    /** what plays behind the glass: desk, the film itself (sharp, and "Showreel" only restarts it with sound) in
+        the rendition the screen and the connection call for; the phone, the light cut (with its sound) */
+    const glassSrc = mode === "desk" ? filmPick() : REEL_SRC.glass;
 
     /* ── the words: wiped along the light as it passes ── */
     const rims = () => Array.from(section?.querySelectorAll<HTMLElement>("[data-rim]") ?? []);
@@ -759,7 +792,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (glassFilm) {
         // back behind the glass, from where the film was (desk: the same source, it just plays on, muted)
         const at = v.ended ? 0 : v.currentTime;
-        setSrc(glassSrc, at);
+        setSrc(mode === "desk" && src ? src : glassSrc, at);
         if (visible && !document.hidden) v.play().catch(() => {});
       } else {
         v.pause();
@@ -784,7 +817,10 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       // inside the click: the film may start with sound
       v.loop = false;
       if (!back) {
-        setSrc(REEL_SRC.film);
+        // desk: the film behind the glass is the one to watch; phone: the cut itself, unless the screen wants a
+        // sharper one and the connection has shown it can carry it
+        filmSrc = mode === "desk" && src ? src : filmPick();
+        setSrc(filmSrc);
         if (v.currentTime > 0) { try { v.currentTime = 0; } catch { /* fine */ } }
         R.down = false;
         R.asked = now;
@@ -1050,7 +1086,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         }
         // the reveal: the flare holds until the film plays, then the rim goes down
         if (R.phase === "opening" && !R.down) {
-          const live = src === REEL_SRC.film && !v.paused && v.readyState >= 3 && v.currentTime > 0.04;
+          const live = src === filmSrc && !v.paused && v.readyState >= 3 && v.currentTime > 0.04;
           if ((live && fin(R.fTw, now)) || now - R.asked > WAIT_MS) {
             R.down = true;
             box.dataset.down = "1";
@@ -1209,6 +1245,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       scroller?.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", onVis);
       v.removeEventListener("ended", onEnded);
+      v.removeEventListener("progress", onProgress);
       stopGl();
       unwipe();
       if (section) delete section.dataset.fade;

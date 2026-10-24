@@ -1,16 +1,43 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 
 /**
- * The showreel lives behind the disc of the hero. On the desk the glass shows the 1080p film itself, muted and looping
+ * The showreel lives behind the disc of the hero. On the desk the glass shows the film itself, muted and looping
  * (sharp behind the glass), and "Showreel" restarts the same element at 0 with sound: no source switch, no wait. The
- * phone loops a light 540p cut behind the glass and switches to the film on "Showreel". HeroLightB owns the element
- * and the transition; this file holds what the site around it needs: the sources, the phases and the player state.
+ * phone loops the light 540p behind the glass; "Showreel" unmutes it, or switches to a sharper rendition when the
+ * screen needs one and the connection can carry it. HeroLightB owns the element and the transition; this file holds
+ * what the site around it needs: the sources, the phases and the player state.
  */
+/** the film in three renditions, all with sound (H.264 + AAC, the index up front, a keyframe at least every 2 s) */
+export const REELS = [
+  { src: "video/site/showreel-540a.mp4", w: 960, mbps: 0.84 },   // ~5.8 MB
+  { src: "video/site/showreel-720.mp4", w: 1280, mbps: 2.05 },   // ~14 MB
+  { src: "video/site/showreel-1080.mp4", w: 1920, mbps: 4.52 },  // ~31 MB
+] as const;
+export type Reel = (typeof REELS)[number];
+
+type Conn = { saveData?: boolean; effectiveType?: string; downlink?: number };
+/** navigator.connection, where the browser has it (not Safari, not Firefox): a firm "slow" (save-data, 2g/3g), and
+    its downlink estimate in Mbps with headroom, 0 when unknown. Chrome rounds the estimate, caps it at 10 and starts
+    from a guess before it has seen real traffic, so it is only a hint: what the film itself fetched comes first. */
+export function connHint(): { slow: boolean; mbps: number } {
+  const c = (navigator as Navigator & { connection?: Conn }).connection;
+  if (!c) return { slow: false, mbps: 0 };
+  const slow = !!c.saveData || (!!c.effectiveType && /2g|3g/.test(c.effectiveType));
+  return { slow, mbps: c.downlink ? (c.downlink >= 10 ? 1000 : c.downlink * 0.7) : 0 };
+}
+
+/** the smallest rendition that fills `needPx` device pixels across, within `budget` Mbps (the 540p always) */
+export function pickReel(needPx: number, budget: number): Reel {
+  const ok = REELS.filter((r, i) => i === 0 || r.mbps <= budget);
+  return ok.find((r) => r.w >= needPx * 0.85) ?? ok[ok.length - 1];
+}
+/** the next rendition down (itself when it is the lightest) */
+export const lighter = (src: string): Reel => REELS[Math.max(0, REELS.findIndex((r) => r.src === src) - 1)];
+export const reelOf = (src: string): Reel | undefined => REELS.find((r) => r.src === src);
+
 export const REEL_SRC = {
-  /** behind the glass on the phone: 960×540, no sound track, ~5 MB */
-  glass: "video/site/showreel-540.mp4",
-  /** watching, and behind the glass on the desk: 1920×1080 with sound, ~31 MB */
-  film: "video/site/showreel-1080.mp4",
+  /** behind the glass on the phone: the 540p, with its sound so "Showreel" can simply unmute it */
+  glass: REELS[0].src,
   /** reduced motion, save-data */
   poster: "video/site/showreel.jpg",
   /** the film's own first frame (960×540, ~24 KB): on the glass at once, until the film's frames arrive, so the film
