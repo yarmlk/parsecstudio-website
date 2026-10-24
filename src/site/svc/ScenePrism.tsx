@@ -301,7 +301,8 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /* Motion's projector: our 3D and CGI works, one loop after another, laid on the floor by the light */
     let projTex: WebGLTexture | null = null;
     let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0, projFrame = 0, projUp = -1, projRVFC = false;
-    const PROJ = ["centil", "soundstamp", "kiwus", "retica", "dehealth", "scichart"];
+    /** one short reel of the best shots of our Motion, 3D and CGI work, cut straight (no dip between shots), looping */
+    const PROJ = ["motion-reel"];
     const projNext = () => {
       if (!projVid) return;
       const list = PROJ;
@@ -314,8 +315,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     const projStart = () => {
       if (!projVid) {
         const v = document.createElement("video");
-        v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-        v.addEventListener("ended", projNext);
+        v.muted = true; v.playsInline = true; v.loop = true; v.preload = "auto"; v.crossOrigin = "anonymous";
         projVid = v;
         // count the video's new frames, so the texture is uploaded only when there is a new one (not on every draw)
         const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
@@ -957,8 +957,6 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         if (projFrame !== projUp) { try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, projVid); projUp = projFrame; } catch { pw = 0; } }
         const ar = projVid.videoWidth / projVid.videoHeight, fa = 2;
         f2("uProjCrop", ar > fa ? fa / ar : 1, ar > fa ? 1 : ar / fa);
-        const sinceCut = (performance.now() - projAt) / 1000, left = projVid.duration ? projVid.duration - projVid.currentTime : 9;
-        pw *= Math.min(1, sinceCut / 0.35) * Math.min(1, left / 0.3);
       }
       f1("uProjW", pw);
       f2("uProjC", projC[0], projC[1]); f2("uProjU", projU[0], projU[1]); f2("uProjV", projV[0], projV[1]);
