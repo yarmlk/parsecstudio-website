@@ -11,10 +11,16 @@
 <meta property="og:image" content="video/site/showreel.jpg">
 <meta property="og:type" content="website">
 <link rel="icon" href="logo/favicon-p.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
+<!-- the fonts are ours to serve (all OFL, Latin only): no third-party request in the way of the first paint -->
 <link rel="preload" href="fonts/kharkiv-tone.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Kharkiv Tone"; src: url(fonts/kharkiv-tone.woff2) format("woff2"); font-weight: 400; font-display: swap; unicode-range: U+0021-007E, U+00A0-00FF, U+2010-2027, U+2032-2033, U+2190-2193, U+2212; }
+@font-face { font-family: "Geist"; src: url(fonts/geist.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url(fonts/geist-mono.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Instrument Serif"; src: url(fonts/instrument-serif.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Instrument Serif"; src: url(fonts/instrument-serif-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+</style>
 <link rel="preload" href="video/site/showreel-first.jpg" as="image">
 </head>
 <body>

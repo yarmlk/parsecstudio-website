@@ -31,7 +31,7 @@ export type Case = {
   stills: Still[];
 };
 
-const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: media(`${id}.mp4`), loop: media(`${id}-loop.mp4`), loopWebm: media(`${id}-loop.webm`), poster: media(`${id}.jpg`), card: media(`${id}-sm.jpg`), thumb: media(`${id}-xs.jpg`), dur, ar });
+const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: media(`${id}.mp4`), loop: media(`${id}-loop.mp4`), loopWebm: media(`${id}-loop.webm`), poster: media(`${id}.jpg`), card: media(`${id}-sm.webp`), thumb: media(`${id}-xs.jpg`), dur, ar });
 const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: media(`${id}.jpg`), pos, alt });
 
 /** a work from one of our Vimeo showcases (title and running time from it), its film hosted here like the others */

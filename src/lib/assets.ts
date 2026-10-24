@@ -7,8 +7,8 @@ export const LOGO = {
 
 /** 1920×1080 stills from the Parsec showreel (public/img/reel). */
 export const REEL = {
-  portrait: "img/reel/portrait.jpg", robot: "img/reel/robot.jpg", medieval: "img/reel/medieval.jpg",
-  forest: "img/reel/forest.jpg", astronaut: "img/reel/astronaut.jpg", road: "img/reel/road.jpg",
+  portrait: "img/reel/portrait.webp", robot: "img/reel/robot.webp", medieval: "img/reel/medieval.webp",
+  forest: "img/reel/forest.webp", astronaut: "img/reel/astronaut.webp", road: "img/reel/road.webp",
 } as const;
 
 /** White client logos, 475×175 PNG, same optical box (public/img/clients). */
@@ -19,5 +19,5 @@ export const CLIENT_LOGOS: { id: string; name: string; file: string }[] = [
 
 /** 4K light plates (public/img/open). */
 export const OPEN = {
-  cut: "img/open/cut.jpg", horizon: "img/open/horizon.jpg", reflection: "img/open/reflection.jpg",
+  cut: "img/open/cut.jpg", horizon: "img/open/horizon.webp", reflection: "img/open/reflection.webp",
 } as const;

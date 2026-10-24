@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
 import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
 import { easeMove } from "../lib/ease";
 import { CONTACT } from "../lib/facts";
@@ -10,7 +10,8 @@ import { LogoGrid } from "./clients";
 import { ReviewColumns } from "./reviews";
 import { CutLine, useCutTrack, useReduced } from "./ui";
 import { ContactForm } from "./contact";
-import { SvcStage } from "./svc/SvcStage";
+/* the services stage (the prism and its light) is the desk's alone, and loads on its own: the phone never fetches it */
+const SvcStage = lazy(() => import("./svc/SvcStage").then((m) => ({ default: m.SvcStage })));
 import { media } from "../lib/media";
 
 /** the phone's service loops: our Motion reel, our AI films, three of our vertical series side by side */
@@ -61,7 +62,7 @@ function Nav({ mode, active, onGo, onMenu, solid, away }: { mode: SiteMode; acti
   return (
     <header className={`st-nav${solid ? " is-solid" : ""}${away ? " is-away" : ""}`} inert={away || undefined}>
       <button type="button" className="st-nav__brand" onClick={() => onGo("hero")} aria-label="parsec studio, back to top">
-        <img src={LOGO.lockupWhite} alt="parsec studio" />
+        <img src={LOGO.lockupWhite} alt="parsec studio" width={4406} height={788} />
       </button>
       {mode === "desk" ? (
         <div className="st-nav__right">
@@ -98,7 +99,7 @@ function MobileMenu({ active, onGo, onClose }: { active: number; onGo: (id: SecI
   return (
     <div className="st-menu" role="dialog" aria-label="Menu" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
       <div className="st-menu__top">
-        <img src={LOGO.lockupWhite} alt="parsec studio" className="st-menu__logo" />
+        <img src={LOGO.lockupWhite} alt="parsec studio" width={4406} height={788} className="st-menu__logo" />
         <button ref={close} type="button" className="st-round st-round--sm" onClick={onClose} aria-label="Close the menu"><Icon name="close" size={17} /></button>
       </div>
       <nav ref={ref} className="st-menu__list" aria-label="Site">
@@ -390,7 +391,7 @@ export function Site({
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
               <ul className="st-hero__logos" aria-label="Clients">
-                {HERO_LOGOS.map((l) => <li key={l.id}><img src={l.file} alt={l.name} style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>)}
+                {HERO_LOGOS.map((l) => <li key={l.id}><img src={l.file} alt={l.name} width={320} height={118} style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>)}
               </ul>
             </div>
           )}
@@ -416,7 +417,7 @@ export function Site({
             follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
         <section data-sec="services" className="st-sec st-svc" onPointerMove={desk ? onSvcMove : undefined}>
           {/* the phone has no stage: each service carries its own quiet loop instead (light, no WebGL) */}
-          {desk && <SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} />}
+          {desk && <Suspense fallback={null}><SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} /></Suspense>}
           <Head label="From treatment to master" title="Services" />
           <span className="st-rule" aria-hidden />
           <ol className="st-svc__list">
@@ -440,7 +441,7 @@ export function Site({
                   </span>
                   {!desk && (
                     <span className="st-svc__reel grain" aria-hidden>
-                      <img src={media(`${SVC_REEL[i]}.jpg`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
+                      <img src={media(`${SVC_REEL[i]}.webp`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
                       <LoopVideo src={media(`${SVC_REEL[i]}-loop.mp4`)} webm={media(`${SVC_REEL[i]}-loop.webm`)} on={sec === "services" && i === svcOn} className="st-svc__vid" />
                     </span>
                   )}
@@ -492,7 +493,7 @@ export function Site({
         {/* 04 clients: 3 rows of 4, white logos in glass over the light (the deck's client slide); the pointer sends a
             pulse of light through each tile it enters (clients.tsx) */}
         <section data-sec="clients" className="st-sec st-clients">
-          <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" width={4096} height={2323} loading="lazy" /></div>
+          <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" width={2560} height={1452} loading="lazy" /></div>
           <Head label="100+ happy customers" title="Clients" />
           <LogoGrid logos={LOGOS} widths={LOGO_W} />
         </section>
@@ -505,7 +506,7 @@ export function Site({
 
         {/* 06 contact: the head on the left, the form as one frosted plate over the Horizon light; a quiet footer */}
         <section data-sec="contact" className="st-sec st-contact">
-          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" width={desk ? 3840 : 752} height={desk ? 2144 : 1344} loading="lazy" /></div>
+          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" width={desk ? 2560 : 752} height={desk ? 1429 : 1344} loading="lazy" /></div>
           <div className="st-contact__in">
             <div className="st-contact__l">
               <Head label="Contact" title="Let’s talk" />
@@ -515,7 +516,7 @@ export function Site({
             <ContactForm />
           </div>
           <footer className="st-foot">
-            <img className="st-foot__logo" src={LOGO.lockupWhite} alt="parsec studio" />
+            <img className="st-foot__logo" src={LOGO.lockupWhite} alt="parsec studio" width={4406} height={788} loading="lazy" />
             <a className="st-foot__mail" href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>
             <span className="st-foot__c">© 2026 Parsec Studio</span>
           </footer>
