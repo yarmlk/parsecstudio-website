@@ -11,7 +11,7 @@ import { useReduced } from "./ui";
    Nothing here is invented: a field we don't know is left out. */
 
 export type Still = { src: string; pos: string; alt: string };
-export type Film = { src: string; loop: string; poster: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
+export type Film = { src: string; loop: string; poster: string; /** the poster made small, for cards */ card: string; dur: string; /** width / height of the picture (letterbox cut away) */ ar: number };
 
 /* ── Cases ────────────────────────────────────────────────── */
 export type Case = {
@@ -30,22 +30,26 @@ export type Case = {
   stills: Still[];
 };
 
-const V = "video/site/";
-const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, dur, ar });
+/** where the films live: on the site by default, or on a media host (VITE_MEDIA_BASE, e.g. a CDN in front of a bucket,
+ *  serving the same paths with CORS open, since the stage draws loops into WebGL) */
+export const MEDIA = (import.meta.env.VITE_MEDIA_BASE as string | undefined) ?? "";
+const V = `${MEDIA}video/site/`;
+const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, card: `${V}${id}-sm.jpg`, dur, ar });
 const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}${id}.jpg`, pos, alt });
 
-export const CASES: Case[] = [
-  {
-    id: "prison", title: "A Prison Without Walls", type: "3D short film", dur: "1:07",
-    tools: "Unreal Engine 5 · MetaHuman · Maya · Substance Painter · Cascadeur",
-    line: "A short film with its own story, directed by the studio: a woman and a small robot, sets and characters built from scratch in Unreal Engine 5.",
-    poster: "58% 50%", film: film("prison", "1:07", 1920 / 676), stills: [still("prison", "A small robot by a window in warm light", "58% 50%")],
-  },
+/** our 3D, CGI and filmed works (older than the AI ones), Centil first */
+export const CRAFT_CASES: Case[] = [
   {
     id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
     tools: "Unreal Engine 5 · 3ds Max · Cinema 4D · After Effects",
     line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
     poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
+  },
+  {
+    id: "prison", title: "A Prison Without Walls", type: "3D short film", dur: "1:07",
+    tools: "Unreal Engine 5 · MetaHuman · Maya · Substance Painter · Cascadeur",
+    line: "A short film with its own story, directed by the studio: a woman and a small robot, sets and characters built from scratch in Unreal Engine 5.",
+    poster: "58% 50%", film: film("prison", "1:07", 1920 / 676), stills: [still("prison", "A small robot by a window in warm light", "58% 50%")],
   },
   {
     id: "leave", title: "Leave It Alone", type: "Animated music video", client: "Tariq", dur: "3:36",
@@ -110,8 +114,8 @@ export const AI_CASES: Case[] = [
   ai("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   ai("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
-/** the AI films' loops, for the projector */
-export const AI_LOOPS = AI_CASES.map((c) => c.id);
+/** the Cases row: the AI works first (the newest), then the 3D, CGI and filmed ones */
+export const CASES: Case[] = [...AI_CASES, ...CRAFT_CASES];
 
 /* ── Services ─────────────────────────────────────────────── */
 export type Service = {
@@ -135,7 +139,7 @@ export const SITE_SERVICES: Service[] = [
     id: "craft", name: "Motion, 3D & CGI",
     line: "SaaS and product films, motion design, 3D and CGI.",
     text: "SaaS and product films, motion design, 3D animation and CGI. From script and storyboard to the edit, colour and sound.",
-    works: CASES.filter((c) => c.type !== "Music video"),
+    works: CRAFT_CASES.filter((c) => c.type !== "Music video"),
     items: [
       "SaaS and product films", "Motion design and explainers", "3D animation and CGI", "Game trailers and cinematics",
       "Brand and event films", "Script and storyboard", "Characters and environments", "Edit, colour and sound",
@@ -248,7 +252,7 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
                 aria-label={`Open the work: ${c.title}, ${c.type}`}
               >
                 <span className="st-wk__img grain">
-                  <img src={c.film?.poster ?? c.stills[0].src} alt="" decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
+                  <img src={c.film?.card ?? c.stills[0].src} alt="" decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
                   {c.film && <LoopVideo src={c.film.loop} on={hover === k} className="st-wk__vid" />}
                   <span className="st-wk__play" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 14} /></span>
                 </span>
