@@ -11,8 +11,11 @@ export const REEL_SRC = {
   glass: "video/site/showreel-540.mp4",
   /** watching, and behind the glass on the desk: 1920×1080 with sound, ~31 MB */
   film: "video/site/showreel-1080.mp4",
-  /** reduced motion, save-data, before the first frame */
+  /** reduced motion, save-data */
   poster: "video/site/showreel.jpg",
+  /** the film's own first frame (960×540, ~24 KB): on the glass at once, until the film's frames arrive, so the film
+      starts from exactly this picture; also the <video>'s poster while a source loads */
+  first: "video/site/showreel-first.jpg",
   dur: "0:55",
 } as const;
 

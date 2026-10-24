@@ -512,6 +512,8 @@ const sstep = (a: number, b: number, x: number) => { const t = Math.min(1, Math.
 const REST: Record<Mode, number> = { desk: -0.06, mob: -0.02 };
 
 /* ── the reveal ── */
+/** the film behind the glass comes up this long after the light's first frame (its ignition is under way) */
+const FILM_AFTER = 1100;
 const FLARE_MS = 520;                                    // the rim flares (and holds while the film buffers)
 const WAIT_MS = 1500;                                    // … at most this long, then it goes down on the last good frame
 /** the light and its haze are out of the frame here: the <video> takes over (the rest of the descent is unseen) */
@@ -720,7 +722,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
 
     let draw: (now: number) => void = () => {};
     let uploadFilm: (force?: boolean) => void = () => {};
-    let posterTex: () => void = () => {};
+    let posterTex: (url?: string) => void = () => {};
     let stopGl = () => {};
 
     const kick = () => {
@@ -971,9 +973,12 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         gl.useProgram(prog);
       };
       let texW = 0, texH = 0, texOk = false, fresh = true, lastCt = -1, lastSrc = "";
+      /** a film frame is on the glass (not only the still) */
+      let filmTex = false;
       const got = (w: number, h: number) => {
         if (w !== texW || h !== texH) { texW = w; texH = h; gl.uniform1f(u.reelAsp, w / h); }
-        if (!texOk) { texOk = true; R.aTw = tw(0, 1, reduce ? 0 : 2400, easeEnter, performance.now()); }
+        // the film comes up once the light has begun to ignite, however early its first picture is here
+        if (!texOk) { texOk = true; R.aTw = tw(0, 1, reduce ? 0 : 2400, easeEnter, Math.max(performance.now(), st.t0 + FILM_AFTER)); }
       };
       // a frame goes up only when it is new: where the browser can say so (requestVideoFrameCallback), when it does;
       // elsewhere (or if its callbacks go quiet while it plays) when the film's time has moved. A film that stalls
@@ -995,20 +1000,22 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
           if (v.videoWidth !== texW || v.videoHeight !== texH) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, v);
           else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGB, gl.UNSIGNED_BYTE, v);
           got(v.videoWidth, v.videoHeight);
+          filmTex = true;
         } catch { return; /* a frame that cannot be read: keep the last one */ }
         // its light, blurred, for the glow in the glass
         halo();
       };
-      posterTex = () => {
+      posterTex = (url = REEL_SRC.poster) => {
         const img = new Image();
         img.decoding = "async";
         img.onload = () => {
-          if (R.phase !== "idle") return;
+          // the film's first frame only stands in until the film itself is there
+          if (R.phase !== "idle" || (url === REEL_SRC.first && filmTex)) return;
           try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img); got(img.naturalWidth, img.naturalHeight); } catch { return; }
           halo();
           if (!running) draw(performance.now());
         };
-        img.src = REEL_SRC.poster;
+        img.src = url;
       };
 
       /* backing store from the on-screen rect: the site sits inside a scaled frame, and a frame re-fit changes only
@@ -1136,9 +1143,10 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       };
     }
 
-    // behind the glass: the light cut starts once the light has begun to ignite, and only once the hero is seen
-    // (a hero that starts off-screen fetches nothing); otherwise the poster sits there
-    let startT = 0, wantGlass = false;
+    // behind the glass: the film's first frame at once, the film itself loads as soon as the hero is seen (a hero
+    // that starts off-screen fetches nothing) and plays from its first bytes; it shows once the light has begun to
+    // ignite (FILM_AFTER). Without the film (save-data) the poster sits there.
+    let wantGlass = glassFilm;
     const startGlass = () => {
       if (R.phase !== "idle" || src) return;
       if (!visible || document.hidden) { wantGlass = true; return; }
@@ -1146,8 +1154,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       setSrc(glassSrc);
       v.play().catch(() => {});
     };
-    if (glassFilm) startT = window.setTimeout(startGlass, 900);
-    else if (gl && prog) posterTex();
+    if (gl && prog) posterTex(glassFilm ? REEL_SRC.first : REEL_SRC.poster);
 
     const io = new IntersectionObserver((es) => {
       // entries can arrive batched: the last one is the current state
@@ -1196,7 +1203,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
-      halt(); io.disconnect(); window.clearTimeout(startT); window.clearTimeout(timer);
+      halt(); io.disconnect(); window.clearTimeout(timer);
       section?.removeEventListener("pointermove", onMove);
       section?.removeEventListener("pointerleave", onLeave);
       scroller?.removeEventListener("scroll", onScroll);
@@ -1216,7 +1223,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
   return (
     <div ref={boxRef} className="st-hero__plate hlb grain" data-mode={mode}>
       <img className="hlb__fallback" alt="" />
-      <video ref={reelRef} className="hlb__reel" muted playsInline preload="auto" aria-hidden tabIndex={-1} disablePictureInPicture />
+      <video ref={reelRef} className="hlb__reel" muted playsInline preload="auto" poster={REEL_SRC.first} aria-hidden tabIndex={-1} disablePictureInPicture />
     </div>
   );
 });
