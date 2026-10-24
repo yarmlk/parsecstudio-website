@@ -970,24 +970,27 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(prog);
       };
-      let texW = 0, texH = 0, texOk = false, fresh = true, lastCb = 0;
+      let texW = 0, texH = 0, texOk = false, fresh = true, lastCt = -1, lastSrc = "";
       const got = (w: number, h: number) => {
         if (w !== texW || h !== texH) { texW = w; texH = h; gl.uniform1f(u.reelAsp, w / h); }
         if (!texOk) { texOk = true; R.aTw = tw(0, 1, reduce ? 0 : 2400, easeEnter, performance.now()); }
       };
-      // only upload new frames where the browser says so; otherwise every drawn frame while it plays
+      // a frame goes up only when it is new: where the browser can say so (requestVideoFrameCallback), when it does;
+      // elsewhere (or if its callbacks go quiet while it plays) when the film's time has moved. A film that stalls
+      // costs nothing: no upload, no halo passes.
       type RVFC = HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number; cancelVideoFrameCallback?: (h: number) => void };
       const vf = v as RVFC;
-      let rvfc = 0;
+      let rvfc = 0, lastCb = 0;
       const onFrame = () => { fresh = true; lastCb = performance.now(); rvfc = vf.requestVideoFrameCallback!(onFrame); };
       const arm = () => { if (!vf.requestVideoFrameCallback) return; if (rvfc) vf.cancelVideoFrameCallback?.(rvfc); rvfc = vf.requestVideoFrameCallback(onFrame); };
       arm();
       v.addEventListener("loadeddata", arm);
       uploadFilm = (force = false) => {
         if (v.readyState < 2 || !v.videoWidth) return;
-        const stale = performance.now() - lastCb > 250;
-        if (!force && !fresh && !(stale && !v.paused) && texOk) return;
-        fresh = false;
+        const quiet = !rvfc || performance.now() - lastCb > 250;
+        const moved = fresh || (quiet && (v.currentTime !== lastCt || v.currentSrc !== lastSrc));
+        if (!force && !moved && texOk) return;
+        fresh = false; lastCt = v.currentTime; lastSrc = v.currentSrc;
         try {
           if (v.videoWidth !== texW || v.videoHeight !== texH) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, v);
           else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGB, gl.UNSIGNED_BYTE, v);
