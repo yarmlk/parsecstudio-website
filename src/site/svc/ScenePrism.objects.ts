@@ -307,6 +307,9 @@ void main(){
   vec3 col = Li * (alb * diff * (1.0 - fr) + spec * fr * step(0.0, ndl));
   // where the surface turns away from us on the lit side, the light runs along the edge: a line of light on the form
   col += Li * pow(1.0 - max(dot(N, V), 0.0), 3.0) * smoothstep(-0.15, 0.45, ndl) * uRim;
+  // a dim softbox high above the stage, seen only in reflections: glossy forms read by its long soft highlight
+  vec3 Rr = reflect(-V, N);
+  col += vec3(0.95, 0.88, 0.78) * smoothstep(0.45, 0.98, Rr.y) * (0.05 + fr) * 0.75 * (1.0 - rough) * (1.0 - rough);
   // the dark room: barely anything, only so the forms are there when the light leaves
   col += alb * 0.006 * (0.4 + 0.6 * max(N.y, 0.0)) + fr * 0.004;
   col += alb * uGlow * length(Li);

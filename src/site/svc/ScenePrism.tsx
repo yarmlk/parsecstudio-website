@@ -3,6 +3,7 @@ import { kelvinRGB } from "../../ui/LightField";
 import { PRISM_FRAG, PRISM_VERT } from "./ScenePrism.glsl";
 import { CERAMIC, FROST, MARBLE, Objects, camClip, dirXZ, lightClip, loadMesh, model, type Item } from "./ScenePrism.objects";
 import { ShadowArt, type ArtSlot } from "./ScenePrism.art";
+import { Pillow, pillowPose } from "./ScenePrism.pillow";
 import { add, cross, lookCam, makePrism, mul, norm, project, sub, traceBeam, type V3 } from "./ScenePrism.optics";
 
 /* Services: one stage, one real glass prism at the centre of the section, level with the middle of the three names. The
@@ -51,11 +52,11 @@ const N_VIEW: V3 = [1.505, 1.517, 1.532];
 /** Vertical's marble (packed meshes, public/mesh): the two busts, and (dev only) the Hercules group to compare */
 const STATUES = ["mesh/caesar.bin", "mesh/senator.bin", "mesh/hercules.bin"] as const;
 /** mesh slots: the busts and the group, then the shadow art of Motion and of Vertical */
-const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_ART = 14;
+const M_CAESAR = 3, M_SENATOR = 4, M_HERC = 5, M_PILLOW = 6, M_ART = 14;
 /** the alternatives Vlad compares on localhost (a switch under the stage, dev only); production shows the first of each.
- *  Motion: voxels or glass flakes. Vertical: the two busts in conversation, dust drifting off them in the light; or
+ *  Motion: the black ceramic cushion, or the voxels' shadow story. Vertical: the two busts in conversation, dust drifting off them in the light; or
  *  Hercules raising Antaeus in an upright 9:16 frame of light */
-export const VARIANTS = { motion: ["voxels", "glass"], vertical: ["busts", "hercules"] } as const;
+export const VARIANTS = { motion: ["cushion", "voxels"], vertical: ["busts", "hercules"] } as const;
 export type Variants = { motion: (typeof VARIANTS.motion)[number]; vertical: (typeof VARIANTS.vertical)[number] };
 const variant = <K extends keyof Variants>(k: K): Variants[K] => {
   const v = import.meta.env.DEV ? window.__stVar?.[k] : undefined;
@@ -307,6 +308,9 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     let alive = true, ready = false, failed = false, meshes = false;
     /** the shadow-art piece: carved for the light's origin and the camera of the current layout, rebuilt when they move */
     const artM = new ShadowArt();
+    /** Motion's cushion: rebuilt on the CPU each frame it shows */
+    const pillow = new Pillow();
+    let pillowIn = false;
     /* Vertical's dust: motes hanging in the air of the light, the way dust shows in a projector's beam, giving the frame
        its depth: most float around the two at their depth, sharp; some hang high between them and the camera, out of
        focus, as soft discs. They drift slowly and are carried a little downstream; they glow where the light reaches
@@ -756,9 +760,18 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         // Motion, 3D & CGI: a ball of shards hanging in the light; its shadow is a picture that, every few seconds,
         // the shards turn into the next one (to the right of the stage, where the light lies widest)
         const sd = stand[0] ?? { d: 1.6, s: 1 }, sc = sd.s;
-        const glass = variant("motion") === "glass";
-        const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
-        showArt(artM, 0, M_ART, slots, glass ? 4200 : 2700, (glass ? 0.0095 : 0.0095) * sc, glass ? FROST : CERAMIC, glass ? "flake" : "voxel");
+        if (variant("motion") === "voxels") {
+          const slots: ArtSlot[] = [{ ...MOTION_SLOT, at: at(0, sd.d + 0.42 * sc, 0.24 * sc, 0), px: 0.32 * Hs, ball: 0.42 }];
+          showArt(artM, 0, M_ART, slots, 2700, 0.0095 * sc, CERAMIC, "voxel");
+        } else {
+          // the cushion: inflates, drops, squashes, wobbles, settles, lets its air out and floats back up
+          if (!pillowIn) { pillowIn = true; ob.set(M_PILLOW, pillow.mesh()); }
+          const ps = pillowPose(tSec), size = 0.3 * sc;
+          pillow.shape(ps.inflate, ps.squash);
+          ob.update(M_PILLOW, pillow.pos, pillow.nrm);
+          const p0 = at(0, sd.d + 0.05 * sc, 0.05 * sc, 0);
+          items.push({ mesh: M_PILLOW, m: model([p0[0], ps.lift * size * 0.5, p0[2]], ps.yaw, ps.tilt, ps.tilt * 0.6, size), mat: CERAMIC, fade: st.show[0] });
+        }
       }
       // AI Production plays with colour alone: the spectrum over the floor, no object in it
       // Vertical Series: the light comes down as an upright 9:16 screen on the floor, and in it a marble drama, one
