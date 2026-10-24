@@ -37,7 +37,10 @@ const V = `${MEDIA}video/site/`;
 const film = (id: string, dur: string, ar = 16 / 9): Film => ({ src: `${V}${id}.mp4`, loop: `${V}${id}-loop.mp4`, poster: `${V}${id}.jpg`, card: `${V}${id}-sm.jpg`, thumb: `${V}${id}-xs.jpg`, dur, ar });
 const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: `${V}${id}.jpg`, pos, alt });
 
-/** our 3D, CGI and filmed works (older than the AI ones), Centil first */
+/** a work from one of our Vimeo showcases (title and running time from it), its film hosted here like the others */
+const work = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur), stills: [still(id, title)] });
+
+/** our motion design, 3D and CGI: Centil, then the showcase "SaaS & Tech Explainers" in its order */
 export const CRAFT_CASES: Case[] = [
   {
     id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
@@ -45,74 +48,42 @@ export const CRAFT_CASES: Case[] = [
     line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
     poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
   },
-  {
-    id: "prison", title: "A Prison Without Walls", type: "3D short film", dur: "1:07",
-    tools: "Unreal Engine 5 · MetaHuman · Maya · Substance Painter · Cascadeur",
-    line: "A short film with its own story, directed by the studio: a woman and a small robot, sets and characters built from scratch in Unreal Engine 5.",
-    poster: "58% 50%", film: film("prison", "1:07", 1920 / 676), stills: [still("prison", "A small robot by a window in warm light", "58% 50%")],
-  },
-  {
-    id: "leave", title: "Leave It Alone", type: "Animated music video", client: "Tariq", dur: "3:36",
-    tools: "Illustrator",
-    line: "A music video for Tariq: every scene drawn from scratch and animated frame by frame.",
-    poster: "50% 50%", film: film("leave", "3:36"), stills: [still("leave", "Two figures bound by a wire against a burst of light")],
-  },
-  {
-    id: "blkmrkt", title: "BLKMRKT", type: "Game trailer", dur: "0:28",
-    tools: "Unreal Engine 5 · Blender · Maya · Marvelous Designer · Cascadeur",
-    line: "The trailer for a mobile game: streets in Unreal Engine 5, clothes in Marvelous Designer.",
-    poster: "41% 50%", film: film("blkmrkt", "0:28", 1920 / 674), stills: [still("blkmrkt", "A neon alley in the rain", "41% 50%")],
-  },
-  {
-    id: "medieval", title: "Medieval Age", type: "Game trailer", dur: "0:25",
-    tools: "Cinema 4D",
-    line: "One of three concept trailers for a medieval video game, built from the ground up.",
-    poster: "48% 50%", film: film("medieval", "0:25"), stills: [still("medieval", "A figure climbing the stairs to a glowing portal", "48% 50%")],
-  },
-  {
-    id: "pytannia", title: "Krechet feat. Alina Pash", type: "Music video", dur: "3:47",
-    tools: "ARRI Alexa · Drone",
-    line: "The music video for “Pytannia” (Question), shot on ARRI Alexa with drone aerials, then edited, graded and finished at the studio.",
-    poster: "49% 50%", film: film("pytannia", "3:47", 1920 / 804), stills: [still("pytannia", "A figure in a hood and a gas mask", "49% 50%")],
-  },
-  {
-    id: "fifa", title: "FIFA World Cup 2022", type: "3D Animation & CGI", client: "FIFA", year: "2022", dur: "0:17",
-    tools: "Cinema 4D · Octane Render",
-    line: "A 3D film for the FIFA collectible coin, made for the 2022 World Cup in Qatar.",
-    poster: "55% 50%", film: film("fifa", "0:17"), stills: [still("fifa", "Two gold World Cup coins falling through red space", "55% 50%")],
-  },
-  {
-    id: "tefal", title: "Tefal Unlimited", type: "3D product film", client: "Tefal", dur: "0:15",
-    tools: "Cinema 4D · DaVinci Resolve",
-    line: "A digital double of the cookware in Cinema 4D, graded to the brand’s colours.",
-    poster: "48% 50%", film: film("tefal", "0:15", 2), stills: [still("tefal", "The heat indicator under a fan of light", "48% 50%")],
-  },
-  {
-    id: "arch", title: "Architecture Visualization", type: "3D Animation & CGI", dur: "0:19",
-    tools: "Unreal Engine 5",
-    line: "A house and its interiors, rendered in real time in Unreal Engine 5.",
-    poster: "38% 50%", film: film("arch", "0:19"), stills: [still("arch", "A modern house among pines", "38% 50%")],
-  },
+  work("banxe", "Banxe", "Crypto & banking platform promo", "0:34"),
+  work("google-meet", "Google Meet", "2D product explainer", "0:15"),
+  work("vodafone", "Vodafone", "Field service software promo", "1:57"),
+  work("nymcard", "NymCard", "Card issuing dashboard explainer", "0:43"),
+  work("dehealth", "DeHealth", "Health super app promo", "0:28"),
+  work("frontdesk", "Frontdesk", "AI voice emotions promo", "2:35"),
+  work("scichart", "SciChart", "Data visualization library promo", "1:16"),
+  work("contentstack", "Contentstack", "Content platform explainer", "0:22"),
+  work("wilde", "WILDE", "Streaming platform promo", "1:26"),
+  work("refuelrs", "ReFuelrs", "Fuel delivery app explainer", "0:44"),
+  work("fifteen", "Fifteen", "Brand motion promo", "0:31"),
+  work("translinguist", "TransLinguist", "Multilingual meetings explainer", "0:33"),
+  work("microsoft-elearning", "Microsoft", "E-Learning explainer concept", "1:19"),
+  work("retica", "Retica", "Product explainer", "1:06"),
+  work("banxe-iban", "Banxe", "IBAN & crypto banking explainer", "0:37"),
+  work("kiwus", "Kiwus Consulting", "Motion design", "0:14"),
+  work("soundstamp", "Soundstamp", "Product story video", "1:37"),
 ];
 
 /** AI works, in the order of our Vimeo showcase "AI Video Production" (titles and running times from it), the films
  *  re-encoded and hosted here like the cases; each poster a strong frame of its film */
-const ai = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur), stills: [still(id, title)] });
 export const AI_CASES: Case[] = [
-  ai("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
-  ai("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
-  ai("golfone", "GolfOne", "Golf club booking software promo", "1:00"),
-  ai("zenegy", "Zenegy", "Payroll & HR software brand video (Danish)", "1:12"),
-  ai("snappy", "Snappy", "Birthday reminder app promo", "0:50"),
-  ai("openclaw", "OpenClaw", "AI agent teaser spot", "0:39"),
-  ai("myclaw", "MyClaw", "AI agent product promo", "0:55"),
-  ai("kraken", "Kraken", "Trading platform product video", "1:14"),
-  ai("tavrix", "Tavrix", "Cinematic whisky cask brand spot", "0:30"),
-  ai("prism-air", "Prism", "Airline content platform demo", "2:42"),
-  ai("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
-  ai("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
-  ai("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
-  ai("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
+  work("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
+  work("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
+  work("golfone", "GolfOne", "Golf club booking software promo", "1:00"),
+  work("zenegy", "Zenegy", "Payroll & HR software brand video (Danish)", "1:12"),
+  work("snappy", "Snappy", "Birthday reminder app promo", "0:50"),
+  work("openclaw", "OpenClaw", "AI agent teaser spot", "0:39"),
+  work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
+  work("kraken", "Kraken", "Trading platform product video", "1:14"),
+  work("tavrix", "Tavrix", "Cinematic whisky cask brand spot", "0:30"),
+  work("prism-air", "Prism", "Airline content platform demo", "2:42"),
+  work("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
+  work("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
+  work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
+  work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
 /** the Cases row: the AI works first (the newest), then the 3D, CGI and filmed ones */
 export const CASES: Case[] = [...AI_CASES, ...CRAFT_CASES];
@@ -139,7 +110,7 @@ export const SITE_SERVICES: Service[] = [
     id: "craft", name: "Motion, 3D & CGI",
     line: "SaaS and product films, motion design, 3D and CGI.",
     text: "SaaS and product films, motion design, 3D animation and CGI. From script and storyboard to the edit, colour and sound.",
-    works: CRAFT_CASES.filter((c) => c.type !== "Music video"),
+    works: CRAFT_CASES,
     items: [
       "SaaS and product films", "Motion design and explainers", "3D animation and CGI", "Game trailers and cinematics",
       "Brand and event films", "Script and storyboard", "Characters and environments", "Edit, colour and sound",

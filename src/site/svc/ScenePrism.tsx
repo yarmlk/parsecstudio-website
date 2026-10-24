@@ -301,7 +301,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
     /* Motion's projector: our 3D and CGI works, one loop after another, laid on the floor by the light */
     let projTex: WebGLTexture | null = null;
     let projVid: HTMLVideoElement | null = null, projK = 0, projAt = 0, projFrame = 0, projUp = -1, projRVFC = false;
-    const PROJ = ["centil", "fifa", "tefal", "prison", "arch"];
+    const PROJ = ["centil", "soundstamp", "kiwus", "retica", "dehealth", "scichart"];
     const projNext = () => {
       if (!projVid) return;
       const list = PROJ;
