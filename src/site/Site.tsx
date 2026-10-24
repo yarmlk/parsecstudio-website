@@ -506,7 +506,7 @@ export function Site({
 
         {/* 06 contact: the head on the left, the form as one frosted plate over the Horizon light; a quiet footer */}
         <section data-sec="contact" className="st-sec st-contact">
-          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" width={desk ? 2560 : 752} height={desk ? 1429 : 1344} loading="lazy" /></div>
+          <div className="st-contact__plate grain" aria-hidden><img src={desk ? OPEN.horizon : "img/plates/horizon-vertical.jpg"} alt="" width={desk ? 2560 : 752} height={desk ? 1406 : 1344} loading="lazy" /></div>
           <div className="st-contact__in">
             <div className="st-contact__l">
               <Head label="Contact" title="Let’s talk" />
