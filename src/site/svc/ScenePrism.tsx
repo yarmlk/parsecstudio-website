@@ -331,7 +331,7 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
       if (!vertVid) {
         const v = document.createElement("video");
         v.muted = true; v.playsInline = true; v.loop = true; v.preload = "auto"; v.crossOrigin = "anonymous";
-        v.src = `${import.meta.env.BASE_URL}video/site/vertical3-loop.${v.canPlayType('video/webm; codecs="vp9"') !== "" ? "webm" : "mp4"}`;
+        v.src = `${import.meta.env.BASE_URL}video/site/vertical-drama-loop.${v.canPlayType('video/webm; codecs="vp9"') !== "" ? "webm" : "mp4"}`;
         const rv = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
         if (rv.requestVideoFrameCallback) { vertRVFC = true; const tick = () => { vertFrame++; if (vertVid === v) rv.requestVideoFrameCallback!(tick); }; rv.requestVideoFrameCallback(tick); }
         vertVid = v;
