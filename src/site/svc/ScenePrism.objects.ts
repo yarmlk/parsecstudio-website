@@ -365,7 +365,8 @@ void main(){
   if (r > 1.0) discard;
   float soft = exp(-r * 2.6);
   vec3 Li = coneLight(vW) * shadowVis1(vW);
-  vec3 col = (Li * 1.5 + vec3(0.9, 0.85, 0.78) * 0.012) * soft * vA * uFade;
+  // lit by our light, and a faint glow of its own so a stream or a shape of dust still reads where the light is weak
+  vec3 col = (Li * 1.3 + vec3(1.0, 0.84, 0.62) * 0.16) * soft * vA * uFade;
   col *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
   gl_FragColor = vec4(1.0 - exp(-col * 1.4 * uGain), 1.0);
 }`;
