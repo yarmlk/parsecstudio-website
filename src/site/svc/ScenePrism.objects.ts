@@ -387,7 +387,7 @@ vec3 spectrum(float s){ return uS0; }
 ${cone}
 uniform sampler2D uTex;
 uniform vec4 uUV;             // offset, scale in the atlas
-uniform float uFade, uMirror, uTopY, uTopSoft, uGain;
+uniform float uFade, uMirror, uTopY, uTopSoft, uGain, uDev, uDevDir;
 varying vec2 vUV;
 varying vec3 vW;
 void main(){
@@ -397,16 +397,21 @@ void main(){
   vec2 d = max(q - (1.0 - 2.5 * k), 0.0) / (2.5 * k);
   float edge = 1.0 - smoothstep(0.55, 1.0, length(d));
   vec3 v = texture2D(uTex, uUV.xy + vUV * uUV.zw).rgb;
-  // lit by our light where it passes (the panel and the floor at its foot), a little by itself
+  // the light develops the picture: it is there only as far as our light reaches it (the panel and the floor at its
+  // foot), and as Vertical comes on it appears from the light's side across, a warm seam running ahead of it
   vec3 Li = max(coneLight(vW), coneLight(vec3(vW.x, 0.0, vW.z)) * 0.85);
-  float lit = clamp(0.32 + 2.4 * dot(Li, vec3(0.3, 0.5, 0.2)), 0.0, 1.0);
-  vec3 col = v * (1.0 - 0.3 * v) * 0.95 * lit;
-  float a = edge * uFade;
+  float lit = clamp(0.06 + 2.9 * dot(Li, vec3(0.3, 0.5, 0.2)), 0.0, 1.0);
+  float x = uDevDir > 0.0 ? vUV.x : 1.0 - vUV.x;
+  float dv = uDev * 1.35 - 0.2;
+  float dev = smoothstep(x - 0.2, x + 0.02, dv);
+  float seam = exp(-pow((x - dv) / 0.06, 2.0)) * (1.0 - smoothstep(0.9, 1.15, uDev));
+  vec3 col = v * (1.0 - 0.3 * v) * 0.95 * lit * dev + vec3(1.0, 0.8, 0.58) * seam * 0.22 * lit;
+  float a = edge * uFade * max(dev, seam * 0.6);
   if (uMirror > 0.5) a *= 0.14 * (1.0 - smoothstep(0.0, 0.45, vUV.y));
   a *= 1.0 - smoothstep(uTopY - uTopSoft, uTopY, gl_FragCoord.y);
   gl_FragColor = vec4(col, a);
 }`;
-export interface Screen { c: V3; r: V3; u: V3; uv: [number, number, number, number]; fade: number }
+export interface Screen { c: V3; r: V3; u: V3; uv: [number, number, number, number]; fade: number; /** how far the light has developed it (0..1), and from which side (1: from its left) */ dev: number; devDir: number }
 
 export interface Material { alb: V3; rough: number; f0: number; wrap: number; glow: number; rim: number }
 export const MARBLE: Material = { alb: [0.86, 0.84, 0.8], rough: 0.42, f0: 0.04, wrap: 0.28, glow: 0.035, rim: 0.12 };
@@ -541,6 +546,7 @@ export class Objects {
         gl.uniform3f(this.u(p, "uU"), s.u[0], s.u[1], s.u[2]);
         gl.uniform4f(this.u(p, "uUV"), s.uv[0], s.uv[1], s.uv[2], s.uv[3]);
         gl.uniform1f(this.u(p, "uFade"), s.fade);
+        gl.uniform1f(this.u(p, "uDev"), s.dev); gl.uniform1f(this.u(p, "uDevDir"), s.devDir);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       }
     }

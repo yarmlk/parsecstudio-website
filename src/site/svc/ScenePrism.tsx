@@ -811,15 +811,18 @@ export function ScenePrism({ active, mode }: { active: number; mode: "desk" | "m
         const up = norm(cam.u), rt = norm(cam.r);
         const p0 = toScreen(S), p1 = toScreen(add(S, mul(up, 0.1)));
         const perU = Math.max(1, Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / 0.1);
-        const hW = Math.min(0.36 * Hs, Hs - ruleY - 120) / perU, wW = (hW * 9) / 16;
+        const hW = Math.min(0.33 * Hs, Hs - ruleY - 120) / perU, wW = (hW * 9) / 16;
         const open = svc === 2 && !frozen ? easeEnter(clamp01((sw - 0.15) / 1.6)) : 1;
+        // which side of a screen the light comes from: the light's origin to the left of it on screen, or right
+        const devDir = toScreen(O)[0] < toScreen(S)[0] ? 1 : -1;
         for (let k = 2; k >= 0; k--) {
-          // the front one in the light right of the glass; each further one a step deeper and a step along the light,
-          // so all three show
-          const deep = (k * 0.45 * open - 1.5) * wW, side = 0.1 * wW + k * 0.72 * wW * open + px * 0.06 * wW * k;
+          // to the right of where the light lands, close together: each further one a small step deeper and a step
+          // along the light, so all three show
+          const deep = (k * 0.3 * open - 1.45) * wW, side = 0.5 * wW + k * 0.86 * wW * open + px * 0.06 * wW * k;
           const c: V3 = [S[0] + fx * deep + rx * side, 0, S[2] + fz * deep + rz * side];
-          const f = st.show[2] * clamp01(open * 2.2 - (k === 0 ? 0 : 0.35 * k)) * (1 - 0.12 * k);
-          screens.push({ c, r: mul(rt, wW / 2), u: mul(up, hW), uv: [k / 3, 1, 1 / 3, -1], fade: k === 0 ? st.show[2] : f });
+          // the light reaches the near one first and develops each in turn
+          const dev = svc === 2 && !frozen ? clamp01((sw - 0.35 - 0.28 * k) / 1.5) : 1;
+          screens.push({ c, r: mul(rt, wW / 2), u: mul(up, hW), uv: [k / 3, 1, 1 / 3, -1], fade: st.show[2] * (1 - 0.1 * k), dev: easeEnter(dev), devDir });
         }
       } else if (vertVid && !vertVid.paused) vertVid.pause();
       if (st.show[2] > 0.004 && variant("vertical") === "busts" && ob.has(M_CAESAR) && ob.has(M_SENATOR) && (stand[2]?.s ?? 1) > 0) {
