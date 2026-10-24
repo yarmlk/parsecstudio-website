@@ -322,7 +322,8 @@ vec3 mob(vec2 p, float px, float lp, float t, float I, float ign){
   // the plane slower than the page, the haze slower still, the light drifts along the rim and rises a little.
   vec2 R = vec2(0.46, 0.30);
   float th = -0.05;
-  vec2 C = vec2(0.0, -0.005 - R.y - uDrop);
+  // the horizon sits low: most of the screen is the film above it
+  vec2 C = vec2(0.0, -0.15 - R.y - uDrop);
   vec3 cool = vec3(0.80, 0.88, 1.0);
   float s = uScroll;
   vec2 pn = p + vec2(0.0, s * 0.20);
@@ -421,7 +422,7 @@ void main(){
   gLens = 0.62 * uLens.z * (1.0 - smoothstep(0.0, 0.26, lr)) * (1.0 - smoothstep(0.0, 0.26, lr));
   // the slow push-in of the camera
   float zoom = 1.0 + 0.03 * uPush;
-  vec2 F = uMob > 0.5 ? vec2(0.0, -0.005) : vec2(-0.05, -0.02);
+  vec2 F = uMob > 0.5 ? vec2(0.0, -0.15) : vec2(-0.05, -0.02);
   p = (p - F) / zoom + F;
   float px = 1.0 / (uRes.y * zoom);
   // the rim comes closer as it goes down past the lens: it thickens
@@ -536,7 +537,7 @@ const fin = (w: Tw, now: number) => w.ms <= 0 || now - w.t0 >= w.ms;
    Used to wipe the words exactly as the light passes them. */
 const GEO = {
   desk: { C: [-0.055, 0.21], a: 0.976, b: 0.249, th: -0.2546, F: [-0.05, -0.02], from: Math.PI, to: 2 * Math.PI, line: -0.4 },
-  mob: { C: [0, -0.305], a: 0.46, b: 0.30, th: -0.05, F: [0, -0.005], from: 0, to: Math.PI, line: 0 },
+  mob: { C: [0, -0.45], a: 0.46, b: 0.30, th: -0.05, F: [0, -0.15], from: 0, to: Math.PI, line: 0 },
 } as const;
 /** the disc's tilt with the camera (rad), as in the shader */
 const thAt = (mode: Mode, cx: number) => GEO[mode].th - (mode === "desk" ? PAR.tilt * cx : 0);
@@ -701,7 +702,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     let stepDown = () => {};
     const onWaiting = () => {
       window.clearTimeout(stallT);
-      if (!src || lighter(src).src === src) return;
+      // the phone's tiny cut behind the glass is not one of the film's renditions: it never steps "down" to one
+      if (!src || !reelOf(src) || lighter(src).src === src) return;
       const now = performance.now(), watching = R.phase !== "idle";
       if (watching && v.currentTime > 0.2) {
         while (stalls.length && now - stalls[0] > STALL_WIN) stalls.shift();
@@ -835,7 +837,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (glassFilm) {
         // back behind the glass, from where the film was (desk: the same source, it just plays on, muted)
         const at = v.ended ? 0 : v.currentTime;
-        setSrc(mode === "desk" && src ? src : glassSrc, at);
+        setSrc(mode === "desk" && src ? src : glassSrc, mode === "desk" ? at : 0);
         if (visible && !document.hidden) v.play().catch(() => {});
       } else {
         v.pause();

@@ -376,7 +376,8 @@ export function Site({
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
             <div className="st-hero__acts" data-rim="">
-              <WorksPill onGo={() => goTo("cases")} />
+              {/* the phone keeps one control on the first screen: Play showreel */}
+              {desk && <WorksPill onGo={() => goTo("cases")} />}
               {reelDock && <ReelButton btnRef={reelBtn} onOpen={openReel} tease={tease} />}
             </div>
           </div>

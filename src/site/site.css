@@ -569,8 +569,10 @@
 .st-site--mob .st-watch__close { top: 58px; right: 20px; width: 40px; height: 40px; }
 .st-site--mob .st-watch__bar.st-pl { left: 16px; right: 16px; bottom: auto; top: calc(50% + 28.125cqw + 12px); }
 .st-site--mob .st-hero__plate img { object-position: 50% 74%; }
-.st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 56px; width: auto; gap: 16px; }
-.st-site--mob .st-hero__h { font-size: 38px; line-height: 1.08; }
+/* phone: the film takes most of the screen, the horizon low; under it the one button, then the line, centred */
+.st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 96px; width: auto; gap: 16px; align-items: center; text-align: center; }
+.st-site--mob .st-hero__h { font-size: 31px; line-height: 1.1; }
+.st-site--mob .st-hero__acts:empty { display: none; }
 .st-site--mob .wp { height: 54px; gap: 12px; font-size: 14px; }
 .st-site--mob .wp__win { width: 72px; height: 42px; }
 .st-site--mob .wp__go { width: 32px; height: 32px; }
@@ -595,9 +597,7 @@
   box-shadow: inset 0 1px 0 rgba(157, 176, 194, .22), inset 0 0 0 1px rgba(255, 255, 255, .06);
   opacity: .32; transform: scale(.97); transform-origin: 50% 0; transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
 .st-svc__item.is-on .st-svc__reel { opacity: 1; transform: none; }
-/* the phone keeps the services to one screen: only the one in focus opens its loop, the others fold to their name */
-.st-site--mob .st-svc__reel { max-height: 0; margin-top: 0; transition: max-height 700ms var(--ease-move), margin-top 700ms var(--ease-move), opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
-.st-site--mob .st-svc__item.is-on .st-svc__reel { max-height: 260px; margin-top: 12px; }
+
 .st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .st-svc__vid { opacity: 0; transition: opacity 600ms var(--ease-enter); }
 .st-svc__vid.is-on { opacity: 1; }
