@@ -23,8 +23,9 @@ export async function POST(request) {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", Origin: SITE.slice(0, -1), Referer: SITE },
       body: JSON.stringify({
-        name, email, company: company || "—", message: message || "—",
-        _subject: `Website: ${from}`, _replyto: email, _template: "table", _captcha: "false",
+        // each line in the mail is the key as written here, so they read as a person would put them
+        Name: name, Email: email, Company: company || "—", Message: message || "—",
+        _subject: `Website: ${from}`, _replyto: email, _template: "box", _captcha: "false",
       }),
     })
       .then(async (r) => { const t = await r.text(); if (!r.ok || !t.includes('"true"')) console.error("contact: not sent", r.status, t.slice(0, 300)); })
