@@ -756,8 +756,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       return gl.getProgramParameter(p, gl.LINK_STATUS) ? p : null;
     };
     const prog = link(FRAG);
-    /** no light to ride: the film just fades in over the plate (no WebGL, or reduced motion) */
-    let fade = !gl || !prog || reduce;
+    /** no light to ride: the film just fades in over the plate (no WebGL). Reduced motion keeps the light still,
+        but the disc still goes down and up on "Play showreel" and close: the visitor asked for that move */
+    let fade = !gl || !prog;
     const plate = () => {
       // the photographic plate, fetched only when it is needed
       const img = box.querySelector<HTMLImageElement>(".hlb__fallback");

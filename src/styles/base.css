@@ -82,8 +82,9 @@ html[lang="uk"] .t-hero { font-size: calc(var(--fs-hero) * 0.9); }
 
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* reduced motion (Windows sets it whenever "animation effects" are off): the ambient motion stops; what moves on the
+   visitor's own click or hover (a case opening, a loop on hover, the showreel's disc) still does */
 @media (prefers-reduced-motion: reduce) {
   .grain::after { animation: none; }
   .spark--pulse { animation: none; }
-  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
 }

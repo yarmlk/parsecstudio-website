@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { media } from "../lib/media";
 import { AiFlux } from "../ui/AiFlux";
 import { Icon } from "../ui/Icons";
-import { useReduced } from "./ui";
 
 /* Services and cases for the parsec.studio mock (site copy, English).
    Cases are the live site's own projects (parsec.studio, __NEXT_DATA__): titles, types and tools from its texts and
@@ -140,7 +139,6 @@ export const SITE_SERVICES: Service[] = [
 export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, pos }: { src: string; /** its VP9 copy (else derived from src) */ webm?: string; /** phones: H.264 first, which every phone decodes in hardware (Safari would take the VP9 and decode it in software) */ mp4First?: boolean; on: boolean; /** load ahead, before the first hover */ warm?: boolean; className?: string; poster?: string; /** object-position, to frame the loop like its poster */ pos?: string }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [armed, setArmed] = useState(false);
-  const reduced = useReduced();
   useEffect(() => { if (on || warm) setArmed(true); }, [on, warm]);
   /* a card that has stayed in view for a moment loads its loop ahead, so the hover plays at once (only those in view:
      a row of cards loads a handful of loops, not all of them) */
@@ -159,9 +157,11 @@ export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, po
   useEffect(() => {
     const v = ref.current;
     if (!v || !armed) return;
-    if (on && !reduced) v.play().catch(() => {});
+    // plays on the visitor's own hover or tap, so also with reduced motion on (Windows turns that on with its
+    // "animation effects" off, and the loops would then never play)
+    if (on) v.play().catch(() => {});
     else v.pause();
-  }, [on, armed, reduced]);
+  }, [on, armed]);
   // VP9 first (small, plays everywhere Chromium does), H.264 for Safari and the rest
   return (
     <video
@@ -399,7 +399,8 @@ export function CaseView({
   rectOf: (i: number) => Rect | null;
   backLabel: string;
 }) {
-  const reduced = useReduced();
+  /* the case opens and closes on a click: its move plays with reduced motion on too (see LoopVideo) */
+  const reduced = false;
   const c = list[index];
   const [box, setBox] = useState<Rect | null>(reduced ? null : from);
   const [phase, setPhase] = useState<"enter" | "open" | "leave">(from && !reduced ? "enter" : "open");

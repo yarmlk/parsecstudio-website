@@ -107,6 +107,7 @@ document.getElementById("go").onclick = async (e) => {
   log(`Browser: ${navigator.userAgent}`);
   log(`Screen: ${screen.width}x${screen.height} @${devicePixelRatio}x, window ${innerWidth}x${innerHeight}, CPU threads ${navigator.hardwareConcurrency || "?"}, memory ${navigator.deviceMemory || "?"} GB`);
   log(`Connection (browser estimate): ${c.effectiveType || "?"}, ${c.downlink || "?"} Mbit/s, rtt ${c.rtt ?? "?"} ms, data saver ${c.saveData ? "ON" : "off"}`);
+  log(`Reduced motion (Windows "animation effects" off): ${matchMedia("(prefers-reduced-motion: reduce)").matches ? "ON" : "off"}`);
   log(gpu());
   log(await fps(2));
   log("\nVideo decoding:");
