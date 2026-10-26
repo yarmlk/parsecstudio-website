@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Parsec site check</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 32px 20px; background: #0b0b0d; color: #f2f0eb; font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 6px; }
+  p { color: #a8a6a1; margin: 0 0 20px; }
+  pre { white-space: pre-wrap; background: #16161a; border: 1px solid #2a2a30; border-radius: 12px; padding: 16px; font: 12.5px/1.55 ui-monospace, monospace; min-height: 200px; }
+  button { font: inherit; padding: 10px 18px; border-radius: 999px; border: 0; background: #f2f0eb; color: #0b0b0d; cursor: pointer; margin-right: 8px; }
+  button:disabled { opacity: .5; cursor: default; }
+  video { width: 240px; aspect-ratio: 16/9; background: #000; border-radius: 8px; margin: 12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Parsec site check</h1>
+  <p>Takes about 40 seconds. Keep this tab in front. Then press Copy and send the text.</p>
+  <button id="go">Run the check</button><button id="copy" disabled>Copy result</button>
+  <video id="v" muted playsinline></video>
+  <pre id="out">Press "Run the check".</pre>
+</main>
+<script>
+const out = document.getElementById("out"), V = document.getElementById("v");
+const lines = [];
+const log = (s) => { lines.push(s); out.textContent = lines.join("\n"); };
+const ms = (x) => Math.round(x) + " ms";
+const sleep = (t) => new Promise((r) => setTimeout(r, t));
+const BASE = "/video/site/";
+
+function gpu() {
+  const c = document.createElement("canvas");
+  const strict = c.getContext("webgl", { failIfMajorPerformanceCaveat: true });
+  const gl = strict || document.createElement("canvas").getContext("webgl");
+  if (!gl) return "WebGL: not available";
+  const i = gl.getExtension("WEBGL_debug_renderer_info");
+  const r = i ? gl.getParameter(i.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  return `WebGL renderer: ${r}\nGPU for the page (hardware acceleration): ${strict ? "yes" : "NO (software fallback)"}`;
+}
+
+async function decode() {
+  if (!navigator.mediaCapabilities) return "mediaCapabilities: n/a";
+  const q = async (contentType, w, h) => {
+    try {
+      const r = await navigator.mediaCapabilities.decodingInfo({ type: "file", video: { contentType, width: w, height: h, bitrate: 3000000, framerate: 30 } });
+      return `${r.supported ? "ok" : "NO"}${r.smooth ? ", smooth" : ", not smooth"}${r.powerEfficient ? ", hardware" : ", SOFTWARE"}`;
+    } catch (e) { return "error"; }
+  };
+  return [
+    `H.264 1080p: ${await q('video/mp4; codecs="avc1.640028"', 1920, 1080)}`,
+    `H.264 1080x1920: ${await q('video/mp4; codecs="avc1.640028"', 1080, 1920)}`,
+    `VP9 540p: ${await q('video/webm; codecs="vp09.00.31.08"', 960, 540)}`,
+  ].join("\n");
+}
+
+async function fetchTest(name, range) {
+  const url = BASE + name + "?diag=" + Date.now();
+  const t0 = performance.now();
+  try {
+    const r = await fetch(url, { cache: "no-store", headers: range ? { Range: "bytes=0-" + (range - 1) } : {} });
+    const tH = performance.now();
+    const b = await r.arrayBuffer();
+    const t1 = performance.now();
+    const mb = b.byteLength / 1e6, sec = (t1 - tH) / 1000;
+    return `${name}${range ? " (first " + range / 1e6 + " MB)" : ""}: ${r.status}, first byte ${ms(tH - t0)}, ${mb.toFixed(2)} MB in ${ms(t1 - t0)} = ${(mb * 8 / Math.max(0.001, (t1 - t0) / 1000)).toFixed(1)} Mbit/s, cache ${r.headers.get("x-vercel-cache") || "?"}, edge ${(r.headers.get("x-vercel-id") || "?").split("::")[0]}`;
+  } catch (e) { return `${name}: FAILED ${e.message}`; }
+}
+
+function playTest(src, secs) {
+  return new Promise((res) => {
+    const t0 = performance.now();
+    let tReady = 0, tPlay = 0, waits = 0;
+    V.src = BASE + src + "?diag=" + Date.now();
+    V.oncanplay = () => { if (!tReady) tReady = performance.now(); };
+    V.onplaying = () => { if (!tPlay) tPlay = performance.now(); };
+    V.onwaiting = () => { waits++; };
+    V.loop = true;
+    V.play().catch(() => {});
+    setTimeout(() => {
+      const q = V.getVideoPlaybackQuality ? V.getVideoPlaybackQuality() : null;
+      V.pause();
+      res(`${src}: ready ${tReady ? ms(tReady - t0) : "never"}, playing ${tPlay ? ms(tPlay - t0) : "never"}, stalls ${waits}` +
+        (q ? `, frames ${q.totalVideoFrames}, dropped ${q.droppedVideoFrames} (${q.totalVideoFrames ? Math.round(100 * q.droppedVideoFrames / q.totalVideoFrames) : 0}%)` : ""));
+    }, secs * 1000);
+  });
+}
+
+async function fps(secs) {
+  let n = 0, worst = 0, last = performance.now();
+  const end = last + secs * 1000;
+  await new Promise((res) => { const f = (t) => { n++; worst = Math.max(worst, t - last); last = t; if (t < end) requestAnimationFrame(f); else res(); }; requestAnimationFrame(f); });
+  return `Screen frames: ${Math.round(n / secs)} fps, worst frame ${ms(worst)}`;
+}
+
+document.getElementById("go").onclick = async (e) => {
+  e.target.disabled = true; lines.length = 0;
+  const c = navigator.connection || {};
+  log(`When: ${new Date().toISOString()}`);
+  log(`Browser: ${navigator.userAgent}`);
+  log(`Screen: ${screen.width}x${screen.height} @${devicePixelRatio}x, window ${innerWidth}x${innerHeight}, CPU threads ${navigator.hardwareConcurrency || "?"}, memory ${navigator.deviceMemory || "?"} GB`);
+  log(`Connection (browser estimate): ${c.effectiveType || "?"}, ${c.downlink || "?"} Mbit/s, rtt ${c.rtt ?? "?"} ms, data saver ${c.saveData ? "ON" : "off"}`);
+  log(gpu());
+  log(await fps(2));
+  log("\nVideo decoding:");
+  log(await decode());
+  log("\nDownloads from the site:");
+  for (const [n, r] of [["buldak-sm.webp"], ["buldak-loop.webm"], ["buldak-loop.mp4"], ["vd-blood-sisters-loop.mp4"], ["vd-arena.mp4", 4000000], ["showreel-1080.mp4", 4000000]]) log(await fetchTest(n, r));
+  log("\nPlayback (each for 6 s):");
+  log(await playTest("buldak-loop.webm", 6));
+  log(await playTest("buldak-loop.mp4", 6));
+  log(await playTest("vd-arena.mp4", 6));
+  log(await playTest("showreel-1080.mp4", 6));
+  log(await fps(2));
+  log("\nDone.");
+  e.target.disabled = false; document.getElementById("copy").disabled = false;
+};
+document.getElementById("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(lines.join("\n")); document.getElementById("copy").textContent = "Copied"; }
+  catch { const r = document.createRange(); r.selectNodeContents(out); getSelection().removeAllRanges(); getSelection().addRange(r); }
+};
+</script>
+</body>
+</html>

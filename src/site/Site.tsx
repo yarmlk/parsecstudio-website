@@ -424,7 +424,9 @@ export function Site({
             follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
         <section data-sec="services" className="st-sec st-svc" onPointerMove={desk ? onSvcMove : undefined}>
           {/* the phone has no stage: each service carries its own quiet loop instead (light, no WebGL) */}
-          {desk && <Suspense fallback={null}><SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} /></Suspense>}
+          {/* the prism rests while a service or a case is open over it (it is out of sight, and its frames would cost
+              the films and loops being watched) */}
+          {desk && <Suspense fallback={null}><SvcStage active={svOpen == null && !open && (sec === "services" || svcHover != null) ? svcOn : -1} mode={mode} /></Suspense>}
           <Head label="From treatment to master" title="Services" />
           <span className="st-rule" aria-hidden />
           <ol className="st-svc__list">
