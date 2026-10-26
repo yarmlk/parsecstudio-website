@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode, type Ref } from "react";
-import { REEL } from "../lib/assets";
 import { media } from "../lib/media";
 import { AiFlux } from "../ui/AiFlux";
 import { Icon } from "../ui/Icons";
@@ -82,6 +81,14 @@ export const AI_CASES: Case[] = [
   work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
+/** our vertical series, 9:16 episodes (working cuts: the finished versions replace them) */
+const tall = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur, 9 / 16), stills: [still(id, title)] });
+export const VERTICAL_CASES: Case[] = [
+  tall("vd-blood-sisters", "Blood Sisters", "Vertical drama series", "3:02"),
+  tall("vd-miami", "Miami", "Vertical crime drama", "3:01"),
+  tall("vd-arena", "Arena", "Vertical historical drama", "2:47"),
+];
+
 /** the Cases row: the strongest, best-known names first, then the rest of the AI works, then the rest of motion */
 const LEAD = ["buldak", "banxe", "google-meet", "snappy", "vodafone", "contentstack", "microsoft-elearning", "centil"];
 const ALL = [...AI_CASES, ...CRAFT_CASES];
@@ -99,8 +106,6 @@ export type Service = {
   text: string;
   /** works inside the service, each opens like a case */
   works: Case[];
-  /** 9:16 frames, for a line with no public work yet */
-  frames?: Still[];
   items: string[];
 };
 
@@ -126,15 +131,7 @@ export const SITE_SERVICES: Service[] = [
     id: "vertical", name: "Vertical Series",
     line: "Episodes made for 9:16.",
     text: "Episodes made for 9:16, from the series treatment to the masters, delivered at 1080 × 1920.",
-    works: [],
-    frames: [
-      { src: REEL.portrait, pos: "44% 40%", alt: "A woman’s face in warm light" },
-      { src: REEL.road, pos: "50% 50%", alt: "A man walking down a forest road" },
-      { src: REEL.forest, pos: "48% 50%", alt: "A woman in a sunlit forest" },
-      { src: REEL.medieval, pos: "47% 50%", alt: "A woman walking down a medieval street" },
-      { src: REEL.astronaut, pos: "76% 50%", alt: "An astronaut walking through a meadow" },
-      { src: REEL.robot, pos: "42% 50%", alt: "A small robot in a warm apartment" },
-    ],
+    works: VERTICAL_CASES,
     items: ["Series treatment", "Scripts and storyboards", "Production", "Edit, colour and sound", "Safe zones for platform UI", "1080 × 1920 masters"],
   },
 ];
@@ -208,7 +205,7 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
         </div>
 
         {s.works.length > 0 && (
-          <div className="st-sv__works" onPointerLeave={() => setHover(null)}>
+          <div className={`st-sv__works${s.works[0].film && s.works[0].film.ar < 1 ? " st-sv__works--tall" : ""}`} onPointerLeave={() => setHover(null)}>
             {s.works.map((c, k) => (
               <button
                 key={c.id}
@@ -223,7 +220,7 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
                 aria-label={`Open the work: ${c.title}, ${c.type}`}
               >
                 <span className="st-wk__img grain">
-                  <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
+                  <img src={c.film?.card ?? c.stills[0].src} alt="" width={c.film && c.film.ar < 1 ? 428 : 1100} height={c.film && c.film.ar < 1 ? 760 : 619} decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
                   {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} on={hover === k} className="st-wk__vid" />}
                   <span className="st-wk__play" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 14} /></span>
                 </span>
@@ -232,16 +229,6 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
                   <span className="st-wk__k">{c.type}{c.dur ? ` · ${c.dur}` : ""}</span>
                 </span>
               </button>
-            ))}
-          </div>
-        )}
-
-        {s.frames && (
-          <div className="st-sv__frames">
-            {s.frames.map((st, k) => (
-              <figure key={st.src} className="st-sv__frame grain" style={{ animationDelay: `${160 + k * 70}ms` }}>
-                <img src={st.src} alt={st.alt} decoding="async" style={{ objectPosition: st.pos }} />
-              </figure>
             ))}
           </div>
         )}
@@ -471,11 +458,14 @@ export function CaseView({
   // a film that nearly fills the window fills it (a few px of black at the top and bottom read as a bar)
   const fill = !!(ar && vp && mode === "desk" && Math.abs(vp.w / vp.h - ar) / ar < 0.06);
   const fit = ar && vp && !fill ? Math.min(vp.w, vp.h * ar) : 0;
+  // a 9:16 episode stands in the middle of the screen, its text and controls over its lower part (as a phone shows one)
+  const upright = !!(ar && ar < 1);
+  const under = mode === "mob" && !upright;
   const style = box
     ? { left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: mode === "desk" ? 14 : 12 }
     : fit && vp
       // phone: the film a little above the middle of the screen, its controls and the text under it
-      ? { left: (vp.w - fit) / 2, top: mode === "mob" ? Math.max(112, (vp.h - fit / ar!) / 2 - 70) : (vp.h - fit / ar!) / 2, width: fit, height: fit / ar!, borderRadius: 0 }
+      ? { left: (vp.w - fit) / 2, top: under ? Math.max(112, (vp.h - fit / ar!) / 2 - 70) : (vp.h - fit / ar!) / 2, width: fit, height: fit / ar!, borderRadius: 0 }
       : { left: 0, top: 0, width: "100%", height: "100%", borderRadius: 0 };
   const meta: [string, string][] = [];
   if (c.client) meta.push(["Client", c.client]);
@@ -487,11 +477,11 @@ export function CaseView({
 
   return (
     <div
-      className={`st-cv st-cv--${phase}${ready ? " is-ready" : ""}${rest ? " is-idle" : ""}${c.film ? " st-cv--film" : ""}`}
+      className={`st-cv st-cv--${phase}${ready ? " is-ready" : ""}${rest ? " is-idle" : ""}${c.film ? " st-cv--film" : ""}${upright ? " st-cv--tall" : ""}`}
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
       onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
       // the phone: where the film ends, so its controls and the text follow right under it
-      style={mode === "mob" && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.max(112, (vp.h - fit / ar!) / 2 - 70) + fit / ar!)}px` }) : undefined}
+      style={under && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.max(112, (vp.h - fit / ar!) / 2 - 70) + fit / ar!)}px` }) : undefined}
     >
       <div className="st-cv__veil" aria-hidden />
       <div className="st-cv__box" style={style}>

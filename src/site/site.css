@@ -522,9 +522,11 @@
 .st-wk__t { font-family: var(--font-display); font-size: 19px; line-height: 1.15; color: rgba(242, 240, 235, .72); transition: color var(--t-button) var(--ease-enter); }
 .st-wk:hover .st-wk__t, .st-wk:focus-visible .st-wk__t { color: var(--paper); }
 .st-wk__k { font-size: 13px; line-height: 1.4; color: var(--mute); }
-.st-sv__frames { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
-.st-sv__frame { position: relative; margin: 0; aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden; background: var(--graphite); animation: st-slit 800ms var(--ease-enter) both; }
-.st-sv__frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* vertical series: 9:16 cards, four to a row */
+.st-sv__works--tall { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.st-sv__works--tall .st-wk__img { aspect-ratio: 9 / 16; }
+/* a 9:16 episode stands in the middle; its text keeps to the black on its left */
+.st-cv--tall .st-cv__panel { width: 380px; }
 .st-sv__inside { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; }
 .st-sv__items { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
 .st-sv__items--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -666,9 +668,9 @@
 .st-site--mob .st-sv__text { margin: 0; font-size: 15px; }
 .st-site--mob .st-sv__works { grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .st-site--mob .st-wk__play { opacity: 1; transform: none; }
-.st-site--mob .st-sv__frames { display: flex; gap: 10px; margin: 0 -20px; padding: 0 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; scrollbar-width: none; }
-.st-site--mob .st-sv__frames::-webkit-scrollbar { display: none; }
-.st-site--mob .st-sv__frame { flex: none; width: 190px; border-radius: 14px; scroll-snap-align: start; }
+.st-site--mob .st-sv__works--tall { display: flex; gap: 12px; margin: 0 -20px; padding: 0 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; scrollbar-width: none; }
+.st-site--mob .st-sv__works--tall::-webkit-scrollbar { display: none; }
+.st-site--mob .st-sv__works--tall .st-wk { flex: none; width: 214px; scroll-snap-align: start; }
 .st-site--mob .st-sv__inside { margin-top: 32px; }
 .st-site--mob .st-sv__items { grid-template-columns: minmax(0, 1fr); }
 .st-site--mob .st-sv__items li { padding: 14px 0 15px; }
@@ -685,6 +687,10 @@
 .st-site--mob .st-cv--film .st-cv__top { order: 0; }
 .st-site--mob .st-cv--film .st-cv__ui > .st-pl { order: 1; margin-top: calc(var(--fb, 340px) - 104px + 10px); }
 .st-site--mob .st-cv--film .st-cv__bottom { order: 2; margin-top: 28px; }
+/* a 9:16 episode: as a phone shows one, the text and controls over its lower part */
+.st-site--mob .st-cv--tall .st-cv__ui { justify-content: space-between; }
+.st-site--mob .st-cv--tall .st-cv__bottom { order: 1; margin-top: auto; }
+.st-site--mob .st-cv--tall .st-cv__ui > .st-pl { order: 2; margin-top: 12px; }
 .st-site--mob .st-cv__panel { width: auto; gap: 10px; }
 .st-site--mob .st-cv__title { font-size: 32px; }
 .st-site--mob .st-cv__line { font-size: 14px; }
