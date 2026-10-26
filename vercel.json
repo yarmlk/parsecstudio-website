@@ -40,5 +40,12 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/services/:id",
+      "destination": "/",
+      "permanent": true
+    }
   ]
 }

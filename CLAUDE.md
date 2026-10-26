@@ -1,6 +1,7 @@
 # parsecstudio-website — how we work
 
-The Parsec Studio site (Vite + React + TypeScript). Production is `main`, deployed by Vercel to demo.parsec.studio.
+The Parsec Studio site (Vite + React + TypeScript). Production is `main`, deployed by Vercel to www.parsec.studio (the apex redirects to www; parsecstudio-website.vercel.app
+stays as the project's own address).
 
 ## Review before deploy (Vlad's rule)
 
@@ -10,7 +11,7 @@ The Parsec Studio site (Vite + React + TypeScript). Production is `main`, deploy
   (not production).
 - After a change: commit with a clear message, push to `review`, tell Vlad in a few lines what to look at locally, and
   ask whether to deploy.
-- On "yes": fast-forward `main` to `review`, push, check demo.parsec.studio serves the new build.
+- On "yes": fast-forward `main` to `review`, push, check www.parsec.studio serves the new build.
 - Small commits, one idea each, so any of them can be reverted alone.
 
 ## Parallel agents
