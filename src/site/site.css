@@ -249,6 +249,7 @@
 
 /* the opened case */
 .st-cv { position: absolute; inset: 0; z-index: 60; }
+.st-cv:focus, .st-sv:focus { outline: none; }
 /* the black behind an opened case: it comes up while the card grows into the film, and goes with it */
 .st-cv__veil { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 640ms var(--ease-enter); }
 .st-cv--open .st-cv__veil { opacity: 1; }

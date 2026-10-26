@@ -207,7 +207,7 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
   useEffect(() => { back.current?.focus({ preventScroll: true }); }, []);
   const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !openId) { e.stopPropagation(); onClose(); } };
   return (
-    <div className={`st-sv${s.ai ? " st-sv--ai" : ""}`} role="dialog" aria-modal="true" aria-label={`Service: ${s.name}`} onKeyDown={onKey} data-own-keys="">
+    <div className={`st-sv${s.ai ? " st-sv--ai" : ""}`} role="dialog" aria-modal="true" aria-label={`Service: ${s.name}`} onKeyDown={onKey} data-own-keys="" tabIndex={-1}>
       <div className="st-sv__scroll">
         <div className="st-sv__head">
           <div className="st-sv__t">
@@ -501,6 +501,8 @@ export function CaseView({
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
       onKeyDown={onKey} onKeyUp={(e) => { if (e.key === " " && c.film && !typing(e.target)) e.preventDefault(); }}
       onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
+      // a click on the film keeps the focus here (else it falls to the page and the keys stop reaching the player)
+      tabIndex={-1}
       // the phone: where the film ends, so its controls and the text follow right under it
       style={under && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.max(112, (vp.h - fit / ar!) / 2 - 70) + fit / ar!)}px` }) : undefined}
     >
