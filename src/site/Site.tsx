@@ -5,7 +5,7 @@ import { CONTACT } from "../lib/facts";
 import { AiFlux } from "../ui/AiFlux";
 import { CutProgress } from "../ui/Cut";
 import { Icon } from "../ui/Icons";
-import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, type Case, type Rect } from "./cases";
+import { CASES, CaseView, LoopVideo, PlayerBar, SITE_SERVICES, ServiceView, typing, type Case, type Rect } from "./cases";
 import { LogoGrid } from "./clients";
 import { ReviewColumns } from "./reviews";
 import { CutLine, useCutTrack, useReduced } from "./ui";
@@ -206,14 +206,17 @@ export function Site({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); closeReel(); return; }
       if (reelPh !== "open") return;
-      const t = e.target as HTMLElement | null;
-      if (e.key === " " && !(t instanceof HTMLButtonElement)) { e.preventDefault(); reelPl.toggle(); }
+      // space plays and pauses, wherever the focus is (on open it sits on the close button, which the space would press)
+      if (e.key === " " && !typing(e.target)) { e.preventDefault(); reelPl.toggle(); }
       else if (e.key === "m" || e.key === "M") reelPl.mute();
       else if (e.key === "f" || e.key === "F") fullscreen(reelRef.current);
       wake();
     };
+    // a button activates on the space's keyup: held back too, so the space never closes the film
+    const onUp = (e: KeyboardEvent) => { if (e.key === " " && reelPh === "open" && !typing(e.target)) e.preventDefault(); };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onUp);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onUp); };
   }, [reelPh, reelPl, closeReel, wake]);
   const [open, setOpen] = useState<{ list: Case[]; i: number; from: Rect | null; src: "row" | "sv" } | null>(
     startCase != null ? { list: CASES, i: startCase, from: null, src: "row" } : null,

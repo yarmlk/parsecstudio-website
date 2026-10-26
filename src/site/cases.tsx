@@ -262,6 +262,11 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
 }
 
 export type Rect = { x: number; y: number; w: number; h: number };
+
+/** the key goes into a text field */
+export const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+/** a click on a control (a button, a link, the timeline), which keeps its own meaning */
+export const onControl = (t: EventTarget | null) => t instanceof Element && !!t.closest("button, a, input, textarea, select, [role=slider], .st-pl");
 const DUR = 720;
 
 /** A frame that crossfades to its next source (light first: the new frame opens over the old one). */
@@ -462,7 +467,8 @@ export function CaseView({
     if (e.key === "Escape") { e.stopPropagation(); close(); }
     if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
     if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
-    if (e.key === " " && c.film && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); pl.toggle(); }
+    // space plays and pauses, wherever the focus is (also on the back or next button: the space would press them)
+    if (e.key === " " && c.film && !typing(e.target)) { e.preventDefault(); pl.toggle(); }
     if (e.key === "m" && c.film) pl.mute();
   };
 
@@ -493,7 +499,8 @@ export function CaseView({
     <div
       className={`st-cv st-cv--${phase}${ready ? " is-ready" : ""}${rest ? " is-idle" : ""}${c.film ? " st-cv--film" : ""}${upright ? " st-cv--tall" : ""}`}
       role="dialog" aria-modal="true" aria-label={`Case: ${c.title}`}
-      onKeyDown={onKey} onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
+      onKeyDown={onKey} onKeyUp={(e) => { if (e.key === " " && c.film && !typing(e.target)) e.preventDefault(); }}
+      onPointerMove={wake} onPointerDown={wake} data-own-keys="" ref={root}
       // the phone: where the film ends, so its controls and the text follow right under it
       style={under && fit && vp ? ({ ["--fb" as string]: `${Math.round(Math.max(112, (vp.h - fit / ar!) / 2 - 70) + fit / ar!)}px` }) : undefined}
     >
@@ -519,7 +526,8 @@ export function CaseView({
       </div>
       <div className="st-cv__shade" aria-hidden />
 
-      <div className="st-cv__ui">
+      {/* a click anywhere on the film (not on a control) plays and pauses it, as people expect */}
+      <div className="st-cv__ui" onClick={(e) => { if (c.film && phase === "open" && !onControl(e.target)) pl.toggle(); }}>
         <div className="st-cv__top">
           <BackArrow label={backLabel} onClick={close} btnRef={back} className="st-cv__back" />
         </div>
