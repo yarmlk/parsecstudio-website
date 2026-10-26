@@ -178,7 +178,7 @@
    reserved line under each name), so the light to the prism leaves the middle name level */
 .st-svc__list { flex: 1; align-self: flex-start; list-style: none; margin: 0; padding: 0 0 24px; display: flex; flex-direction: column; justify-content: center; }
 .st-svc__li { position: relative; }
-.st-svc__item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; padding: 21px 0; text-align: left; }
+.st-svc__item { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; padding: 34px 0; text-align: left; }
 /* the stage: one live scene behind the list (svc/SvcStage.tsx); the subject lives on the right, the type on the left */
 .st-stage { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .st-stage__scene { position: absolute; inset: 0; opacity: 0; filter: blur(14px); transition: opacity 700ms var(--ease-enter), filter 700ms var(--ease-enter); }
