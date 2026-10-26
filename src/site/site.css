@@ -469,8 +469,6 @@
 .st-cf__send:hover { box-shadow: 0 12px 40px -12px rgba(246, 200, 140, .55); }
 .st-cf__send:hover svg, .st-cf__send:focus-visible svg { transform: translateX(3px); }
 .st-cf__hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.st-cf__send[disabled] { opacity: .7; cursor: progress; }
-.st-cf__fail { color: var(--paper); }
 .st-cf__alt { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ash); }
 .st-cf__alt a, .st-cf__line a { color: var(--paper); transition: color var(--t-button) var(--ease-enter); }
 .st-cf__alt a:hover, .st-cf__line a:hover { color: var(--ember-text); }
