@@ -566,6 +566,8 @@
 
 /* ── Mobile site (390) ────────────────────────────────────── */
 .st-site--mob .st-nav { left: 14px; right: 14px; top: 52px; height: 52px; padding: 0 6px 0 18px; }
+/* the phone: a big title can pass right under the bar; a denser glass keeps the bar readable over it */
+.st-site--mob .st-nav.is-solid { background: rgba(20, 20, 24, .66); }
 .st-site--mob .st-nav__brand img { height: 15px; }
 .st-site--mob .st-hero { height: 844px; container-type: inline-size; }
 /* phone: the whole film in the middle, the bar right under it */
