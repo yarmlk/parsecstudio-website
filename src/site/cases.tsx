@@ -142,6 +142,19 @@ export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, po
   const [armed, setArmed] = useState(false);
   const reduced = useReduced();
   useEffect(() => { if (on || warm) setArmed(true); }, [on, warm]);
+  /* a card that has stayed in view for a moment loads its loop ahead, so the hover plays at once (only those in view:
+     a row of cards loads a handful of loops, not all of them) */
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || armed || typeof IntersectionObserver === "undefined") return;
+    let t = 0;
+    const io = new IntersectionObserver(([e]) => {
+      window.clearTimeout(t);
+      if (e.isIntersecting) t = window.setTimeout(() => setArmed(true), 350);
+    }, { threshold: 0.5 });
+    io.observe(v);
+    return () => { io.disconnect(); window.clearTimeout(t); };
+  }, [armed]);
   useEffect(() => { if (armed) ref.current?.load(); }, [armed]);
   useEffect(() => {
     const v = ref.current;
