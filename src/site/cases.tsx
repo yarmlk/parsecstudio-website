@@ -73,7 +73,6 @@ export const AI_CASES: Case[] = [
   work("openclaw", "OpenClaw", "AI agent teaser spot", "0:39"),
   work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
   work("kraken", "Kraken", "Trading platform product video", "1:14"),
-  work("tavrix", "Tavrix", "Cinematic whisky cask brand spot", "0:30"),
   work("prism-air", "Prism", "Airline content platform demo", "2:42"),
   work("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
   work("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
@@ -214,7 +213,6 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
             <BackArrow label="Services" onClick={onClose} ai={s.ai} btnRef={back} />
             <h2 className="st-sv__title">{s.name}</h2>
           </div>
-          <p className="st-sv__text">{s.text}</p>
         </div>
 
         {s.works.length > 0 && (
@@ -245,16 +243,6 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
           </div>
         )}
 
-        <div className="st-sv__inside">
-          <span className="st-lbl">What’s inside</span>
-          <ul className={`st-sv__items st-sv__items--${s.items.length > 6 ? 4 : 3}`}>
-            {s.items.map((it, k) => (
-              <li key={it} style={{ animationDelay: `${380 + k * 40}ms` }}>
-                <span className="st-sv__it">{it}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </div>
     </div>
   );

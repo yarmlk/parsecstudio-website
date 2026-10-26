@@ -199,6 +199,8 @@
 .st-svc__line { display: block; font-size: 15px; line-height: 1.5; color: var(--fog); opacity: 0; transform: translateY(6px); transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
 .st-svc__item.is-on .st-svc__line { opacity: 1; transform: none; transition-delay: 120ms; }
 .st-svc__tail { white-space: nowrap; }
+.st-svc__line--go { line-height: 0; }
+.st-svc__line--go .st-svc__go { margin-left: -4px; }
 /* the way in, at the end of the line: a small frost button (no lines; the stage's beam is the one light here) */
 .st-svc__go { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 12px; border-radius: 50%; vertical-align: middle; color: rgba(242, 240, 235, .7);
   background: rgba(242, 240, 235, .06); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .35), inset 0 0 0 1px rgba(255, 255, 255, .06);
@@ -466,7 +468,10 @@
 .st-cf__hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .st-cf__alt { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ash); }
 .st-cf__alt a, .st-cf__line a { color: var(--paper); transition: color var(--t-button) var(--ease-enter); }
-.st-cf__alt a:hover, .st-cf__line a:hover { color: var(--ember-text); }
+/* the address beside Send: the brightest thing after the button, in the warm light, with a quiet underline */
+.st-cf__alt a { color: var(--ember-text); font-weight: 500; text-decoration: underline; text-decoration-color: rgba(246, 200, 140, .45); text-underline-offset: 4px; }
+.st-cf__alt a:hover { color: var(--paper); text-decoration-color: rgba(242, 240, 235, .6); }
+.st-cf__line a:hover { color: var(--ember-text); }
 
 /* sent: the plate lights up; the thank-you in the middle, the honest note at the foot */
 .st-cf__sent { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; }
@@ -498,7 +503,6 @@
 .st-sv__t .st-back { margin: -8px 0 26px; }
 .st-sv__title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 72px; line-height: 1; letter-spacing: .004em; color: var(--paper); white-space: nowrap; }
 .st-sv__t .st-lbl { margin-top: 22px; }
-.st-sv__text { margin: 0 0 4px; max-width: 430px; font-size: 16px; line-height: 1.55; color: var(--fog); }
 /* works inside a service: each opens like a case; hover plays its loop */
 .st-sv__works { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 16px; }
 .st-wk { display: flex; flex-direction: column; gap: 12px; min-width: 0; text-align: left; animation: st-rise 600ms var(--ease-enter) both; }
@@ -519,12 +523,7 @@
 .st-sv__works--tall .st-wk__img { aspect-ratio: 9 / 16; }
 /* a 9:16 episode stands in the middle; its text keeps to the black on its left */
 .st-cv--tall .st-cv__panel { width: 380px; }
-.st-sv__inside { margin-top: 40px; display: flex; flex-direction: column; gap: 16px; }
-.st-sv__items { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
-.st-sv__items--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.st-sv__items li { display: flex; align-items: baseline; gap: 14px; padding: 16px 0 18px; border-top: 1px solid rgba(242, 240, 235, .13); animation: st-rise 600ms var(--ease-enter) both; }
 .st-sv__n { flex: none; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--frost); }
-.st-sv__it { font-size: 16px; line-height: 1.4; font-weight: 400; color: var(--paper); }
 
 /* showreel: it lives behind the disc (hero/HeroLightB). While the rim goes down the words are wiped by the light
    (masks set from the shader's geometry); once it has gone the film plays in the hero with our bar. */
@@ -658,15 +657,10 @@
 .st-site--mob .st-sv__t .st-back__arrow { width: 96px; }
 .st-site--mob .st-sv__title { font-size: 42px; line-height: 1.04; white-space: normal; }
 .st-site--mob .st-sv__t .st-lbl { margin-top: 16px; }
-.st-site--mob .st-sv__text { margin: 0; font-size: 15px; }
 .st-site--mob .st-sv__works { grid-template-columns: minmax(0, 1fr); gap: 22px; }
 .st-site--mob .st-sv__works--tall { display: flex; gap: 12px; margin: 0 -20px; padding: 0 20px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 20px; scrollbar-width: none; }
 .st-site--mob .st-sv__works--tall::-webkit-scrollbar { display: none; }
 .st-site--mob .st-sv__works--tall .st-wk { flex: none; width: 214px; scroll-snap-align: start; }
-.st-site--mob .st-sv__inside { margin-top: 32px; }
-.st-site--mob .st-sv__items { grid-template-columns: minmax(0, 1fr); }
-.st-site--mob .st-sv__items li { padding: 14px 0 15px; }
-.st-site--mob .st-sv__it { font-size: 15px; }
 .st-site--mob .st-cv__ui { padding: 52px 14px 18px; }
 .st-site--mob .st-cv__top { height: 52px; }
 .st-site--mob .st-cv__back .st-back__arrow { width: 64px; }
