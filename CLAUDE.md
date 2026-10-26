@@ -27,6 +27,15 @@ The Parsec Studio site (Vite + React + TypeScript). Production is `main`, deploy
 - `node scripts/shoot.mjs --port <p> --out <dir> --media <dir-with-webm-copies>` screenshots desk (1440) or `--mobile`
   (390), can hover, open the showreel and shoot a sequence. The sandbox Chromium has no H.264: pass VP9 `.webm` copies.
 
+## Media (Bunny CDN)
+
+- Films, loops and posters live in `public/video/site` (the source) and are served from Bunny
+  (`parsec-video.b-cdn.net`, `.env.production`); the build does not ship them. Dev (`npm run dev` / `live`) serves the
+  local copies.
+- A new or replaced file: put it in `public/video/site`, then
+  `BUNNY_STORAGE_KEY=<storage zone password> node scripts/media-push.mjs` before deploying. Files go up as
+  `name.<v>.ext`, so a replacement is a new URL and no cache keeps the old one. Never commit the key.
+
 ## Look
 
 Parsec v2 FINAL look: satin black, one warm 3500 K source, frosted-glass UI, clean type with no effects on text.
