@@ -1,26 +1,32 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-import { createHash } from "node:crypto";
-import { closeSync, openSync, readSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, rmSync, statSync } from "node:fs";
+import { hostedName, mediaHash } from "./scripts/media-hash.mjs";
 import { join } from "node:path";
 
-/* Media versions: each file in public/video/site gets a short fingerprint of its size and first bytes, which the site
-   appends to its URL (?v=…). A film replaced under the same name gets a new URL, so no browser or CDN keeps showing
-   the old one; an unchanged film keeps its URL and stays cached. */
+/* Media versions (scripts/media-hash.mjs): in dev each file of public/video/site is asked for with ?v=<v>; built for a
+   media host (VITE_MEDIA_BASE) it is asked for by its hosted name, name.<v>.ext, so a replaced film is a new file there
+   and no CDN cache can serve the old one under the new URL. */
 function mediaVersions(base: string): Plugin {
   const id = "virtual:media-v", rid = "\0" + id;
   const dir = join(__dirname, "public/video/site");
   const table = () => {
     const out: Record<string, string> = {};
-    for (const f of readdirSync(dir)) {
-      const p = join(dir, f), size = statSync(p).size, buf = Buffer.alloc(Math.min(65536, size)), fd = openSync(p, "r");
-      readSync(fd, buf, 0, buf.length, 0); closeSync(fd);
-      out[f] = createHash("sha1").update(String(size)).update(buf).digest("hex").slice(0, 8);
-    }
+    for (const f of readdirSync(dir)) if (statSync(join(dir, f)).isFile() && !f.startsWith(".")) out[f] = mediaHash(join(dir, f));
     return out;
   };
+  const url = (f: string, v: string) => (base ? `${base}video/site/${hostedName(f, v)}` : `video/site/${f}?v=${v}`);
+  let outDir = "";
   return {
     name: "media-versions",
+    configResolved: (c) => { outDir = c.build.outDir.startsWith("/") ? c.build.outDir : join(c.root, c.build.outDir); },
+    // media.json: each file's URL as built (the /diag.html check reads it)
+    generateBundle() {
+      const t = table();
+      this.emitFile({ type: "asset", fileName: "media.json", source: JSON.stringify(Object.fromEntries(Object.entries(t).map(([f, v]) => [f, url(f, v)]))) });
+    },
+    // built for a media host, the films are not shipped with the site (public/ is copied into the build by default)
+    closeBundle() { if (base && outDir) rmSync(join(outDir, "video"), { recursive: true, force: true }); },
     resolveId: (s) => (s === id ? rid : null),
     load: (s) => (s === rid ? `export default ${JSON.stringify(table())};` : null),
     // the page's own preloads of media get the same URL the code asks for: on the media host, versioned; a preload
@@ -28,7 +34,7 @@ function mediaVersions(base: string): Plugin {
     transformIndexHtml: (html) => {
       const t = table();
       return html
-        .replace(/"(video\/site\/)([\w.-]+)"/g, (m, d, f) => (t[f] ? `"${base}${d}${f}?v=${t[f]}"` : m))
+        .replace(/"video\/site\/([\w.-]+)"/g, (m, f) => (t[f] ? `"${url(f, t[f])}"` : m))
         .replace(/<link rel="preload"([^>]*href="https?:[^"]*")([^>]*)>/g, (m, a, b) => (m.includes("crossorigin") ? m : `<link rel="preload"${a}${b} crossorigin="anonymous">`));
     },
   };

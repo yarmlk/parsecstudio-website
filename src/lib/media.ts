@@ -4,8 +4,10 @@ import versions from "virtual:media-v";
  *  serving the same paths with CORS open, since the stage draws loops into WebGL) */
 export const MEDIA = (import.meta.env.VITE_MEDIA_BASE as string | undefined) ?? "";
 
-/** a file of public/video/site, with its version in the URL (see vite.config.ts) */
+/** a file of public/video/site at its current version (scripts/media-hash.mjs): on the media host under its hosted
+ *  name, name.<v>.ext (a replaced film is a new file there, so no CDN cache serves the old one); in dev with ?v=<v> */
 export const media = (file: string) => {
   const v = (versions as Record<string, string>)[file];
-  return `${MEDIA}video/site/${file}${v ? `?v=${v}` : ""}`;
+  if (!v) return `${MEDIA}video/site/${file}`;
+  return MEDIA ? `${MEDIA}video/site/${file.replace(/(\.[^.]+)$/, `.${v}$1`)}` : `video/site/${file}?v=${v}`;
 };

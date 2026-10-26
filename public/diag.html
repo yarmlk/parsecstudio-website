@@ -31,7 +31,9 @@ const lines = [];
 const log = (s) => { lines.push(s); out.textContent = lines.join("\n"); };
 const ms = (x) => Math.round(x) + " ms";
 const sleep = (t) => new Promise((r) => setTimeout(r, t));
-const BASE = "/video/site/";
+// each file's URL as the site asks for it (media.json, written by the build); else the site's own copies
+let URLS = {};
+const at = (name) => URLS[name] || "/video/site/" + name;
 
 function gpu() {
   const c = document.createElement("canvas");
@@ -59,7 +61,7 @@ async function decode() {
 }
 
 async function fetchTest(name, range) {
-  const url = BASE + name + "?diag=" + Date.now();
+  const url = at(name);
   const t0 = performance.now();
   try {
     const r = await fetch(url, { cache: "no-store", headers: range ? { Range: "bytes=0-" + (range - 1) } : {} });
@@ -67,7 +69,7 @@ async function fetchTest(name, range) {
     const b = await r.arrayBuffer();
     const t1 = performance.now();
     const mb = b.byteLength / 1e6, sec = (t1 - tH) / 1000;
-    return `${name}${range ? " (first " + range / 1e6 + " MB)" : ""}: ${r.status}, first byte ${ms(tH - t0)}, ${mb.toFixed(2)} MB in ${ms(t1 - t0)} = ${(mb * 8 / Math.max(0.001, (t1 - t0) / 1000)).toFixed(1)} Mbit/s, cache ${r.headers.get("x-vercel-cache") || "?"}, edge ${(r.headers.get("x-vercel-id") || "?").split("::")[0]}`;
+    return `${name}${range ? " (first " + range / 1e6 + " MB)" : ""}: ${r.status}, first byte ${ms(tH - t0)}, ${mb.toFixed(2)} MB in ${ms(t1 - t0)} = ${(mb * 8 / Math.max(0.001, (t1 - t0) / 1000)).toFixed(1)} Mbit/s, from ${new URL(url, location.href).host}`;
   } catch (e) { return `${name}: FAILED ${e.message}`; }
 }
 
@@ -75,7 +77,7 @@ function playTest(src, secs) {
   return new Promise((res) => {
     const t0 = performance.now();
     let tReady = 0, tPlay = 0, waits = 0;
-    V.src = BASE + src + "?diag=" + Date.now();
+    V.src = at(src);
     V.oncanplay = () => { if (!tReady) tReady = performance.now(); };
     V.onplaying = () => { if (!tPlay) tPlay = performance.now(); };
     V.onwaiting = () => { waits++; };
@@ -99,6 +101,7 @@ async function fps(secs) {
 
 document.getElementById("go").onclick = async (e) => {
   e.target.disabled = true; lines.length = 0;
+  try { URLS = await (await fetch("media.json", { cache: "no-store" })).json(); } catch { URLS = {}; }
   const c = navigator.connection || {};
   log(`When: ${new Date().toISOString()}`);
   log(`Browser: ${navigator.userAgent}`);
