@@ -13,8 +13,9 @@ export const REEL = {
 
 /** White client logos, 475×175 PNG, same optical box (public/img/clients). */
 export const CLIENT_LOGOS: { id: string; name: string; file: string }[] = [
-  ["google", "Google"], ["tefal", "Tefal"], ["fifa", "FIFA"], ["nasa", "NASA"], ["microsoft", "Microsoft"], ["kinder", "Kinder"],
-  ["karcher", "Kärcher"], ["rowenta", "Rowenta"], ["henkel", "Henkel"], ["subaru", "Subaru"], ["unilever", "Unilever"], ["porsche", "Porsche"],
+  ["google", "Google"], ["microsoft", "Microsoft"], ["jnj", "Johnson & Johnson"], ["vodafone", "Vodafone"],
+  ["tefal", "Tefal"], ["karcher", "Kärcher"], ["buldak", "Buldak"], ["kinder", "Kinder"],
+  ["fifa", "FIFA"], ["henkel", "Henkel"], ["unilever", "Unilever"], ["nasa", "NASA"],
 ].map(([id, name]) => ({ id, name, file: `img/clients/${id}.png` }));
 
 /** 4K light plates (public/img/open). */
