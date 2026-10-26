@@ -26,6 +26,8 @@ The Parsec Studio site (Vite + React + TypeScript). Production is `main`, deploy
 - `npm run build` must pass (typecheck + build).
 - `node scripts/shoot.mjs --port <p> --out <dir> --media <dir-with-webm-copies>` screenshots desk (1440) or `--mobile`
   (390), can hover, open the showreel and shoot a sequence. The sandbox Chromium has no H.264: pass VP9 `.webm` copies.
+- The sandbox renders WebGL in software, so the site serves it the lite build (src/lib/gpu.ts); open `/?lite=0` to see
+  the light and the prism.
 
 ## Look
 
