@@ -84,8 +84,8 @@ export const AI_CASES: Case[] = [
 /** our vertical series, 9:16 episodes (working cuts: the finished versions replace them) */
 const tall = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur, 9 / 16), stills: [still(id, title)] });
 export const VERTICAL_CASES: Case[] = [
-  tall("vd-blood-sisters", "Blood Sisters", "Vertical drama series", "3:02"),
-  tall("vd-miami", "Miami", "Vertical crime drama", "3:01"),
+  tall("vd-blood-sisters", "Blood Sisters", "Vertical drama series", "3:01"),
+  tall("vd-miami", "Miami", "Vertical crime drama", "2:54"),
   tall("vd-arena", "Arena", "Vertical historical drama", "2:47"),
 ];
 
