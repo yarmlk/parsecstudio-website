@@ -2,12 +2,30 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent, memo } from "
 import { CONTACT } from "../lib/facts";
 import { Icon } from "../ui/Icons";
 
-/* 06 contact: the form, one frosted plate over the Horizon light. Still a mock: nothing is sent. The thank-you says
-   so quietly and offers the same note by email, so a real visitor never loses it. */
+/* 06 contact: the form, one frosted plate over the Horizon light. A note is sent to our inbox (info@) through
+   FormSubmit; if that fails, the visitor is offered the same note ready in their own mail app, so it is never lost. */
 
 type Key = "name" | "email";
 type Errors = Partial<Record<Key, string>>;
-type Sent = { first: string; mailto: string; h: number };
+type Sent = { first: string; h: number };
+
+/** the form service that mails each note to our inbox (the first note sent asks info@ once to confirm the form) */
+const FORM_URL = `https://formsubmit.co/ajax/${CONTACT.email}`;
+
+async function deliver(f: FormData) {
+  const v = (k: string) => String(f.get(k) ?? "").trim();
+  const r = await fetch(FORM_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      name: v("name"), email: v("email"), company: v("company") || "—", message: v("msg") || "—",
+      _subject: `Website: ${v("company") ? `${v("name")}, ${v("company")}` : v("name")}`,
+      _replyto: v("email"), _template: "table", _captcha: "false",
+    }),
+  });
+  const j = await r.json().catch(() => null) as { success?: string | boolean } | null;
+  if (!r.ok || !j || String(j.success) !== "true") throw new Error("not sent");
+}
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -55,8 +73,11 @@ function ContactFormBase() {
   const [errors, setErrors] = useState<Errors>({});
   const [sent, setSent] = useState<Sent | null>(null);
   const [again, setAgain] = useState(false);
+  const [busy, setBusy] = useState(false);
+  /** the note could not be sent: the same note, ready in the visitor's mail app */
+  const [fail, setFail] = useState<string | null>(null);
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
@@ -64,10 +85,21 @@ function ContactFormBase() {
     setErrors(bad);
     const first = (Object.keys(bad) as Key[])[0];
     if (first) { form.querySelector<HTMLElement>(`[name="${first}"]`)?.focus(); return; }
+    if (busy) return;
     const name = String(f.get("name")).trim();
     /* desk: the plate keeps its size; the phone lets it close up around the thank-you */
     const keep = plate.current && !plate.current.closest(".st-site--mob") ? plate.current.offsetHeight : 0;
-    setSent({ first: name.split(/\s+/)[0], mailto: mailto(f), h: keep });
+    /* a bot fills the hidden field: it is thanked and nothing is sent */
+    if (String(f.get("website") ?? "")) { setSent({ first: name.split(/\s+/)[0], h: keep }); return; }
+    setBusy(true); setFail(null);
+    try {
+      await deliver(f);
+      setSent({ first: name.split(/\s+/)[0], h: keep });
+    } catch {
+      setFail(mailto(f));
+    } finally {
+      setBusy(false);
+    }
   };
   const clear = (k: Key) => () => setErrors((x) => (x[k] ? { ...x, [k]: undefined } : x));
 
@@ -96,9 +128,8 @@ function ContactFormBase() {
             <p className="st-cf__line">We’ll reply from <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>.</p>
           </div>
           <div className="st-cf__note">
-            <span className="st-cf__mock">Preview: this form doesn’t send yet</span>
+            <span className="st-cf__mock">Message sent</span>
             <div className="st-cf__links">
-              <a className="st-cf__link" href={sent.mailto}>Send it by email<Icon name="arrow-up-right" size={14} /></a>
               <button type="button" className="st-cf__link" onClick={() => { setAgain(true); setErrors({}); setSent(null); }}>New message</button>
             </div>
           </div>
@@ -111,9 +142,13 @@ function ContactFormBase() {
             <Field name="company" label="Company" auto="organization" optional />
             <Field name="msg" label="Message" area />
           </div>
+          {/* left empty by people (hidden); a bot fills it */}
+          <input className="st-cf__hp" type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden />
           <div className="st-cf__acts">
-            <button type="submit" className="st-pill st-pill--paper st-pill--lg st-cf__send">Send message<Icon name="arrow-right" size={16} /></button>
-            <p className="st-cf__alt">or write to <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></p>
+            <button type="submit" className="st-pill st-pill--paper st-pill--lg st-cf__send" disabled={busy} aria-busy={busy || undefined}>{busy ? "Sending…" : "Send message"}<Icon name="arrow-right" size={16} /></button>
+            {fail
+              ? <p className="st-cf__alt st-cf__fail" role="alert">It didn’t go through. <a href={fail}>Send it by email</a></p>
+              : <p className="st-cf__alt">or write to <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></p>}
           </div>
         </form>
       )}
