@@ -604,7 +604,12 @@
   opacity: .32; transform: scale(.97); transform-origin: 50% 0; transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
 .st-svc__item.is-on .st-svc__reel { opacity: 1; transform: none; }
 
-.st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* a desk with no graphics hardware: one frame on the right holds the active service's loop */
+.st-svc > .st-svc__aside { position: absolute; z-index: 0; right: 72px; top: calc(50% + 52px); width: 720px; aspect-ratio: 16 / 9; transform: translateY(-50%); border-radius: 18px; overflow: hidden; background: var(--graphite);
+  box-shadow: inset 0 1px 0 rgba(157, 176, 194, .22), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 40px 120px -40px rgba(246, 200, 140, .18); }
+.st-svc__shot { position: absolute; inset: 0; opacity: 0; transition: opacity var(--t-light) var(--ease-enter); }
+.st-svc__shot.is-on { opacity: 1; }
+.st-svc__shot img, .st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .st-svc__vid { opacity: 0; transition: opacity 600ms var(--ease-enter); }
 .st-svc__vid.is-on { opacity: 1; }
 .st-site--mob .st-svc__list { flex: none; padding-top: 14px; }
