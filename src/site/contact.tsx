@@ -15,9 +15,9 @@ const FORM_URL = "https://formsubmit.co/ajax/8adc7b1a3c7fbd37d9b484be18eec5fe";
 
 async function deliver(f: FormData) {
   const v = (k: string) => String(f.get(k) ?? "").trim();
-  // the service can be slow to answer: after 20 s the visitor is offered their mail app instead of a button that hangs
+  // the service can be slow to answer: after 60 s the visitor is offered their mail app instead of a button that hangs
   const stop = new AbortController();
-  const t = window.setTimeout(() => stop.abort(), 20000);
+  const t = window.setTimeout(() => stop.abort(), 60000);
   const r = await fetch(FORM_URL, {
     method: "POST", signal: stop.signal,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
