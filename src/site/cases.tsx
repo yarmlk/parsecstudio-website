@@ -235,7 +235,6 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
                 <span className="st-wk__img grain">
                   <img src={c.film?.card ?? c.stills[0].src} alt="" width={c.film && c.film.ar < 1 ? 428 : 1100} height={c.film && c.film.ar < 1 ? 760 : 619} decoding="async" loading="lazy" style={{ objectPosition: c.stills[0].pos }} />
                   {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} on={hover === k} className="st-wk__vid" />}
-                  <span className="st-wk__play" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 14} /></span>
                 </span>
                 <span className="st-wk__cap">
                   <span className="st-wk__t">{c.title}</span>
