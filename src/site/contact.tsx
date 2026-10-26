@@ -2,21 +2,26 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent, memo } from "
 import { CONTACT } from "../lib/facts";
 import { Icon } from "../ui/Icons";
 
-/* 06 contact: the form, one frosted plate over the Horizon light. Send thanks the visitor at once; the note goes to our
-   own endpoint (api/contact), which sends it on to our inbox (info@) in the background. */
+/* 06 contact: the form, one frosted plate over the Horizon light. Send thanks the visitor at once; the note goes on to
+   our inbox (info@, behind FormSubmit's key for it, so the address is not in the code for bots) in the background. */
 
 type Key = "name" | "email";
 type Errors = Partial<Record<Key, string>>;
 type Sent = { first: string; h: number };
 
-/** hand the note to our server; keepalive lets it go out even if the page is closed straight after */
+const FORM_URL = "https://formsubmit.co/ajax/8adc7b1a3c7fbd37d9b484be18eec5fe";
+
+/** send the note without waiting on the form service (it can take half a minute to answer). A plain form-encoded POST
+ *  needs no preflight, so keepalive carries it through even if the page is closed straight after. */
 function deliver(f: FormData) {
   const v = (k: string) => String(f.get(k) ?? "").trim();
-  fetch("/api/contact", {
-    method: "POST", keepalive: true,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: v("name"), email: v("email"), company: v("company"), message: v("msg"), website: v("website") }),
-  }).catch(() => {});
+  const from = v("company") ? `${v("name")}, ${v("company")}` : v("name");
+  // each line of the mail is the key as written here
+  const body = new URLSearchParams({
+    Name: v("name"), Email: v("email"), Company: v("company") || "—", Message: v("msg") || "—",
+    _subject: `Website: ${from}`, _replyto: v("email"), _template: "box", _captcha: "false",
+  });
+  fetch(FORM_URL, { method: "POST", body, keepalive: true, headers: { Accept: "application/json" } }).catch(() => {});
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -69,7 +74,8 @@ function ContactFormBase() {
     const name = String(f.get("name")).trim();
     /* desk: the plate keeps its size; the phone lets it close up around the thank-you */
     const keep = plate.current && !plate.current.closest(".st-site--mob") ? plate.current.offsetHeight : 0;
-    deliver(f);
+    /* a bot fills the hidden field: it is thanked and nothing is sent */
+    if (!String(f.get("website") ?? "")) deliver(f);
     setSent({ first: name.split(/\s+/)[0], h: keep });
   };
   const clear = (k: Key) => () => setErrors((x) => (x[k] ? { ...x, [k]: undefined } : x));
