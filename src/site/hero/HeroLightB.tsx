@@ -1111,6 +1111,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       posterTex = (url = REEL_SRC.poster) => {
         const img = new Image();
         img.decoding = "async";
+        // drawn into WebGL: from the media host it has to come with CORS
+        img.crossOrigin = "anonymous";
         img.onload = () => {
           // the film's first frame only stands in until the film itself is there
           if (R.phase !== "idle" || (url === REEL_SRC.first && filmTex)) return;
@@ -1330,7 +1332,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
   return (
     <div ref={boxRef} className="st-hero__plate hlb grain" data-mode={mode}>
       <img className="hlb__fallback" alt="" />
-      <video ref={reelRef} className="hlb__reel" muted playsInline preload="auto" aria-hidden tabIndex={-1} disablePictureInPicture />
+      <video ref={reelRef} className="hlb__reel" crossOrigin="anonymous" muted playsInline preload="auto" aria-hidden tabIndex={-1} disablePictureInPicture />
     </div>
   );
 });
