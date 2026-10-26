@@ -37,12 +37,8 @@ const work = (id: string, title: string, type: string, dur: string): Case => ({ 
 
 /** our motion design, 3D and CGI: Centil, then the showcase "SaaS & Tech Explainers" in its order */
 export const CRAFT_CASES: Case[] = [
-  {
-    id: "centil", title: "Centil", type: "3D Animation & CGI", client: "Centil", year: "2023", dur: "1:55",
-    tools: "Unreal Engine 5 · 3ds Max · Cinema 4D · After Effects",
-    line: "Satellites, a ground station and an operations room, modelled in 3ds Max and staged in Unreal Engine 5.",
-    poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")],
-  },
+  // like the other works: the type, the name, the length (its film is wider than 16:9)
+  { ...work("centil", "Centil", "3D Animation & CGI", "1:55"), poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")] },
   work("banxe", "Banxe", "Crypto & banking platform promo", "0:34"),
   work("google-meet", "Google Meet", "2D product explainer", "0:15"),
   work("vodafone", "Vodafone", "Field service software promo", "1:57"),
