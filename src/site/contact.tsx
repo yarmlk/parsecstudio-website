@@ -9,13 +9,17 @@ type Key = "name" | "email";
 type Errors = Partial<Record<Key, string>>;
 type Sent = { first: string; h: number };
 
-/** the form service that mails each note to our inbox (the first note sent asks info@ once to confirm the form) */
-const FORM_URL = `https://formsubmit.co/ajax/${CONTACT.email}`;
+/** the form service that mails each note to our inbox (info@, behind FormSubmit's key for it, so the address is not in
+ *  the code for bots to collect) */
+const FORM_URL = "https://formsubmit.co/ajax/8adc7b1a3c7fbd37d9b484be18eec5fe";
 
 async function deliver(f: FormData) {
   const v = (k: string) => String(f.get(k) ?? "").trim();
+  // the service can be slow to answer: after 20 s the visitor is offered their mail app instead of a button that hangs
+  const stop = new AbortController();
+  const t = window.setTimeout(() => stop.abort(), 20000);
   const r = await fetch(FORM_URL, {
-    method: "POST",
+    method: "POST", signal: stop.signal,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
       name: v("name"), email: v("email"), company: v("company") || "—", message: v("msg") || "—",
@@ -24,6 +28,7 @@ async function deliver(f: FormData) {
     }),
   });
   const j = await r.json().catch(() => null) as { success?: string | boolean } | null;
+  window.clearTimeout(t);
   if (!r.ok || !j || String(j.success) !== "true") throw new Error("not sent");
 }
 
