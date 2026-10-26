@@ -47,14 +47,14 @@ const topIn = (el: HTMLElement, root: HTMLElement) => {
 
 /** Client order of the live site (3 rows of 4). Logo width at deck scale (from the studio deck's client slide:
  *  equal visual area, heavy marks a little smaller); the site scales it with --k. */
-const LOGO_ORDER = ["google", "microsoft", "subaru", "tefal", "porsche", "karcher", "rowenta", "kinder", "fifa", "henkel", "unilever", "nasa"];
+const LOGO_ORDER = ["google", "microsoft", "jnj", "vodafone", "tefal", "karcher", "buldak", "kinder", "fifa", "henkel", "unilever", "nasa"];
 const LOGO_W: Record<string, number> = {
   google: 193, tefal: 226, fifa: 178, nasa: 200, microsoft: 242, kinder: 197,
-  karcher: 208, rowenta: 262, henkel: 242, subaru: 253, unilever: 243, porsche: 310,
+  karcher: 208, henkel: 242, unilever: 243, jnj: 320, vodafone: 236, buldak: 186,
 };
 const LOGOS = LOGO_ORDER.map((id) => CLIENT_LOGOS.find((c) => c.id === id)).filter((c): c is (typeof CLIENT_LOGOS)[number] => !!c);
 /** the hero rail: six marks, one line */
-const HERO_LOGOS = ["google", "microsoft", "fifa", "nasa", "tefal", "henkel"].map((id) => LOGOS.find((l) => l.id === id)!).filter(Boolean);
+const HERO_LOGOS = ["google", "microsoft", "jnj", "vodafone", "fifa", "nasa"].map((id) => LOGOS.find((l) => l.id === id)!).filter(Boolean);
 
 /* ── Navigation ───────────────────────────────────────────── */
 function Nav({ mode, active, onGo, onMenu, solid, away }: { mode: SiteMode; active: number; onGo: (id: SecId) => void; onMenu: () => void; solid: boolean; away?: boolean }) {
@@ -121,13 +121,13 @@ function MobileMenu({ active, onGo, onClose }: { active: number; onGo: (id: SecI
 
 /* ── Section head, as on the live site: a short rule over a big title, the quiet giant word behind,
    the section number with its short line on the right ── */
-function Head({ label, title, children }: { label: string; title: string; children?: ReactNode }) {
+function Head({ label, title, children }: { label?: string; title: string; children?: ReactNode }) {
   return (
     <div className="st-head">
       <div className="st-head__t">
         <span className="st-head__rule" aria-hidden />
         <h2 className="st-h2">{title}</h2>
-        <span className="st-lbl">{label}</span>
+        {label && <span className="st-lbl">{label}</span>}
       </div>
       {children && <div className="st-head__r">{children}</div>}
     </div>
@@ -389,7 +389,7 @@ export function Site({
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
-            {!desk && <p className="st-hero__sub" data-rim="">Full-cycle video production.<br />500+ projects for 100+ brands.</p>}
+            {!desk && <p className="st-hero__sub" data-rim="">Full-cycle video production.<br />13+ years, 500+ projects for 100+ brands.</p>}
             <div className="st-hero__acts" data-rim="">
               {/* the phone keeps one control on the first screen: Play showreel */}
               {desk && <WorksPill onGo={() => goTo("cases")} />}
@@ -399,7 +399,7 @@ export function Site({
           {desk && <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />}
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
-              <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
+              <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 13+ years, 500+ projects for 100+ brands</span>
               <ul className="st-hero__logos" aria-label="Clients">
                 {HERO_LOGOS.map((l) => <li key={l.id}><img src={l.file} alt={l.name} width={320} height={118} style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>)}
               </ul>
@@ -430,7 +430,7 @@ export function Site({
           {/* the prism rests while a service or a case is open over it (it is out of sight, and its frames would cost
               the films and loops being watched) */}
           {desk && <Suspense fallback={null}><SvcStage active={svOpen == null && !open && (sec === "services" || svcHover != null) ? svcOn : -1} mode={mode} /></Suspense>}
-          <Head label="From treatment to master" title="Services" />
+          <Head title="Services" />
           <span className="st-rule" aria-hidden />
           <ol className="st-svc__list">
             {SITE_SERVICES.map((s, i) => (
@@ -443,13 +443,9 @@ export function Site({
                   aria-label={`${s.name}. ${s.line} Open the service`}
                 >
                   <span className="st-svc__name">{s.name}</span>
-                  <span className="st-svc__line">
-                    {s.line.slice(0, s.line.lastIndexOf(" ") + 1)}
-                    {/* the last word keeps the arrow with it if the line ever wraps */}
-                    <span className="st-svc__tail">
-                      {s.line.slice(s.line.lastIndexOf(" ") + 1)}
-                      <span className="st-svc__go" aria-hidden><Icon name="arrow-up-right" size={13} /></span>
-                    </span>
+                  {/* the name alone (no line under it); the open arrow comes up under the active one */}
+                  <span className="st-svc__line st-svc__line--go">
+                    <span className="st-svc__go" aria-hidden><Icon name="arrow-up-right" size={13} /></span>
                   </span>
                   {!desk && (
                     <span className="st-svc__reel grain" aria-hidden>
