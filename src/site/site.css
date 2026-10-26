@@ -195,17 +195,6 @@
 .st-svc__name { display: block; font-family: var(--font-display); font-weight: 400; font-size: 46px; line-height: 1; letter-spacing: .004em; white-space: nowrap; color: rgba(242, 240, 235, .15); transition: color var(--t-light) var(--ease-enter); }
 .st-svc__item.is-seen .st-svc__name { color: rgba(242, 240, 235, .38); }
 .st-svc__item.is-on .st-svc__name { color: var(--paper); }
-/* the line under the active name; its space is kept on every row, so nothing moves when the light changes rows */
-.st-svc__line { display: block; font-size: 15px; line-height: 1.5; color: var(--fog); opacity: 0; transform: translateY(6px); transition: opacity var(--t-light) var(--ease-enter), transform var(--t-light) var(--ease-enter); }
-.st-svc__item.is-on .st-svc__line { opacity: 1; transform: none; transition-delay: 120ms; }
-.st-svc__tail { white-space: nowrap; }
-.st-svc__line--go { line-height: 0; }
-.st-svc__line--go .st-svc__go { margin-left: -4px; }
-/* the way in, at the end of the line: a small frost button (no lines; the stage's beam is the one light here) */
-.st-svc__go { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 12px; border-radius: 50%; vertical-align: middle; color: rgba(242, 240, 235, .7);
-  background: rgba(242, 240, 235, .06); box-shadow: inset 0 1px 0 rgba(157, 176, 194, .35), inset 0 0 0 1px rgba(255, 255, 255, .06);
-  transition: background-color var(--t-button) var(--ease-enter), color var(--t-button) var(--ease-enter), transform var(--t-panel) var(--ease-move); }
-.st-svc__item:hover .st-svc__go, .st-svc__item:focus-visible .st-svc__go { color: var(--paper); background: rgba(242, 240, 235, .14); transform: translate(2px, -2px); }
 
 /* 03 cases: tall columns between thin lines (the live site); a card opens into the case */
 .st-cases { display: flex; flex-direction: column; padding-bottom: 0; }
@@ -602,8 +591,6 @@
 .st-site--mob .st-svc__list { flex: none; padding-top: 14px; }
 .st-site--mob .st-svc__item { gap: 7px; padding: 14px 0 18px; }
 .st-site--mob .st-svc__name { font-size: 30px; white-space: normal; }
-.st-site--mob .st-svc__line { font-size: 13.5px; }
-.st-site--mob .st-svc__go { width: 24px; height: 24px; margin-left: 8px; }
 .st-site--mob .st-cases { padding-bottom: 0; }
 .st-site--mob .st-row { flex: none; margin: 0 -20px; padding-left: 20px; scroll-padding-left: 20px; }
 .st-site--mob .st-row::after { flex-basis: 20px; }

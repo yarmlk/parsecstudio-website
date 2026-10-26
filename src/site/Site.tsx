@@ -443,10 +443,7 @@ export function Site({
                   aria-label={`${s.name}. ${s.line} Open the service`}
                 >
                   <span className="st-svc__name">{s.name}</span>
-                  {/* the name alone (no line under it); the open arrow comes up under the active one */}
-                  <span className="st-svc__line st-svc__line--go">
-                    <span className="st-svc__go" aria-hidden><Icon name="arrow-up-right" size={13} /></span>
-                  </span>
+                  {/* the name alone: it is the link */}
                   {!desk && (
                     <span className="st-svc__reel grain" aria-hidden>
                       <img src={media(`${SVC_REEL[i]}.webp`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
