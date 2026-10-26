@@ -17,7 +17,6 @@ import { media } from "../lib/media";
 /** the phone's service loops: our Motion reel, our AI films, three of our vertical series side by side */
 const SVC_REEL = ["motion-reel-sm", "ai-reel", "vertical-drama-sm"];
 import { HeroLightB } from "./hero/HeroLightB";
-import { LITE } from "../lib/gpu";
 import { HeroMob, ReelMob } from "./hero/HeroMob";
 import { REEL_SRC, fullscreen, useReelPlayer, type HeroCtl, type ReelPhase } from "./hero/reel";
 import { ReelButton, ReelCursor, useTease } from "./hero/ReelCta";
@@ -143,8 +142,6 @@ export function Site({
   mode, jump, onSection, startCase,
 }: { mode: SiteMode; jump?: { id: SecId; n: number }; onSection?: (id: SecId) => void; startCase?: number }) {
   const desk = mode === "desk";
-  /** the desk with graphics hardware: the light and the prism; a desk without it (see lib/gpu) runs the phone's plain loops */
-  const rich = desk && !LITE;
   const reduced = useReduced();
   const root = useRef<HTMLDivElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -173,7 +170,7 @@ export function Site({
   const [noLight, setReelDock] = useState(false);
   /* the phone: a plain, still button under the line (nothing to hover there, and a button riding the light moves as
      you scroll); the desk: on the pointer over the glass, or docked here when there is no light */
-  const reelDock = noLight || !rich;
+  const reelDock = noLight || !desk;
   const dockReel = useCallback(() => setReelDock(true), []);
   const openReel = useCallback(() => heroCtl.current?.open(), []);
   const [mobReel, setMobReel] = useState(false);
@@ -385,7 +382,7 @@ export function Site({
         {/* 01 hero */}
         <section ref={heroRef} data-sec="hero" className={`st-hero${reelPh !== "idle" ? " is-reeling" : ""}${reelPh === "open" ? " is-watching" : ""}`}>
           {/* the phone: a plain looping cut behind a still horizon, the film in a player of its own (HeroMob) */}
-          {rich ? <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} /> : <HeroMob />}
+          {desk ? <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} /> : <HeroMob />}
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
             <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
@@ -393,10 +390,10 @@ export function Site({
             <div className="st-hero__acts" data-rim="">
               {/* the phone keeps one control on the first screen: Play showreel */}
               {desk && <WorksPill onGo={() => goTo("cases")} />}
-              {reelDock && <ReelButton btnRef={reelBtn} onOpen={rich ? openReel : openMobReel} tease={tease} />}
+              {reelDock && <ReelButton btnRef={reelBtn} onOpen={desk ? openReel : openMobReel} tease={tease} />}
             </div>
           </div>
-          {rich && <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />}
+          {desk && <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />}
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
               <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 500+ projects for 100+ brands</span>
@@ -427,18 +424,7 @@ export function Site({
             follows the active line; on the AI line its shaft is the AI spectrum, as on the way back. */}
         <section data-sec="services" className="st-sec st-svc" onPointerMove={desk ? onSvcMove : undefined}>
           {/* the phone has no stage: each service carries its own quiet loop instead (light, no WebGL) */}
-          {rich && <Suspense fallback={null}><SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} /></Suspense>}
-          {/* a desk with no graphics hardware: the active service's loop in one frame on the right, in place of the stage */}
-          {desk && !rich && (
-            <div className="st-svc__aside grain" aria-hidden>
-              {SITE_SERVICES.map((s, i) => (
-                <span key={s.id} className={`st-svc__shot${i === svcOn ? " is-on" : ""}`}>
-                  <img src={media(`${SVC_REEL[i]}.webp`)} alt="" width={640} height={360} loading="lazy" decoding="async" />
-                  <LoopVideo src={media(`${SVC_REEL[i]}-loop.mp4`)} webm={media(`${SVC_REEL[i]}-loop.webm`)} mp4First on={sec === "services" && i === svcOn} warm={svcNear} className="st-svc__vid" />
-                </span>
-              ))}
-            </div>
-          )}
+          {desk && <Suspense fallback={null}><SvcStage active={sec === "services" || svcHover != null ? svcOn : -1} mode={mode} /></Suspense>}
           <Head label="From treatment to master" title="Services" />
           <span className="st-rule" aria-hidden />
           <ol className="st-svc__list">
@@ -499,7 +485,7 @@ export function Site({
               >
                 <span className="st-card__img grain">
                   <img src={c.film?.card ?? c.stills[0].src} alt="" width={1100} height={619} decoding="async" loading="lazy" style={{ objectPosition: c.poster }} />
-                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} mp4First={!rich} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
+                  {c.film && <LoopVideo src={c.film.loop} webm={c.film.loopWebm} mp4First={!desk} on={rowHover === i} className="st-card__vid" pos={c.poster} />}
                   <span className="st-card__plus" aria-hidden><Icon name={c.film ? "play" : "plus"} size={c.film ? 12 : 15} /></span>
                 </span>
                 <span className="st-card__cap">
