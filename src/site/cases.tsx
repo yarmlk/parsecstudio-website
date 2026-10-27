@@ -204,9 +204,12 @@ export function ServiceView({ index, mode, onClose, onWork, openId }: {
   return (
     <div className={`st-sv${s.ai ? " st-sv--ai" : ""}`} role="dialog" aria-modal="true" aria-label={`Service: ${s.name}`} onKeyDown={onKey} data-own-keys="" tabIndex={-1}>
       <div className="st-sv__scroll">
+        {/* the way back stays at the top while the works scroll under it */}
+        <div className="st-sv__bar">
+          <BackArrow label="Services" onClick={onClose} ai={s.ai} btnRef={back} />
+        </div>
         <div className="st-sv__head">
           <div className="st-sv__t">
-            <BackArrow label="Services" onClick={onClose} ai={s.ai} btnRef={back} />
             <h2 className="st-sv__title">{s.name}</h2>
           </div>
         </div>
