@@ -170,10 +170,6 @@
 .st-svc { display: flex; flex-direction: column; padding-bottom: 0; }
 /* the head here is a quiet caption: the stage is the section */
 .st-site--desk .st-svc { padding-top: 104px; }
-.st-site--desk .st-svc .st-head { margin-bottom: 26px; }
-.st-site--desk .st-svc .st-head__rule { width: 120px; margin-bottom: 18px; }
-.st-site--desk .st-svc .st-h2 { font-size: 52px; line-height: 1; }
-.st-site--desk .st-svc .st-head__t .st-lbl { margin-top: 14px; }
 /* the block sits in the band under the rule, the middle name on the band's centre line (the padding offsets the
    reserved line under each name), so the light to the prism leaves the middle name level */
 .st-svc__list { flex: 1; align-self: flex-start; list-style: none; margin: 0; padding: 0 0 24px; display: flex; flex-direction: column; justify-content: center; }
@@ -485,11 +481,13 @@
 
 /* a service, opened inside the site: head, real frames, what's inside (under the nav, over the page) */
 .st-sv { position: absolute; inset: 0; z-index: 15; background: var(--void); animation: st-fade 360ms var(--ease-enter) both; }
-.st-sv__scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; padding: 116px 72px 72px; }
+.st-sv__scroll { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; padding: 0 72px 72px; }
+/* the back control, held at the top as the works scroll under it (the page's black fades them out beneath it) */
+.st-sv__bar { position: sticky; top: 0; z-index: 4; margin: 0 -72px; padding: 108px 72px 26px; background: linear-gradient(180deg, var(--void) calc(100% - 18px), rgba(11, 11, 13, 0)); animation: st-rise 700ms var(--ease-enter) 60ms both; }
+.st-sv__bar .st-back { margin: 0; }
 .st-sv__scroll::-webkit-scrollbar { display: none; }
 .st-sv__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 48px; margin-bottom: 44px; animation: st-rise 700ms var(--ease-enter) 60ms both; }
 .st-sv__t { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
-.st-sv__t .st-back { margin: -8px 0 26px; }
 .st-sv__title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 72px; line-height: 1; letter-spacing: .004em; color: var(--paper); white-space: nowrap; }
 .st-sv__t .st-lbl { margin-top: 22px; }
 /* works inside a service: each opens like a case; hover plays its loop */
@@ -638,10 +636,10 @@
 .st-site--mob .st-foot__mail { font-size: 14px; }
 .st-site--mob .st-foot__c { flex-basis: 100%; }
 .st-site--mob .st-foot__c { justify-self: auto; }
-.st-site--mob .st-sv__scroll { padding: 128px 20px 56px; }
+.st-site--mob .st-sv__scroll { padding: 0 20px 56px; }
+.st-site--mob .st-sv__bar { margin: 0 -20px; padding: 128px 20px 26px; }
 .st-site--mob .st-sv__head { flex-direction: column; align-items: flex-start; gap: 22px; margin-bottom: 26px; }
-.st-site--mob .st-sv__t .st-back { margin: 0 0 22px; }
-.st-site--mob .st-sv__t .st-back__arrow { width: 96px; }
+.st-site--mob .st-sv__bar .st-back__arrow { width: 96px; }
 .st-site--mob .st-sv__title { font-size: 42px; line-height: 1.04; white-space: normal; }
 .st-site--mob .st-sv__t .st-lbl { margin-top: 16px; }
 .st-site--mob .st-sv__works { grid-template-columns: minmax(0, 1fr); gap: 22px; }
