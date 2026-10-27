@@ -148,7 +148,19 @@ export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, po
     io.observe(v);
     return () => { io.disconnect(); window.clearTimeout(t); };
   }, [armed]);
-  useEffect(() => { if (armed) ref.current?.load(); }, [armed]);
+  /* arming inserts the <source>s, and that alone starts the load (an empty video picks its source as soon as one is
+     added), so load() again would abort it and fetch the file a second time. load() only when the sources of an
+     armed video change (the phone/desk order, or another film): a video that has picked a source ignores new ones. */
+  const srcKey = `${mp4First ? 1 : 0}|${src}|${webm ?? ""}`;
+  const loaded = useRef<string | null>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || !armed) return;
+    const first = loaded.current === null;
+    if (loaded.current === srcKey) return;
+    loaded.current = srcKey;
+    if (!first || v.networkState === HTMLMediaElement.NETWORK_EMPTY) v.load();
+  }, [armed, srcKey]);
   useEffect(() => {
     const v = ref.current;
     if (!v || !armed) return;
@@ -156,7 +168,7 @@ export function LoopVideo({ src, webm, mp4First, on, warm, className, poster, po
     // "animation effects" off, and the loops would then never play)
     if (on) v.play().catch(() => {});
     else v.pause();
-  }, [on, armed]);
+  }, [on, armed, srcKey]);
   // VP9 first (small, plays everywhere Chromium does), H.264 for Safari and the rest
   return (
     <video
