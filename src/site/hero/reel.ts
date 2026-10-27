@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
 import { media } from "../../lib/media";
 
 /**
- * The showreel lives behind the disc of the hero. On the desk the glass shows the film itself, muted and looping
- * (sharp behind the glass), and "Showreel" restarts the same element at 0 with sound: no source switch, no wait. The
- * phone loops the light 540p behind the glass; "Showreel" unmutes it, or switches to a sharper rendition when the
- * screen needs one and the connection can carry it. HeroLightB owns the element and the transition; this file holds
+ * The showreel lives behind the disc of the hero. On the desk the glass shows the film itself, muted and looping, in
+ * its light 540p (through smoked glass it needs no more), and "Showreel" restarts the same element at 0 with sound in
+ * the rendition the screen calls for (pickReel); the flare holds until that one plays. The phone loops a light cut
+ * behind the glass; "Showreel" switches to the film, sharper when the screen needs it and the connection can carry it. HeroLightB owns the element and the transition; this file holds
  * what the site around it needs: the sources, the phases and the player state.
  */
 /** the film in three renditions, all with sound (H.264 + AAC, the index up front, a keyframe at least every 2 s) */

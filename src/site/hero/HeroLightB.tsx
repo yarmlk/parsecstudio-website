@@ -16,10 +16,11 @@ import "./hero-b.css";
  * soft-box, the rim's light), and all of these stay with the glass while the film moves under them. The film comes
  * through clearly across the disc, clearer near the lit rim, clearest under the hot spot (our light shows our work),
  * and the rim's light enters the glass edge and glows inside it like edge-lit acrylic. On the desk the glass shows the
- * film itself (muted), so "Showreel" only restarts it with sound; the phone runs a light cut. "Showreel": the rim
- * flares, then comes down past the lens like a curtain of light; behind it the glass clears, the words dissolve as
- * the light passes them, the sound comes in with it. Then the <video> itself takes over (cheap to play) and the
- * canvas rests. Closing runs it back.
+ * film itself, muted, in its light 540p (through smoked glass it needs no more), and "Showreel" restarts it with sound
+ * in the rendition the screen calls for; the phone runs a light cut. "Showreel": the rim flares (and holds until the
+ * film to watch plays), then comes down past the lens like a curtain of light; behind it the glass clears, the words
+ * dissolve as the light passes them, the sound comes in with it. Then the <video> itself takes over (cheap to play)
+ * and the canvas rests. Closing runs it back, and the glass goes back to the 540p from the same moment.
  *
  * Motion is a camera and the light, nothing else:
  * - the hot spot follows the pointer x along the rim with the cover's inertia (lerp 0.035 / frame at 60 fps);
@@ -772,9 +773,9 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     if (fade && section) section.dataset.fade = "1"; else if (section) delete section.dataset.fade;
     /** the muted film runs behind the glass (otherwise the poster sits there) */
     const glassFilm = !fade && !saveData;
-    /** what plays behind the glass: desk, the film itself (sharp, and "Showreel" only restarts it with sound) in
-        the rendition the screen and the connection call for; the phone, the light cut (with its sound) */
-    const glassSrc = mode === "desk" ? filmPick() : REEL_SRC.glass;
+    /** what plays behind the glass: desk, the film itself in its light 540p (seen muted through smoked glass, it
+        needs no more; "Showreel" switches to the rendition the screen calls for); the phone, the light cut */
+    const glassSrc = mode === "desk" ? REELS[0].src : REEL_SRC.glass;
 
     /* ── the words: wiped along the light as it passes ── */
     const rims = () => Array.from(section?.querySelectorAll<HTMLElement>("[data-rim]") ?? []);
@@ -803,6 +804,8 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     let draw: (now: number) => void = () => {};
     let uploadFilm: (force?: boolean) => void = () => {};
     let posterTex: (url?: string) => void = () => {};
+    /** the film's first frame on the glass (when it is loaded), for a source switch at the start of the film */
+    let showFirst = () => {};
     let stopGl = () => {};
 
     const kick = () => {
@@ -838,9 +841,10 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       if (volOk) { try { v.volume = 1; } catch { /* fixed */ } }
       v.loop = true;
       if (glassFilm) {
-        // back behind the glass, from where the film was (desk: the same source, it just plays on, muted)
+        // back behind the glass. Desk: the film plays on, muted, from where it was, in its light 540p again (a switch
+        // holds the last frame on the glass until the 540p has the same moment); phone: its cut, from the start
         const at = v.ended ? 0 : v.currentTime;
-        setSrc(mode === "desk" && src ? src : glassSrc, mode === "desk" ? at : 0);
+        setSrc(glassSrc, mode === "desk" ? at : 0);
         if (visible && !document.hidden) v.play().catch(() => {});
       } else {
         v.pause();
@@ -865,9 +869,11 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
       // inside the click: the film may start with sound
       v.loop = false;
       if (!back) {
-        // desk: the film behind the glass is the one to watch; phone: the cut itself, unless the screen wants a
-        // sharper one and the connection has shown it can carry it
-        filmSrc = mode === "desk" && src ? src : filmPick();
+        // the film to watch, from its start, in the rendition the screen and the connection call for: the desk
+        // leaves its light 540p, the phone its cut. Until the new source has its first frames the glass shows the
+        // film's first frame (the <video>'s poster too), and the flare holds until it plays (WAIT_MS at most)
+        filmSrc = filmPick();
+        if (filmSrc !== src) showFirst();
         setSrc(filmSrc);
         if (v.currentTime > 0) { try { v.currentTime = 0; } catch { /* fine */ } }
         R.down = false;
@@ -1117,6 +1123,7 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
         // drawn into WebGL: from the media host it has to come with CORS
         img.crossOrigin = "anonymous";
         img.onload = () => {
+          if (url === REEL_SRC.first) firstImg = img;
           // the film's first frame only stands in until the film itself is there
           if (R.phase !== "idle" || (url === REEL_SRC.first && filmTex)) return;
           try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img); got(img.naturalWidth, img.naturalHeight); } catch { return; }
@@ -1124,6 +1131,12 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
           if (!running) draw(performance.now());
         };
         img.src = url;
+      };
+      let firstImg: HTMLImageElement | null = null;
+      showFirst = () => {
+        if (!firstImg) return;
+        try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, firstImg); got(firstImg.naturalWidth, firstImg.naturalHeight); } catch { return; }
+        halo();
       };
 
       /* backing store from the on-screen rect: the site sits inside a scaled frame, and a frame re-fit changes only
