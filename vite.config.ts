@@ -32,9 +32,14 @@ function mediaVersions(base: string): Plugin {
     // the page's own preloads of media get the same URL the code asks for: on the media host, versioned. Each preload
     // states its own CORS mode in index.html (crossorigin only where the code fetches with CORS, as the light does for
     // what it draws into WebGL): a preload whose mode differs from the request's is fetched twice
+    // and the media host's connections open with the page: one for the images (no CORS), one for what is fetched with
+    // CORS (the hero's film and what the light draws), as the browser keeps the two apart
     transformIndexHtml: (html) => {
       const t = table();
-      return html.replace(/"video\/site\/([\w.-]+)"/g, (m, f) => (t[f] ? `"${url(f, t[f])}"` : m));
+      const out = html.replace(/"video\/site\/([\w.-]+)"/g, (m, f) => (t[f] ? `"${url(f, t[f])}"` : m));
+      if (!base) return out;
+      const origin = new URL(base).origin;
+      return out.replace(/(<meta name="viewport"[^>]*>\n)/, `$1<link rel="preconnect" href="${origin}">\n<link rel="preconnect" href="${origin}" crossorigin>\n`);
     },
   };
 }
