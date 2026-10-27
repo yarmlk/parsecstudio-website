@@ -498,7 +498,7 @@ export function Site({
             pulse of light through each tile it enters (clients.tsx) */}
         <section data-sec="clients" className="st-sec st-clients">
           <div className="st-clients__plate grain" aria-hidden><img src={OPEN.reflection} alt="" width={2560} height={1452} loading="lazy" /></div>
-          <Head label="100+ happy customers" title="Clients" />
+          <Head label="100+ brands" title="Clients" />
           <LogoGrid logos={LOGOS} widths={LOGO_W} />
         </section>
 

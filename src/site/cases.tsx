@@ -38,8 +38,8 @@ const work = (id: string, title: string, type: string, dur: string): Case => ({ 
 /** our motion design, 3D and CGI: Centil, then the showcase "SaaS & Tech Explainers" in its order */
 export const CRAFT_CASES: Case[] = [
   // like the other works: the type, the name, the length (its film is wider than 16:9)
-  { ...work("centil", "Centil", "3D Animation & CGI", "1:55"), poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")] },
-  work("banxe", "Banxe", "Crypto & banking platform promo", "0:34"),
+  { ...work("centil", "Centil", "3D and CGI film", "1:55"), poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")] },
+  work("banxe", "Banxe", "Crypto and banking platform promo", "0:34"),
   work("google-meet", "Google Meet", "2D product explainer", "0:15"),
   work("vodafone", "Vodafone", "Field service software promo", "1:57"),
   work("nymcard", "NymCard", "Card issuing dashboard explainer", "0:43"),
@@ -51,10 +51,10 @@ export const CRAFT_CASES: Case[] = [
   work("refuelrs", "ReFuelrs", "Fuel delivery app explainer", "0:44"),
   work("fifteen", "Fifteen", "Brand motion promo", "0:31"),
   work("translinguist", "TransLinguist", "Multilingual meetings explainer", "0:33"),
-  work("microsoft-elearning", "Microsoft", "E-Learning explainer concept", "1:19"),
+  work("microsoft-elearning", "Microsoft", "E-learning explainer", "1:19"),
   work("retica", "Retica", "Product explainer", "1:06"),
-  work("banxe-iban", "Banxe", "IBAN & crypto banking explainer", "0:37"),
-  work("kiwus", "Kiwus Consulting", "Motion design", "0:14"),
+  work("banxe-iban", "Banxe", "IBAN and crypto banking explainer", "0:37"),
+  work("kiwus", "Kiwus", "Brand motion", "0:14"),
   work("soundstamp", "Soundstamp", "Product story video", "1:37"),
 ];
 
@@ -64,9 +64,9 @@ export const AI_CASES: Case[] = [
   work("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
   work("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
   work("golfone", "GolfOne", "Golf club booking software promo", "1:00"),
-  work("zenegy", "Zenegy", "Payroll & HR software brand video (Danish)", "1:12"),
+  work("zenegy", "Zenegy", "Payroll and HR software brand film", "1:12"),
   work("snappy", "Snappy", "Birthday reminder app promo", "0:50"),
-  work("openclaw", "OpenClaw", "AI agent teaser spot", "0:39"),
+  work("openclaw", "OpenClaw", "AI agent teaser", "0:39"),
   work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
   work("kraken", "Kraken", "Trading platform product video", "1:14"),
   work("prism-air", "Prism", "Airline content platform demo", "2:42"),
