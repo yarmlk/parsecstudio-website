@@ -24,7 +24,11 @@
 @font-face { font-family: "Instrument Serif"; src: url(fonts/instrument-serif.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: "Instrument Serif"; src: url(fonts/instrument-serif-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
 </style>
-<link rel="preload" href="video/site/showreel-first.jpg" as="image">
+<!-- the hero's first picture, fetched with the page. Desk: the film's first frame, which the light draws into WebGL, so
+     with CORS like the light's own request. Phone: the poster of its looping cut, its LCP; a plain <video> poster, so
+     no crossorigin, or the browser would fetch it a second time -->
+<link rel="preload" href="video/site/showreel-first.jpg" as="image" crossorigin="anonymous" media="(min-width: 900px)">
+<link rel="preload" href="video/site/showreel-glass.webp" as="image" type="image/webp" media="(max-width: 899px)" fetchpriority="high">
 </head>
 <body>
 <div id="root"></div>

@@ -29,13 +29,12 @@ function mediaVersions(base: string): Plugin {
     closeBundle() { if (base && outDir) rmSync(join(outDir, "video"), { recursive: true, force: true }); },
     resolveId: (s) => (s === id ? rid : null),
     load: (s) => (s === rid ? `export default ${JSON.stringify(table())};` : null),
-    // the page's own preloads of media get the same URL the code asks for: on the media host, versioned; a preload
-    // from the media host is fetched with CORS, as the light then draws that image into WebGL
+    // the page's own preloads of media get the same URL the code asks for: on the media host, versioned. Each preload
+    // states its own CORS mode in index.html (crossorigin only where the code fetches with CORS, as the light does for
+    // what it draws into WebGL): a preload whose mode differs from the request's is fetched twice
     transformIndexHtml: (html) => {
       const t = table();
-      return html
-        .replace(/"video\/site\/([\w.-]+)"/g, (m, f) => (t[f] ? `"${url(f, t[f])}"` : m))
-        .replace(/<link rel="preload"([^>]*href="https?:[^"]*")([^>]*)>/g, (m, a, b) => (m.includes("crossorigin") ? m : `<link rel="preload"${a}${b} crossorigin="anonymous">`));
+      return html.replace(/"video\/site\/([\w.-]+)"/g, (m, f) => (t[f] ? `"${url(f, t[f])}"` : m));
     },
   };
 }
