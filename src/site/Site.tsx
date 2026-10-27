@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from "react";
-import { CLIENT_LOGOS, LOGO, OPEN, REEL } from "../lib/assets";
+import { CLIENT_LOGOS, LOGO, OPEN } from "../lib/assets";
 import { easeMove } from "../lib/ease";
 import { CONTACT } from "../lib/facts";
 import { AiFlux } from "../ui/AiFlux";

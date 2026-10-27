@@ -5,12 +5,6 @@ export const LOGO = {
   markWhite: "logo/p-white.svg",
 } as const;
 
-/** 1920×1080 stills from the Parsec showreel (public/img/reel). */
-export const REEL = {
-  portrait: "img/reel/portrait.webp", robot: "img/reel/robot.webp", medieval: "img/reel/medieval.webp",
-  forest: "img/reel/forest.webp", astronaut: "img/reel/astronaut.webp", road: "img/reel/road.webp",
-} as const;
-
 /** White client logos on transparent, WebP (lossless), same optical box (public/img/clients): 320×118, and 640×236 for
  *  the three drawn wider than 160 px. */
 export const CLIENT_LOGOS: { id: string; name: string; file: string }[] = [
