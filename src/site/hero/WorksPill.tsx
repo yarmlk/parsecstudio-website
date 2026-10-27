@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CASES } from "../cases";
 import { useReduced } from "../ui";
 
@@ -19,15 +19,27 @@ export function WorksPill({ onGo }: { onGo: () => void }) {
     const t = setTimeout(() => setWarm(true), 1600);
     return () => clearTimeout(t);
   }, []);
+  // the stills pass only while the pill is on screen and the tab is in front (no stills fetched for nobody)
+  const pill = useRef<HTMLButtonElement | null>(null);
+  const [seen, setSeen] = useState(true);
+  const [front, setFront] = useState(() => typeof document === "undefined" || !document.hidden);
   useEffect(() => {
-    if (reduced || !warm) return;
+    const onVis = () => setFront(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    const el = pill.current;
+    const io = el && typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(([e]) => setSeen(e.isIntersecting)) : null;
+    if (el && io) io.observe(el);
+    return () => { document.removeEventListener("visibilitychange", onVis); io?.disconnect(); };
+  }, []);
+  useEffect(() => {
+    if (reduced || !warm || !seen || !front) return;
     const t = setInterval(() => setI((x) => (x + 1) % STILLS.length), HOLD);
     return () => clearInterval(t);
-  }, [reduced, warm]);
+  }, [reduced, warm, seen, front]);
   const shown = warm ? [i, (i + 1) % STILLS.length] : [0];
 
   return (
-    <button type="button" className="wp" onClick={onGo} aria-label="Selected works: go to the cases">
+    <button ref={pill} type="button" className="wp" onClick={onGo} aria-label="Selected works: go to the cases">
       <span className="wp__win" aria-hidden>
         {STILLS.map((s, k) => (shown.includes(k) || k === (i + STILLS.length - 1) % STILLS.length) && (
           <img key={s.src} src={s.src} alt="" decoding="async" className={k === i ? "is-on" : undefined} style={{ objectPosition: s.pos }} />
