@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties, memo } from "react";
+import { CLIENT_LOGOS } from "../lib/assets";
 import { REVIEWS } from "../lib/facts";
 import { useReduced } from "./ui";
 
@@ -22,11 +23,13 @@ const MOB: Col[] = [{ ids: [0, 1, 2, 3], dir: -1, speed: 13, start: 0 }];
 
 function Quote({ i, copy }: { i: number; copy: boolean }) {
   const r = REVIEWS[i];
+  // the client's logo as the clients grid shows it (the same file, so it is fetched once)
+  const logo = CLIENT_LOGOS.find((c) => c.name === r.client)?.file ?? r.logo;
   return (
     <figure className="st-quote">
       <span className="st-quote__lit" aria-hidden />
       <blockquote>{r.text.map((p, k) => <p key={k}>{p}</p>)}</blockquote>
-      <figcaption><img src={r.logo} alt={copy ? "" : r.client} /></figcaption>
+      <figcaption><img src={logo} alt={copy ? "" : r.client} /></figcaption>
     </figure>
   );
 }

@@ -11,12 +11,13 @@ export const REEL = {
   forest: "img/reel/forest.webp", astronaut: "img/reel/astronaut.webp", road: "img/reel/road.webp",
 } as const;
 
-/** White client logos, 475×175 PNG, same optical box (public/img/clients). */
+/** White client logos on transparent, WebP (lossless), same optical box (public/img/clients): 320×118, and 640×236 for
+ *  the three drawn wider than 160 px. */
 export const CLIENT_LOGOS: { id: string; name: string; file: string }[] = [
   ["google", "Google"], ["microsoft", "Microsoft"], ["jnj", "Johnson & Johnson"], ["vodafone", "Vodafone"],
   ["tefal", "Tefal"], ["karcher", "Kärcher"], ["buldak", "Buldak"], ["kinder", "Kinder"],
   ["fifa", "FIFA"], ["henkel", "Henkel"], ["unilever", "Unilever"], ["nasa", "NASA"],
-].map(([id, name]) => ({ id, name, file: `img/clients/${id}.png` }));
+].map(([id, name]) => ({ id, name, file: `img/clients/${id}.webp` }));
 
 /** 4K light plates (public/img/open). */
 export const OPEN = {
