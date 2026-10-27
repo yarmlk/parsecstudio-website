@@ -11,8 +11,13 @@ type Sent = { first: string; h: number };
 
 const FORM_URL = "https://formsubmit.co/ajax/8adc7b1a3c7fbd37d9b484be18eec5fe";
 
+/** a failed send is tried again after these waits (ms), so a note is not lost to one bad moment of the network or the
+ *  service; the retries run while the page is open */
+const RETRY = [3000, 10000];
+
 /** send the note without waiting on the form service (it can take half a minute to answer). A plain form-encoded POST
- *  needs no preflight, so keepalive carries it through even if the page is closed straight after. */
+ *  needs no preflight, so keepalive carries it through even if the page is closed straight after. FormSubmit answers
+ *  {"success":"true"}; anything else (an error status, another answer, no answer) counts as a failure. */
 function deliver(f: FormData) {
   const v = (k: string) => String(f.get(k) ?? "").trim();
   const from = v("company") ? `${v("name")}, ${v("company")}` : v("name");
@@ -21,7 +26,15 @@ function deliver(f: FormData) {
     Name: v("name"), Email: v("email"), Company: v("company") || "—", Message: v("msg") || "—",
     _subject: `Website: ${from}`, _replyto: v("email"), _template: "box", _captcha: "false",
   });
-  fetch(FORM_URL, { method: "POST", body, keepalive: true, headers: { Accept: "application/json" } }).catch(() => {});
+  const send = (n: number) => {
+    fetch(FORM_URL, { method: "POST", body, keepalive: true, headers: { Accept: "application/json" } })
+      .then(async (r) => {
+        const j: unknown = r.ok ? await r.json().catch(() => null) : null;
+        if (String((j as { success?: unknown } | null)?.success) !== "true") throw new Error("not sent");
+      })
+      .catch(() => { if (n < RETRY.length) window.setTimeout(() => send(n + 1), RETRY[n]); });
+  };
+  send(0);
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
