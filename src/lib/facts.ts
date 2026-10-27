@@ -18,21 +18,21 @@ export const SERVICES: { id: string; name: T; line: T }[] = [
 
 /** Client reviews from parsec.studio, verbatim (English in both languages: they are the client's words). */
 export const REVIEWS: { client: string; logo: string; text: string[] }[] = [
-  { client: "Google", logo: "img/clients/google.png", text: [
+  { client: "Google", logo: "img/clients/google.webp", text: [
     "We appreciate the entire Parsec Studio team for delivering a vibrant and stylish animated video, meeting all requirements and deadlines.",
     "They were fully engaged at every stage and aligned with our vision, especially in adhering to Google's visual style.",
     "Looking forward to future collaborations!",
   ] },
-  { client: "Tefal", logo: "img/clients/tefal.png", text: [
+  { client: "Tefal", logo: "img/clients/tefal.webp", text: [
     "Parsec Studio effectively translated our brand vision into stunning 3D graphics, giving our product models a modern appearance on screen.",
     "Their high-quality graphics beautifully showcase our premium tableware.",
     "Wishing the team continued success and exciting new projects ahead!",
   ] },
-  { client: "Microsoft", logo: "img/clients/microsoft.png", text: [
+  { client: "Microsoft", logo: "img/clients/microsoft.webp", text: [
     "Parsec Studio stands out as an exceptional editing and production partner among the numerous teams we have collaborated with.",
     "Their dedication to delivering top-tier work, meticulous attention to detail, seamless communication, and strict adherence to deadlines render them invaluable to any fortunate client.",
   ] },
-  { client: "Henkel", logo: "img/clients/henkel.png", text: [
+  { client: "Henkel", logo: "img/clients/henkel.webp", text: [
     "Thank you for the fast, high-quality and well-coordinated work!",
     "The video turned out at the highest level. We were pleasantly surprised that the work of the application is shown even better than it actually is.",
     "We were especially impressed by the overall aesthetics of the video, it is immediately noticeable that the team has really good taste.",
