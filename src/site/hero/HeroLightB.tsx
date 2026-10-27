@@ -674,9 +674,11 @@ export const HeroLightB = memo(function HeroLightB({ mode, ctl, reelRef, onPhase
     v.addEventListener("progress", onProgress);
     /** Mbps, a lower bound (the browser may pause between bursts); 0 until it has fetched for over a second */
     const measured = () => (net.mbps && net.at - net.t0 > 1000 ? (net.end * net.mbps) / ((net.at - net.t0) / 1000) : 0);
-    /** device px the film has to fill: desk, the frame (cover); phone, its width (watching, the whole film fits it) */
+    /** device px the film has to fill: desk, the frame (cover); phone, its width (watching, the whole film fits it).
+        The on-screen size: the site is drawn at its design width and scaled, so offsetWidth is not what is seen */
     const needPx = () => {
-      const W = box.offsetWidth, H = box.offsetHeight, d = window.devicePixelRatio || 1;
+      const r = box.getBoundingClientRect();
+      const W = r.width, H = r.height, d = window.devicePixelRatio || 1;
       return (mode === "desk" ? Math.max(W, (H * 16) / 9) : W) * d;
     };
     /** the rendition to watch, by the screen: on a connection that says it is slow, the 540p. The desk takes the
