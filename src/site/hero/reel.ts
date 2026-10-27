@@ -40,8 +40,9 @@ export const REEL_SRC = {
   /** behind the glass on the phone: its first 8 s at 480p, silent (~0.5 MB), looping; "Play showreel" switches to
       the film itself */
   glass: media("showreel-glass.mp4"),
-  /** the glass loop's own first frame (a calm, sharp one), shown until it plays */
-  glassPoster: media("showreel-glass.jpg"),
+  /** the glass loop's own first frame (a calm, sharp one), shown until it plays: the phone's LCP, so a WebP
+      (~35 KB against the JPEG's 75), preloaded by index.html for the phone */
+  glassPoster: media("showreel-glass.webp"),
   /** reduced motion, save-data */
   poster: media("showreel.jpg"),
   /** the film's own first frame (960×540, ~24 KB): on the glass at once, until the film's frames arrive, so the film
