@@ -9,9 +9,8 @@ import { useReduced } from "./ui";
    the loop has no seam; the section's top and bottom fade the cards in and out.
    The drift is a CSS animation of the track's transform: the compositor runs it, so it stays smooth even while the
    page's script or the GPU is busy elsewhere. A light loop only reads where each track is and lets a card catch the
-   light as it passes the middle of the section. The drift holds still while the pointer is over the reviews or the
-   keyboard is on them (the section takes the focus), so a quote can be read to the end. Reduced motion: the columns
-   stand still, every card in view. */
+   light as it passes the middle of the section. The drift never stops (held under the pointer, it read as a stutter
+   whenever the page scrolled past under the cursor). Reduced motion: the columns stand still, every card in view. */
 
 type Col = { ids: number[]; dir: 1 | -1; speed: number; start: number };
 /** speed in px/s at the site's scale; start = phase of the loop at first paint (0..1) */
@@ -107,7 +106,7 @@ function ReviewColumnsBase({ mode }: { mode: "desk" | "mob" }) {
   }, [cols, reduced]);
 
   return (
-    <div ref={view} className={`st-rev${reduced ? " is-still" : ""}`} role="region" aria-label="Client reviews" tabIndex={reduced ? undefined : 0}>
+    <div ref={view} className={`st-rev${reduced ? " is-still" : ""}`} role="region" aria-label="Client reviews">
       {cols.map((c, ci) => (
         <div key={ci} className="st-rev__col">
           <div className={`st-rev__track${reduced ? "" : c.dir < 0 ? " is-up" : " is-down"}`} style={{ "--rev-dur": `${60 / c.speed}s` } as CSSProperties}>

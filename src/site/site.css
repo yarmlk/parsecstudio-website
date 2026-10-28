@@ -351,15 +351,9 @@
 }
 .st-rev__col { min-width: 0; }
 .st-rev__track { position: relative; will-change: transform; }
-/* the drift: one list's height per loop (each track holds its list twice), run by the compositor; it holds still
-   under the pointer or while the keyboard is on the reviews */
+/* the drift: one list's height per loop (each track holds its list twice), run by the compositor, never paused */
 .st-rev__track.is-up { animation: st-rev-up var(--rev-dur, 40s) linear var(--rev-delay, 0s) infinite; }
 .st-rev__track.is-down { animation: st-rev-down var(--rev-dur, 40s) linear var(--rev-delay, 0s) infinite; }
-.st-rev:focus-within .st-rev__track { animation-play-state: paused; }
-@media (hover: hover) { .st-rev:hover .st-rev__track { animation-play-state: paused; } }
-/* the keyboard on the reviews: the section's own ring would sit outside its fade mask, so the cards' glass edges warm */
-.st-site .st-rev:focus-visible { outline: none; }
-.st-rev:focus-visible .st-quote { box-shadow: var(--glass-edge), inset 0 0 0 1px rgba(246, 200, 140, .5); }
 @keyframes st-rev-up { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, -50%, 0); } }
 @keyframes st-rev-down { from { transform: translate3d(0, -50%, 0); } to { transform: translate3d(0, 0, 0); } }
 .st-rev__set { display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px; }
