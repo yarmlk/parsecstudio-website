@@ -146,8 +146,11 @@
 /* the rail: one hairline, the proof on the left, six client marks on the grid */
 .st-hero__rail { position: absolute; z-index: 32; left: 72px; right: 72px; bottom: 0; height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 48px;
   border-top: 1px solid rgba(242, 240, 235, .12); animation: st-fade 900ms var(--ease-enter) 700ms backwards; }
-.st-hero__proof { flex: none; display: flex; align-items: center; gap: 14px; font-size: 13.5px; line-height: 1.4; color: var(--ash); }
-.st-hero__proof i { display: block; width: 3px; height: 3px; border-radius: 50%; background: var(--mute); }
+/* the studio in numbers: the figure in the title's face, the word after it quieter; spaced, no separators */
+.st-proof { margin: 0; display: flex; align-items: baseline; gap: 40px; font-size: 13.5px; line-height: 1.4; color: var(--ash); white-space: nowrap; }
+.st-proof__i { display: inline-flex; align-items: baseline; gap: 7px; }
+.st-proof b { font-family: var(--font-display); font-weight: 400; font-size: 21px; letter-spacing: .01em; color: var(--paper); }
+.st-hero__proof { flex: none; }
 .st-hero__logos { flex: 1; max-width: 700px; list-style: none; margin: 0; padding: 0; display: flex; align-items: center; justify-content: space-between; }
 .st-hero__logos li { display: flex; align-items: center; }
 .st-hero__logos img { display: block; width: calc(var(--w) * .34px); height: auto; opacity: .5; transition: opacity var(--t-button) var(--ease-enter); }
@@ -562,7 +565,8 @@
 .st-site--mob .st-hero__in { left: 20px; right: 20px; bottom: 48px; width: auto; gap: 16px; align-items: center; text-align: center; }
 .st-site--mob .st-hero__h { font-size: 31px; line-height: 1.1; }
 .st-site--mob .st-hero__acts:empty { display: none; }
-.st-site--mob .st-hero__sub { margin: -4px 0 0; font-size: 14px; line-height: 1.5; color: var(--fog); }
+.st-site--mob .st-hero__sub { margin: -2px 0 0; justify-content: center; gap: 22px; font-size: 13px; color: var(--fog); }
+.st-site--mob .st-proof b { font-size: 18px; }
 .st-site--mob .st-hero__acts { justify-content: center; margin-top: 6px; }
 .st-site--mob .wp { height: 54px; gap: 12px; font-size: 14px; }
 .st-site--mob .wp__win { width: 72px; height: 42px; }

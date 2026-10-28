@@ -26,6 +26,16 @@ import { WorksPill } from "./hero/WorksPill";
    Structure, lines and rhythm follow the live site (Services · Cases · Clients · Reviews · Contact): one screen
    per section, a short rule over a big title, the ghost word behind it, the section number on the right. */
 
+/** the studio in three numbers, under the hero's title (the phone) or on the rail (the desk) */
+const PROOF: [string, string][] = [["13+", "years"], ["500+", "projects"], ["100+", "brands"]];
+function Proof({ className, rim }: { className: string; rim?: boolean }) {
+  return (
+    <p className={`st-proof ${className}`} data-rim={rim ? "" : undefined}>
+      {PROOF.map(([n, l]) => <span key={l} className="st-proof__i"><b>{n}</b> {l}</span>)}
+    </p>
+  );
+}
+
 export type SiteMode = "desk" | "mob";
 export type SecId = "hero" | "services" | "cases" | "clients" | "reviews" | "contact";
 
@@ -388,8 +398,8 @@ export function Site({
           {desk ? <HeroLightB mode={mode} ctl={heroCtl} reelRef={reelRef} onPhase={onReelPhase} /> : <HeroMob />}
           <div className="st-hero__shade" aria-hidden />
           <div className="st-hero__in" inert={reelPh !== "idle" || undefined}>
-            <h1 className="st-hero__h" data-rim="">Director-led<br />video production</h1>
-            {!desk && <p className="st-hero__sub" data-rim="">Full-cycle video production.<br />13+ years, 500+ projects for 100+ brands.</p>}
+            <h1 className="st-hero__h" data-rim="">Full-cycle<br />video production</h1>
+            {!desk && <Proof className="st-hero__sub" rim />}
             <div className="st-hero__acts" data-rim="">
               {/* the phone keeps one control on the first screen: Play showreel */}
               {desk && <WorksPill onGo={() => goTo("cases")} />}
@@ -399,7 +409,7 @@ export function Site({
           {desk && <ReelCursor hero={heroRef} ctl={heroCtl} mode={mode} phase={reelPh} btnRef={reelBtn} docked={reelDock} onOpen={openReel} tease={tease} onNoLight={dockReel} />}
           {desk && (
             <div className="st-hero__rail" data-rim="" inert={reelPh !== "idle" || undefined}>
-              <span className="st-hero__proof">Full-cycle video production<i aria-hidden /> 13+ years, 500+ projects for 100+ brands</span>
+              <Proof className="st-hero__proof" />
               <ul className="st-hero__logos" aria-label="Clients">
                 {HERO_LOGOS.map((l) => <li key={l.id}><img src={l.file} alt={l.name} width={320} height={118} style={{ ["--w" as string]: LOGO_W[l.id] ?? 220 }} /></li>)}
               </ul>
