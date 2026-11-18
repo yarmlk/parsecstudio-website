@@ -590,8 +590,9 @@
 .st-svc__reel img, .st-svc__vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .st-svc__vid { opacity: 0; transition: opacity 600ms var(--ease-enter); }
 .st-svc__vid.is-on { opacity: 1; }
-.st-site--mob .st-svc__list { flex: none; padding-top: 14px; }
-.st-site--mob .st-svc__item { gap: 7px; padding: 14px 0 18px; }
+/* the phone: the list takes the whole column, each name and its loop on the centre line */
+.st-site--mob .st-svc__list { flex: none; align-self: stretch; padding-top: 14px; }
+.st-site--mob .st-svc__item { align-items: center; gap: 7px; padding: 14px 0 18px; text-align: center; }
 .st-site--mob .st-svc__name { font-size: 30px; white-space: normal; }
 .st-site--mob .st-cases { padding-bottom: 0; }
 .st-site--mob .st-row { flex: none; margin: 0 -20px; padding-left: 20px; scroll-padding-left: 20px; }
