@@ -10,9 +10,9 @@ import { media } from "../../lib/media";
  */
 /** the film in three renditions, all with sound (H.264 + AAC, the index up front, a keyframe at least every 2 s) */
 export const REELS = [
-  { src: media("showreel-540a.mp4"), w: 960, mbps: 0.84 },   // ~5.8 MB
-  { src: media("showreel-720.mp4"), w: 1280, mbps: 2.05 },   // ~14 MB
-  { src: media("showreel-1080.mp4"), w: 1920, mbps: 4.52 },  // ~31 MB
+  { src: media("showreel-540a.mp4"), w: 960, mbps: 0.93 },   // ~8.4 MB
+  { src: media("showreel-720.mp4"), w: 1280, mbps: 1.76 },   // ~16 MB
+  { src: media("showreel-1080.mp4"), w: 1920, mbps: 4.19 },  // ~38 MB
 ] as const;
 export type Reel = (typeof REELS)[number];
 
@@ -37,7 +37,7 @@ export const lighter = (src: string): Reel => REELS[Math.max(0, REELS.findIndex(
 export const reelOf = (src: string): Reel | undefined => REELS.find((r) => r.src === src);
 
 export const REEL_SRC = {
-  /** behind the glass on the phone: its first 8 s at 480p, silent (~0.5 MB), looping; "Play showreel" switches to
+  /** behind the glass on the phone: its first 9 s at 480p, silent (~0.5 MB), looping; "Play showreel" switches to
       the film itself */
   glass: media("showreel-glass.mp4"),
   /** the glass loop's own first frame (a calm, sharp one), shown until it plays: the phone's LCP, so a WebP
@@ -45,10 +45,10 @@ export const REEL_SRC = {
   glassPoster: media("showreel-glass.webp"),
   /** reduced motion, save-data */
   poster: media("showreel.jpg"),
-  /** the film's own first frame (960×540, ~24 KB): on the glass at once, until the film's frames arrive, so the film
+  /** the film's own first frame (960×540, ~16 KB): on the glass at once, until the film's frames arrive, so the film
       starts from exactly this picture; also the <video>'s poster while a source loads */
   first: media("showreel-first.jpg"),
-  dur: "0:55",
+  dur: "1:12",
 } as const;
 
 /** idle: behind the glass · opening: the rim flares and goes down · open: watching · closing: the rim comes back up */
