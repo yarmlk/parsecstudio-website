@@ -75,12 +75,12 @@ export const AI_CASES: Case[] = [
   work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
-/** our vertical series, 9:16 episodes (working cuts: the finished versions replace them) */
+/** our vertical series, 9:16 episodes (the final cuts, Nov 2026) */
 const tall = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur, 9 / 16), stills: [still(id, title)] });
 export const VERTICAL_CASES: Case[] = [
-  tall("vd-blood-sisters", "Blood Sisters", "Gothic vertical drama", "2:18"),
-  tall("vd-miami", "Sentenced to Love Him", "Vertical crime romance", "2:05"),
-  tall("vd-arena", "The Laurel", "Vertical historical drama", "2:47"),
+  tall("vd-blood-sisters", "Blood Sisters", "Gothic vertical drama", "2:28"),
+  tall("vd-miami", "Sentenced to Love Him", "Vertical crime romance", "2:08"),
+  tall("vd-arena", "The Laurel", "Vertical historical drama", "2:36"),
 ];
 
 /** the Cases row: the strongest, best-known names first, then the rest of the AI works, then the rest of motion */
