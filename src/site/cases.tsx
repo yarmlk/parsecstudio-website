@@ -59,6 +59,14 @@ export const CRAFT_CASES: Case[] = [
   work("translinguist", "TransLinguist", "Multilingual meetings explainer", "0:33"),
   work("fifteen", "Fifteen", "Brand motion promo", "0:31"),
   work("retica", "Retica", "Product explainer", "1:06"),
+  // the rest of our showcase, after Vlad's order
+  work("nymcard", "NymCard", "Card issuing dashboard explainer", "0:43"),
+  work("contentstack", "Contentstack", "Content platform explainer", "0:22"),
+  work("refuelrs", "ReFuelrs", "Fuel delivery app explainer", "0:44"),
+  work("microsoft-elearning", "Microsoft", "E-learning explainer", "1:19"),
+  work("banxe-iban", "Banxe", "IBAN and crypto banking explainer", "0:37"),
+  work("kiwus", "Kiwus", "Brand motion", "0:14"),
+  work("soundstamp", "Soundstamp", "Product story video", "1:37"),
 ];
 
 /** AI works, in the order Vlad set (Nov 2026); the films re-encoded and hosted here like the cases, each poster a
@@ -76,6 +84,10 @@ export const AI_CASES: Case[] = [
   work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
   work("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
+  // the rest of our showcase, after Vlad's order (Zenegy first: a strong one)
+  work("zenegy", "Zenegy", "Payroll and HR software brand film", "1:12"),
+  work("prism-air", "Prism", "Airline content platform demo", "2:42"),
+  work("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
 ];
 /** our vertical series, 9:16 episodes (the final cuts, Nov 2026) */
 const tall = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur, 9 / 16), stills: [still(id, title)] });
@@ -86,7 +98,7 @@ export const VERTICAL_CASES: Case[] = [
 ];
 
 /** the Cases row: Vlad's order first (Nov 2026), then the rest of the AI works, then the rest of motion */
-const LEAD = ["google-meet", "golfone", "ikea", "centil", "buldak", "beyond", "banxe", "arauco", "learn-music", "snappy", "dehealth", "upl", "vodafone", "hydracelt"];
+const LEAD = ["google-meet", "golfone", "ikea", "centil", "buldak", "beyond", "banxe", "arauco", "learn-music", "snappy", "dehealth", "upl", "vodafone", "hydracelt", "zenegy"];
 const ALL = [...AI_CASES, ...CRAFT_CASES];
 export const CASES: Case[] = [...LEAD.map((id) => ALL.find((c) => c.id === id)!), ...ALL.filter((c) => !LEAD.includes(c.id))];
 
