@@ -86,7 +86,6 @@ export const AI_CASES: Case[] = [
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
   // the rest of our showcase, after Vlad's order (Zenegy first: a strong one)
   work("zenegy", "Zenegy", "Payroll and HR software brand film", "1:12"),
-  work("prism-air", "Prism", "Airline content platform demo", "2:42"),
   work("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
 ];
 /** our vertical series, 9:16 episodes (the final cuts, Nov 2026) */
