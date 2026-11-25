@@ -35,56 +35,58 @@ const still = (id: string, alt: string, pos = "50% 50%"): Still => ({ src: media
 /** a work from one of our Vimeo showcases (title and running time from it), its film hosted here like the others */
 const work = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur), stills: [still(id, title)] });
 
-/** our motion design, 3D and CGI: Centil, then the showcase "SaaS & Tech Explainers" in its order */
+/** a work whose film is wider than 16:9 (the letterbox cut away) */
+const wide = (id: string, title: string, type: string, dur: string, ar: number): Case => ({ ...work(id, title, type, dur), film: film(id, dur, ar) });
+
+/** our motion design, 3D and CGI, in the order Vlad set (Nov 2026) */
 export const CRAFT_CASES: Case[] = [
   // like the other works: the type, the name, the length (its film is wider than 16:9)
   { ...work("centil", "Centil", "3D and CGI film", "1:55"), poster: "55% 50%", film: film("centil", "1:55", 1920 / 772), stills: [still("centil", "The Earth at night from orbit", "55% 50%")] },
-  work("banxe", "Banxe", "Crypto and banking platform promo", "0:34"),
-  work("google-meet", "Google Meet", "2D product explainer", "0:15"),
+  work("beyond", "Beyond", "Health tech CGI showcase", "0:48"),
+  work("hydracelt", "Hydracelt", "Energy drink 3D product film", "0:19"),
   work("vodafone", "Vodafone", "Field service software promo", "1:57"),
-  work("nymcard", "NymCard", "Card issuing dashboard explainer", "0:43"),
+  wide("jerusalem", "Jerusalem", "Cinematic game trailer", "2:16", 3840 / 1608),
+  work("upl", "Ukrainian Premier League", "CGI club intros", "0:54"),
+  work("tefal", "Tefal", "3D product film", "0:15"),
+  wide("prison", "A Prison Without Walls", "3D short film", "0:59", 3840 / 1348),
+  work("google-meet", "Google Meet", "2D product explainer", "0:15"),
+  work("banxe", "Banxe", "Crypto and banking platform promo", "0:34"),
+  work("fifa", "FIFA", "World Cup Qatar 2022 coin film", "0:17"),
   work("dehealth", "DeHealth", "Health super app promo", "0:28"),
   work("frontdesk", "Frontdesk", "AI voice emotions promo", "2:35"),
   work("scichart", "SciChart", "Data visualization library promo", "1:16"),
-  work("contentstack", "Contentstack", "Content platform explainer", "0:22"),
   work("wilde", "WILDE", "Streaming platform promo", "1:26"),
-  work("refuelrs", "ReFuelrs", "Fuel delivery app explainer", "0:44"),
-  work("fifteen", "Fifteen", "Brand motion promo", "0:31"),
   work("translinguist", "TransLinguist", "Multilingual meetings explainer", "0:33"),
-  work("microsoft-elearning", "Microsoft", "E-learning explainer", "1:19"),
+  work("fifteen", "Fifteen", "Brand motion promo", "0:31"),
   work("retica", "Retica", "Product explainer", "1:06"),
-  work("banxe-iban", "Banxe", "IBAN and crypto banking explainer", "0:37"),
-  work("kiwus", "Kiwus", "Brand motion", "0:14"),
-  work("soundstamp", "Soundstamp", "Product story video", "1:37"),
 ];
 
-/** AI works, in the order of our Vimeo showcase "AI Video Production" (titles and running times from it), the films
- *  re-encoded and hosted here like the cases; each poster a strong frame of its film */
+/** AI works, in the order Vlad set (Nov 2026); the films re-encoded and hosted here like the cases, each poster a
+ *  strong frame of its film. Arauco is one minute cut from its product films, three at a time. */
 export const AI_CASES: Case[] = [
-  work("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
-  work("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
   work("golfone", "GolfOne", "Golf club booking software promo", "1:00"),
-  work("zenegy", "Zenegy", "Payroll and HR software brand film", "1:12"),
+  work("buldak", "Buldak", "Spicy noodles brand video", "1:37"),
+  work("ikea", "IKEA", "AI brand film", "0:15"),
+  work("arauco", "Arauco", "Building materials product films", "0:59"),
+  work("opencreator", "OpenCreator", "AI video platform promo", "1:09"),
+  work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   work("snappy", "Snappy", "Birthday reminder app promo", "0:50"),
   work("openclaw", "OpenClaw", "AI agent teaser", "0:39"),
-  work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
   work("kraken", "Kraken", "Trading platform product video", "1:14"),
-  work("prism-air", "Prism", "Airline content platform demo", "2:42"),
+  work("myclaw", "MyClaw", "AI agent product promo", "0:55"),
   work("netflect", "Netflect", "Customer engagement platform explainer", "1:51"),
-  work("rightcrowd-pass", "RightCrowd Pass", "Mobile biometric access product video", "1:10"),
-  work("learn-music", "Learn Music Anywhere", "Online music lessons promo", "1:06"),
   work("rightcrowd-ai", "RightCrowd AI", "SaaS explainer", "0:57"),
 ];
 /** our vertical series, 9:16 episodes (the final cuts, Nov 2026) */
 const tall = (id: string, title: string, type: string, dur: string): Case => ({ id, title, type, dur, poster: "50% 50%", film: film(id, dur, 9 / 16), stills: [still(id, title)] });
 export const VERTICAL_CASES: Case[] = [
-  tall("vd-blood-sisters", "Blood Sisters", "Gothic vertical drama", "2:28"),
-  tall("vd-miami", "Sentenced to Love Him", "Vertical crime romance", "2:08"),
   tall("vd-arena", "The Laurel", "Vertical historical drama", "2:36"),
+  tall("vd-miami", "Sentenced to Love Him", "Vertical crime romance", "2:08"),
+  tall("vd-blood-sisters", "Blood Sisters", "Gothic vertical drama", "2:28"),
 ];
 
-/** the Cases row: the strongest, best-known names first, then the rest of the AI works, then the rest of motion */
-const LEAD = ["buldak", "banxe", "google-meet", "snappy", "vodafone", "contentstack", "microsoft-elearning", "centil"];
+/** the Cases row: Vlad's order first (Nov 2026), then the rest of the AI works, then the rest of motion */
+const LEAD = ["google-meet", "golfone", "ikea", "centil", "buldak", "beyond", "banxe", "arauco", "learn-music", "snappy", "dehealth", "upl", "vodafone", "hydracelt"];
 const ALL = [...AI_CASES, ...CRAFT_CASES];
 export const CASES: Case[] = [...LEAD.map((id) => ALL.find((c) => c.id === id)!), ...ALL.filter((c) => !LEAD.includes(c.id))];
 
